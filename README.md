@@ -10,27 +10,21 @@ Then, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in the browser.
 
 ## Contributing
 
-**main** - stable branch
-**dev** - active integration branch
-**feat/\<feature name\>** - atomic branches off of dev
+- **main** - stable branch
+- **dev** - active integration branch
+- **feat/\<feature name\>** - atomic branches off of dev
 
-Feature branches should be smaller than a full story point to avoid merge conflicts.
-Create a pull request to dev whenever a feature is complete.
+- Feature branches should be smaller than a full story point to avoid merge conflicts.
+- Create a pull request to dev whenever a feature is complete.
 
 **Example Workflow in Git**
-We will use the creation of a student-login feature as an example.
+- We will use the creation of a student-login feature as an example.
 
 1. Create a new branch for the feature you are creating
 ```bash
