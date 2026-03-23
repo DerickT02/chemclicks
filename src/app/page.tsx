@@ -1,17 +1,36 @@
+import Lesson_Overview from "../components/homepage/Lesson_Overview";
+import EmailField from "../components/ui/EmailField";
+
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-grow flex-col items-center justify-center py-20 px-4">
-        <div className="text-center">
-          <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-white">
+    <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-[#0d1117]">
+      {/* Main Content Area */}
+      <main className="flex-grow flex flex-col w-full">
+        
+        {/* --- Hero Section --- */}
+        <section className="flex flex-col items-center justify-center py-24 px-4 text-center">
+          <h1 className="mb-4 text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
             Welcome to ChemClicks
           </h1>
           <p className="max-w-md text-lg text-gray-600 dark:text-gray-400">
             Your chemistry learning platform
           </p>
-        </div>
+        </section>
+
+        {/* --- Newsletter Section --- */}
+        <section className="py-20 px-8 md:px-16 w-full max-w-7xl mx-auto">
+          <div className="w-full">
+            <EmailField />
+          </div>
+        </section>
+
+        {/* --- Lesson Overview Section --- */}
+        <section className="w-full border-t border-[#30363d]">
+          <Lesson_Overview />
+        </section>
       </main>
 
+      {/* --- Footer Section --- */}
       <footer className="bg-slate-900 text-slate-300">
         <div className="mx-auto max-w-7xl px-8 py-16">
           <div className="mb-6 text-xs uppercase tracking-wide text-slate-500">
