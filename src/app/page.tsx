@@ -1,5 +1,4 @@
 import Lesson_Overview from "../components/homepage/Lesson_Overview";
-import EmailField from "../components/ui/EmailField";
 
 export default function Home() {
   return (
@@ -20,7 +19,6 @@ export default function Home() {
         {/* --- Newsletter Section --- */}
         <section className="py-20 px-8 md:px-16 w-full max-w-7xl mx-auto">
           <div className="w-full">
-            <EmailField />
           </div>
         </section>
 
