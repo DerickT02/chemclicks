@@ -6,6 +6,8 @@ First, download the necessary packages:
 npm install
 ```
 
+- **Environment**: copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from your Supabase project (**Settings → API**).
+
 Then, run the development server:
 
 ```bash
@@ -58,9 +60,11 @@ git push origin feat/student-login
 
 ## Resources
 
-- [Best place for general documentation](https://devdocs.io/)
-- [Javascript Basics](https://javascript.info/)
-- [TypeScript Docs](https://www.typescriptlang.org/docs/)
-- [Next.js Docs](https://nextjs.org/docs)
-- [Tailwind Docs](https://tailwindcss.com/docs/installation/using-vite)
-- [Supabase Docs](https://supabase.com/docs)
+- [DevDocs (aggregated docs)](https://devdocs.io/)
+- [JavaScript](https://javascript.info/)
+- [TypeScript](https://www.typescriptlang.org/docs/)
+- [React](https://react.dev/)
+- [Next.js](https://nextjs.org/docs)
+- [Tailwind CSS](https://tailwindcss.com/docs)
+- [Supabase](https://supabase.com/docs)
+- [Supabase Auth with Next.js](https://supabase.com/docs/guides/auth/server-side/nextjs)
