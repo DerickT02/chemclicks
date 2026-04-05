@@ -16,7 +16,7 @@ export default function CreateAccountPage() {
           <AuthFooter className="text-zinc-600 dark:text-zinc-400">
             Already have an account?{" "}
             <Link
-              href="/login"
+              href="/login/teacher"
               className="font-medium text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100"
             >
               Sign in

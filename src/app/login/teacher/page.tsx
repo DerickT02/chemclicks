@@ -15,7 +15,7 @@ export default function LoginPage() {
         title="Login"
         footer={
           <AuthFooter className="flex flex-col gap-2">
-            <Link href="/create-account" className={authSecondaryLinkClassName}>
+            <Link href="/create-account/teacher" className={authSecondaryLinkClassName}>
               Create account
             </Link>
             <button type="button" className={authSecondaryLinkClassName}>
