@@ -8,7 +8,7 @@ import {
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
 
-export default function LoginPage() {
+export default function TeacherLoginPage() {
   return (
     <AuthPageLayout>
       <AuthCard

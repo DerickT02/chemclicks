@@ -38,13 +38,18 @@ export function AuthCard({
   );
 }
 
+const authInputErrorClassName =
+  "border-red-500 focus:border-red-500 focus:ring-red-500 dark:border-red-500";
+
 export function AuthField({
   label,
   id,
+  error,
   ...inputProps
 }: {
   label: string;
   id: string;
+  error?: string;
 } & Omit<ComponentProps<"input">, "id" | "className">) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -54,7 +59,22 @@ export function AuthField({
       >
         {label}
       </label>
-      <input id={id} className={authInputClassName} {...inputProps} />
+      <input
+        id={id}
+        className={`${authInputClassName} ${error ? authInputErrorClassName : ""}`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        {...inputProps}
+      />
+      {error ? (
+        <p
+          id={`${id}-error`}
+          className="text-sm text-red-600 dark:text-red-400"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

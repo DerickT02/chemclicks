@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState, type FormEvent } from "react";
 import {
   AuthCard,
   AuthField,
@@ -6,8 +9,29 @@ import {
   AuthPageLayout,
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
+import { validateTeacherSignupPassword } from "@/lib/auth/validate-teacher-password";
 
-export default function CreateAccountPage() {
+export default function TeacherCreateAccountPage() {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | undefined>();
+  const [confirmError, setConfirmError] = useState<string | undefined>();
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setPasswordError(undefined);
+    setConfirmError(undefined);
+
+    const result = validateTeacherSignupPassword(password, confirmPassword);
+    if (!result.valid) {
+      setPasswordError(result.passwordError);
+      setConfirmError(result.confirmError);
+      return;
+    }
+
+    // Supabase signUp will be wired here later
+  }
+
   return (
     <AuthPageLayout>
       <AuthCard
@@ -24,7 +48,7 @@ export default function CreateAccountPage() {
           </AuthFooter>
         }
       >
-        <form className="flex flex-col gap-4">
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <AuthField
             id="signup-email"
             label="Email"
@@ -38,6 +62,12 @@ export default function CreateAccountPage() {
             type="password"
             placeholder="••••••••"
             autoComplete="new-password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordError) setPasswordError(undefined);
+            }}
+            error={passwordError}
           />
           <AuthField
             id="signup-password-confirm"
@@ -45,6 +75,12 @@ export default function CreateAccountPage() {
             type="password"
             placeholder="••••••••"
             autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              if (confirmError) setConfirmError(undefined);
+            }}
+            error={confirmError}
           />
           <AuthPrimaryButton>Create account</AuthPrimaryButton>
         </form>
