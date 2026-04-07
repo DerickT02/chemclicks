@@ -20,7 +20,7 @@ export default function Navbar() {
       {/* Logo */}
       <div className="flex items-center gap-2">
         <span className="w-2.5 h-2.5 rounded-full bg-foreground/70" />
-        <span className="text-foreground font-medium text-sm">Chemistry Curriculum</span>
+        <span className="text-foreground font-medium text-sm">ChemClicks</span>
       </div>
 
       {/* Nav Links*/}
