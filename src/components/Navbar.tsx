@@ -15,7 +15,7 @@ export default function Navbar() {
   const [activeLink, setActiveLink] = useState("Home");
 
   return (
-    <nav className="flex items-center justify-between px-6 h-14 bg-background border-b border-foreground/10">
+    <nav className="sticky top-0 z-50 flex w-full items-center justify-between px-6 h-14 shrink-0 bg-background border-b border-foreground/10">
 
       {/* Logo */}
       <div className="flex items-center gap-2">

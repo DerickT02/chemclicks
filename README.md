@@ -16,6 +16,11 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in the browser.
 
+### Supabase auth (backend)
+
+- **Code layout**: `src/lib/supabase/server.ts` and `client.ts` (cookie-aware clients), `src/lib/supabase/middleware.ts` (`updateSession` helper), `src/proxy.ts` (Next.js 16 session refresh — runs before routes; [docs](https://nextjs.org/docs/messages/middleware-to-proxy)), `src/lib/auth/server.ts` (`getAuthClaims` / `getAuthUser` for protected server code), `src/app/auth/callback/route.ts` (PKCE / email-confirm redirect).
+- **Dashboard**: Under **Authentication → URL Configuration**, set **Site URL** (e.g. `http://localhost:3000`) and add **Redirect URLs** including `http://localhost:3000/auth/callback` (and your production URL + `/auth/callback` when you deploy).
+
 ## Contributing
 
 - **main** - stable branch
