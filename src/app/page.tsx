@@ -24,7 +24,7 @@ export default function Home() {
         </section>
 
         {/* --- Lesson Overview Section --- */}
-        <section id="features" className="w-full border-t border-[#30363d]">
+        <section className="w-full border-t border-[#30363d]">
           <Lesson_Overview />
         </section>
       </main>
