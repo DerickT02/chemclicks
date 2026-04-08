@@ -25,7 +25,7 @@ export default function TeacherCreateAccountPage() {
     setPasswordError(undefined);
     setConfirmError(undefined);
 
-    const result = validateTeacherSignup(email,password, confirmPassword);
+    const result = validateTeacherSignup(email, password, confirmPassword);
     if (!result.valid) {
       setEmailError(result.emailError);
       setPasswordError(result.passwordError);
@@ -59,6 +59,7 @@ export default function TeacherCreateAccountPage() {
             type="email"
             placeholder="you@example.com"
             autoComplete="email"
+            value={email}
             onChange={(e) => {
               setEmail(e.target.value);
               if (emailError) setEmailError(undefined);
@@ -73,7 +74,7 @@ export default function TeacherCreateAccountPage() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => {
-              setPassword(e.target.value.trim());
+              setPassword(e.target.value);
               if (passwordError) setPasswordError(undefined);
             }}
             error={passwordError}

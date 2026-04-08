@@ -4,6 +4,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const TEACHER_PASSWORD_MIN_LENGTH = 8;
 
+export function validateTeacherEmail(email: string): string | undefined {
+  const normalized = email.trim();
+  if (!normalized) return "Email is required.";
+  if (!EMAIL_RE.test(normalized)) return "Please enter a valid email address.";
+  return undefined;
+}
+
 export type TeacherSignupResult =
   | { valid: true }
   | {
@@ -19,13 +26,8 @@ export function validateTeacherSignup(
   confirmPassword: string,
 ): TeacherSignupResult {
   // Validate email
-  let emailError: string | undefined;
-  if (!email) {
-    emailError = "Email is required.";
-  } else if (!EMAIL_RE.test(email)) {
-    emailError = "Please enter a valid email address.";
-  }
-  
+  const emailError = validateTeacherEmail(email);
+
   // Validate password
   let passwordError: string | undefined;
 
@@ -46,8 +48,8 @@ export function validateTeacherSignup(
   }
 
   // Final check
-  if (emailError ||passwordError || confirmError) {
-    return { valid: false, emailError,passwordError, confirmError };
+  if (emailError || passwordError || confirmError) {
+    return { valid: false, emailError, passwordError, confirmError };
   }
 
   return { valid: true };

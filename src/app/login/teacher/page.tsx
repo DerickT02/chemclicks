@@ -10,6 +10,7 @@ import {
   AuthPrimaryButton,
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
+import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
 
 export default function TeacherLoginPage() {
   const [email, setEmail] = useState("");
@@ -20,10 +21,11 @@ export default function TeacherLoginPage() {
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setEmailError(undefined);
+    setPasswordError(undefined);
 
-    // Simple client-side validation
-    if (!email.includes("@")) {
-      setEmailError("Please enter a valid email address.");
+    const nextEmailError = validateTeacherEmail(email);
+    if (nextEmailError) {
+      setEmailError(nextEmailError);
       return;
     }
 
@@ -33,7 +35,6 @@ export default function TeacherLoginPage() {
     }
 
     // Later: Supabase signInWithPassword logic will be wired here
-    console.log("Attempting login for:", email);
   }
 
   return (
