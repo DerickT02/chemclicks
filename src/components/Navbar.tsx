@@ -10,18 +10,18 @@ const LINKS = {
     { label: "How it works", href: "#how-it-works" },
   ],
   student: [
-    { label: "Home", href: "/student/dashboard" },
-    { label: "Labs", href: "/student/labs" },
-    { label: "Models", href: "/student/models" },
+    { label: "Home", href: "#" },
+    { label: "Labs", href: "#" },
+    { label: "Models", href: "#" },
   ],
   teacher: [
-    { label: "Classroom", href: "/teacher/classroom" },
-    { label: "Bohr Models", href: "/teacher/bohr-models" },
-    { label: "Stability", href: "/teacher/stability" },
-    { label: "Lewis Diagram", href: "/teacher/lewis-diagram" },
-    { label: "Lewis (Covalent)", href: "/teacher/lewis-covalent" },
-    { label: "Lewis (Ionic)", href: "/teacher/lewis-ionic" },
-    { label: "Measurement", href: "/teacher/measurement" },
+    { label: "Classroom", href: "#" },
+    { label: "Bohr Models", href: "#" },
+    { label: "Stability", href: "#" },
+    { label: "Lewis Diagram", href: "#" },
+    { label: "Lewis (Covalent)", href: "#" },
+    { label: "Lewis (Ionic)", href: "#" },
+    { label: "Measurement", href: "#" },
   ],
 };
 
@@ -48,7 +48,7 @@ export default function Navbar({ role }: NavbarProps) {
   };
 
   return (
-    <nav className="flex items-center justify-between px-6 h-14 bg-background border-b border-foreground/10">
+    <nav className="relative flex items-center justify-between px-6 h-14 bg-background border-b border-foreground/10">
 
       <Link
         href={role === "public" ? "/" : role === "teacher" ? "/teacher/classroom" : "/student/dashboard"}
@@ -142,7 +142,7 @@ export default function Navbar({ role }: NavbarProps) {
       </button>
 
       {mobileOpen && (
-        <div className="absolute top-14 left-0 right-0 md:hidden border-t border-foreground/10 bg-background px-4 pt-2 pb-4 space-y-1 z-50">
+        <div className="absolute top-full left-0 right-0 md:hidden border-t border-foreground/10 bg-background px-4 pt-2 pb-4 space-y-1 z-50">
           {links.map((link) =>
             link.href.startsWith("#") ? (
               <button
