@@ -1,8 +1,10 @@
 import Lesson_Overview from "../components/homepage/Lesson_Overview";
+import HomepageNavbar from "../components/Navbars/HomepageNavbar";
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-[#0d1117]">
+      <HomepageNavbar />
       {/* Main Content Area */}
       <main className="flex-grow flex flex-col w-full">
         
@@ -23,7 +25,7 @@ export default function Home() {
         </section>
 
         {/* --- Lesson Overview Section --- */}
-        <section className="w-full border-t border-[#30363d]">
+        <section id ="features" className="w-full border-t border-[#30363d]">
           <Lesson_Overview />
         </section>
       </main>
