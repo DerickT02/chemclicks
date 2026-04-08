@@ -1,18 +1,34 @@
 /** Rules for teacher sign-up (client-side; mirror in Supabase / server later). */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const TEACHER_PASSWORD_MIN_LENGTH = 8;
 
-export type TeacherSignupPasswordResult =
+export function validateTeacherEmail(email: string): string | undefined {
+  const normalized = email.trim();
+  if (!normalized) return "Email is required.";
+  if (!EMAIL_RE.test(normalized)) return "Please enter a valid email address.";
+  return undefined;
+}
+
+export type TeacherSignupResult =
   | { valid: true }
   | {
       valid: false;
+      emailError?: string;
       passwordError?: string;
       confirmError?: string;
     };
 
-export function validateTeacherSignupPassword(
+export function validateTeacherSignup(
+  email: string,
   password: string,
   confirmPassword: string,
-): TeacherSignupPasswordResult {
+): TeacherSignupResult {
+  // Validate email
+  const emailError = validateTeacherEmail(email);
+
+  // Validate password
   let passwordError: string | undefined;
 
   if (password.length < TEACHER_PASSWORD_MIN_LENGTH) {
@@ -23,6 +39,7 @@ export function validateTeacherSignupPassword(
     passwordError = "Password must include at least one number.";
   }
 
+  // Validate confirm password   
   let confirmError: string | undefined;
   if (confirmPassword.length === 0) {
     confirmError = "Please confirm your password.";
@@ -30,8 +47,9 @@ export function validateTeacherSignupPassword(
     confirmError = "Passwords do not match.";
   }
 
-  if (passwordError || confirmError) {
-    return { valid: false, passwordError, confirmError };
+  // Final check
+  if (emailError || passwordError || confirmError) {
+    return { valid: false, emailError, passwordError, confirmError };
   }
 
   return { valid: true };
