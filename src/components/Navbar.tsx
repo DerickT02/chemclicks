@@ -27,15 +27,18 @@ const LINKS = {
 
 type Role = "public" | "student" | "teacher";
 
-type NavbarProps = {
-  role: Role;
-};
+function navRoleFromPathname(pathname: string): Role {
+  if (pathname.startsWith("/teacher")) return "teacher";
+  if (pathname.startsWith("/student")) return "student";
+  return "public";
+}
 
-export default function Navbar({ role }: NavbarProps) {
+export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const role = navRoleFromPathname(pathname);
   const links = LINKS[role];
 
   const handleScroll = (href: string) => {
@@ -48,7 +51,7 @@ export default function Navbar({ role }: NavbarProps) {
   };
 
   return (
-    <nav className="flex items-center justify-between px-6 h-14 bg-background border-b border-foreground/10">
+    <nav className="sticky top-0 z-50 relative flex h-14 items-center justify-between border-b border-foreground/10 bg-background px-6">
 
       <Link
         href={role === "public" ? "/" : role === "teacher" ? "/teacher/classroom" : "/student/dashboard"}

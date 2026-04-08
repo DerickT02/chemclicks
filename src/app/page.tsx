@@ -1,13 +1,9 @@
-import Navbar from "../components/Navbar";
-
 import Lesson_Overview from "../components/homepage/Lesson_Overview";
 import Footer from "../components/Footer";
 
 export default function Home() {
   return (
-    
     <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-[#0d1117]">
-      <Navbar role="public" />
       {/* Main Content Area */}
       <main className="flex-grow flex flex-col w-full">
         
