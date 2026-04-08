@@ -15,7 +15,7 @@ export default function Lesson_Overview() {
     return (
     <div className="flex flex-col gap-24 py-20 bg-[#0d1117]">
 
-        <section>
+        <section id ="features">
             <div className="max-w-6xl mx-auto px-4">
             <h2 className="text-white text-center text-xl font-medium mb-12">What you will learn</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -30,7 +30,7 @@ export default function Lesson_Overview() {
             </div>
         </section>
 
-        <section className="max-w-6xl mx-auto px-4 w-full">
+        <section id = "how-it-works" className="max-w-6xl mx-auto px-4 w-full">
             <div className="bg-[#11161d] border border-[#30363d] rounded-2xl p-12 md:p-16">
                 <h2 className="text-white text-center text-xl font-medium mb-16">How it works</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
