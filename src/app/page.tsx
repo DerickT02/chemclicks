@@ -1,5 +1,6 @@
 import Lesson_Overview from "../components/homepage/Lesson_Overview";
 import HomepageNavbar from "../components/Navbars/HomepageNavbar";
+import Footer from "../components/Footer";
 
 export default function Home() {
   return (
@@ -25,45 +26,12 @@ export default function Home() {
         </section>
 
         {/* --- Lesson Overview Section --- */}
-        <section id ="features" className="w-full border-t border-[#30363d]">
+        <section id="features" className="w-full border-t border-[#30363d]">
           <Lesson_Overview />
         </section>
       </main>
 
-      {/* --- Footer Section --- */}
-      <footer className="bg-slate-900 text-slate-300">
-        <div className="mx-auto max-w-7xl px-8 py-16">
-          <div className="mb-6 text-xs uppercase tracking-wide text-slate-500">
-            Footer Boilerplate
-          </div>
-
-          <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 md:p-8">
-            <h2 className="mb-2 text-lg font-semibold text-white">Footer scaffold</h2>
-            <p className="mb-6 text-sm text-slate-400">
-              Placeholder layout only. Replace each section with real content.
-            </p>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div className="rounded-md border border-slate-800 p-4 text-sm text-slate-400">
-                Brand / About
-              </div>
-              <div className="rounded-md border border-slate-800 p-4 text-sm text-slate-400">
-                Links column 1
-              </div>
-              <div className="rounded-md border border-slate-800 p-4 text-sm text-slate-400">
-                Links column 2
-              </div>
-              <div className="rounded-md border border-slate-800 p-4 text-sm text-slate-400">
-                Newsletter / CTA
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-md border border-slate-800 p-4 text-sm text-slate-400">
-              Bottom bar (copyright, legal links, socials)
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
