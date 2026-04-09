@@ -6,7 +6,7 @@ import { updateSession } from "@/lib/supabase/middleware";
  * @see https://nextjs.org/docs/messages/middleware-to-proxy
  */
 export default async function proxy(request: NextRequest) {
-//   return await updateSession(request);
+  return await updateSession(request);
 }
 
 export const config = {

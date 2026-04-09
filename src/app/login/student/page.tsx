@@ -46,9 +46,6 @@ export default function StudentLoginPage() {
             <Link href="/create-account/student" className={authSecondaryLinkClassName}>
               Create account
             </Link>
-            <button type="button" className={authSecondaryLinkClassName}>
-              Forgot code?
-            </button>
           </AuthFooter>
         }
       >
