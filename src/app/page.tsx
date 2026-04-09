@@ -11,10 +11,10 @@ export default function Home() {
         {/* --- Hero Section --- */}
         <section className="flex flex-col items-center justify-center py-24 px-4 text-center">
           <h1 className="mb-4 text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
-            Welcome to ChemClicks
+            Master Chemistry with Interactive Lessons
           </h1>
           <p className="max-w-md text-lg text-gray-600 dark:text-gray-400">
-            Your chemistry learning platform
+            Bohr Models, Lewis Structures, and measurment lab - all in one place. Built for the classroom.
           </p>
           <Get_Started_Button />
         </section>
