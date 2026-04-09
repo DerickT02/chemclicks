@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Lesson_Overview from "../components/homepage/Lesson_Overview";
 import Footer from "../components/Footer";
 
@@ -9,6 +10,14 @@ export default function Home() {
         
         {/* --- Hero Section --- */}
         <section className="flex flex-col items-center justify-center py-24 px-4 text-center">
+          <Image
+            src="/favicon.svg"
+            alt="ChemClicks logo"
+            width={64}
+            height={64}
+            className="mb-5 h-16 w-16"
+            priority
+          />
           <h1 className="mb-4 text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
             Welcome to ChemClicks
           </h1>

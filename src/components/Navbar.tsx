@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -55,8 +56,9 @@ export default function Navbar() {
 
       <Link
         href={role === "public" ? "/" : role === "teacher" ? "/teacher/classroom" : "/student/dashboard"}
-        className="text-sm font-medium text-foreground hover:opacity-80 transition-opacity duration-200 whitespace-nowrap mr-4"
+        className="mr-4 flex items-center gap-2 whitespace-nowrap text-sm font-medium text-foreground transition-opacity duration-200 hover:opacity-80"
       >
+        <Image src="/favicon.svg" alt="ChemClicks logo" width={20} height={20} priority />
         ChemClicks
       </Link>
 

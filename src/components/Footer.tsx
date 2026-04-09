@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function Footer() {
   return (
     <footer className="bg-black-400 bg-background border-b border-foreground/10 text-slate-400">
@@ -6,7 +8,13 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="md:col-span-1">
             <div className="mb-4 flex items-start gap-3">
-              <div className="mt-1 h-8 w-8 flex-shrink-0 rounded-full bg-emerald-400"></div>
+              <Image
+                src="/favicon.svg"
+                alt="ChemClicks logo"
+                width={32}
+                height={32}
+                className="mt-1 h-8 w-8 flex-shrink-0"
+              />
               <div>
                 <h3 className="text-sm font-bold text-white">CHEMISTRY CURRICULUM</h3>
                 <p className="mt-1 text-xs text-slate-500">Master chemistry with interactive tools.</p>
