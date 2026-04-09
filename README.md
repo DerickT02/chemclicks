@@ -6,6 +6,8 @@ First, download the necessary packages:
 npm install
 ```
 
+- **Environment**: copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from your Supabase project (**Settings → API**).
+
 Then, run the development server:
 
 ```bash
@@ -13,6 +15,11 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in the browser.
+
+### Supabase auth (backend)
+
+- **Code layout**: `src/lib/supabase/server.ts` and `client.ts` (cookie-aware clients), `src/lib/supabase/middleware.ts` (`updateSession` helper), `src/proxy.ts` (Next.js 16 session refresh — runs before routes; [docs](https://nextjs.org/docs/messages/middleware-to-proxy)), `src/lib/auth/server.ts` (`getAuthClaims` / `getAuthUser` for protected server code), `src/app/auth/callback/route.ts` (PKCE / email-confirm redirect).
+- **Dashboard**: Under **Authentication → URL Configuration**, set **Site URL** (e.g. `http://localhost:3000`) and add **Redirect URLs** including `http://localhost:3000/auth/callback` (and your production URL + `/auth/callback` when you deploy).
 
 ## Contributing
 
@@ -58,9 +65,11 @@ git push origin feat/student-login
 
 ## Resources
 
-- [Best place for general documentation](https://devdocs.io/)
-- [Javascript Basics](https://javascript.info/)
-- [TypeScript Docs](https://www.typescriptlang.org/docs/)
-- [Next.js Docs](https://nextjs.org/docs)
-- [Tailwind Docs](https://tailwindcss.com/docs/installation/using-vite)
-- [Supabase Docs](https://supabase.com/docs)
+- [DevDocs (aggregated docs)](https://devdocs.io/)
+- [JavaScript](https://javascript.info/)
+- [TypeScript](https://www.typescriptlang.org/docs/)
+- [React](https://react.dev/)
+- [Next.js](https://nextjs.org/docs)
+- [Tailwind CSS](https://tailwindcss.com/docs)
+- [Supabase](https://supabase.com/docs)
+- [Supabase Auth with Next.js](https://supabase.com/docs/guides/auth/server-side/nextjs)
