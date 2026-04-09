@@ -1,6 +1,7 @@
+import Get_Started_Button from "@/components/homepage/Get_Started_Button";
+import Lesson_Overview from "@/components/homepage/Lesson_Overview";
+import Footer from "@/components/Footer";
 import Image from "next/image";
-import Lesson_Overview from "../components/homepage/Lesson_Overview";
-import Footer from "../components/Footer";
 
 export default function Home() {
   return (
@@ -19,11 +20,12 @@ export default function Home() {
             priority
           />
           <h1 className="mb-4 text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
-            Welcome to ChemClicks
+            Master Chemistry with Interactive Lessons
           </h1>
           <p className="max-w-md text-lg text-gray-600 dark:text-gray-400">
-            Your chemistry learning platform
+            Bohr Models, Lewis Structures, and measurment lab - all in one place. Built for the classroom.
           </p>
+          <Get_Started_Button />
         </section>
 
         {/* --- Newsletter Section --- */}
