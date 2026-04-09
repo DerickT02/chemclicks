@@ -1,5 +1,6 @@
 import Lesson_Overview from "../components/homepage/Lesson_Overview";
 import Footer from "../components/Footer";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -15,6 +16,12 @@ export default function Home() {
           <p className="max-w-md text-lg text-gray-600 dark:text-gray-400">
             Your chemistry learning platform
           </p>
+          <Link
+            href="/login/student"
+            className="mt-6 rounded-md bg-green-500 px-4 py-2 font-medium text-black hover:bg-green-600"
+          >
+            Get Started
+          </Link>
         </section>
 
         {/* --- Newsletter Section --- */}
