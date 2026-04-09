@@ -9,21 +9,25 @@ import {
   AuthPageLayout,
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
-import { validateTeacherSignupPassword } from "@/lib/auth/validate-teacher-password";
+import { validateTeacherSignup } from "@/lib/auth/validate-teacher-signup";
 
 export default function TeacherCreateAccountPage() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [emailError, setEmailError] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [confirmError, setConfirmError] = useState<string | undefined>();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setEmailError(undefined);
     setPasswordError(undefined);
     setConfirmError(undefined);
 
-    const result = validateTeacherSignupPassword(password, confirmPassword);
+    const result = validateTeacherSignup(email, password, confirmPassword);
     if (!result.valid) {
+      setEmailError(result.emailError);
       setPasswordError(result.passwordError);
       setConfirmError(result.confirmError);
       return;
@@ -55,6 +59,12 @@ export default function TeacherCreateAccountPage() {
             type="email"
             placeholder="you@example.com"
             autoComplete="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (emailError) setEmailError(undefined);
+            }}
+            error={emailError}
           />
           <AuthField
             id="signup-password"
