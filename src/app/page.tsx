@@ -1,5 +1,5 @@
-import Lesson_Overview from "../components/homepage/Lesson_Overview";
-import Footer from "../components/Footer";
+import Lesson_Overview from "@/components/homepage/Lesson_Overview";
+import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
