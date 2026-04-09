@@ -1,3 +1,4 @@
+import Get_Started_Button from "@/components/homepage/Get_Started_Button";
 import Lesson_Overview from "@/components/homepage/Lesson_Overview";
 import Footer from "@/components/Footer";
 
@@ -15,6 +16,7 @@ export default function Home() {
           <p className="max-w-md text-lg text-gray-600 dark:text-gray-400">
             Your chemistry learning platform
           </p>
+          <Get_Started_Button />
         </section>
 
         {/* --- Newsletter Section --- */}
