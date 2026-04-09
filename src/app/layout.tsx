@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
+    // Apple touch icon: use a 180×180 PNG at /apple-touch-icon.png when available; avoid SVG here for iOS.
   },
 };
 

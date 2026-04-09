@@ -15,7 +15,7 @@ export default function Home() {
               Master Chemistry with Interactive Lessons
             </h1>
             <p className="mb-2 max-w-md text-lg text-muted-foreground">
-              Bohr Models, Lewis Structures, and measurment lab - all in one place. Built for the classroom.
+              Bohr Models, Lewis Structures, and measurement lab - all in one place. Built for the classroom.
             </p>
             <Get_Started_Button />
           </div>

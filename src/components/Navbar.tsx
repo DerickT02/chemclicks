@@ -41,6 +41,10 @@ function easeOutCubic(t: number) {
   return 1 - (1 - t) ** 3;
 }
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /** Eased vertical scroll (rAF) — avoids native smooth scroll being cancelled mid-flight. */
 function scrollToYSmooth(targetY: number) {
   const token = ++scrollAnimationToken;
@@ -48,6 +52,11 @@ function scrollToYSmooth(targetY: number) {
   const delta = targetY - startY;
 
   if (Math.abs(delta) < 2) return;
+
+  if (prefersReducedMotion()) {
+    window.scrollTo(0, targetY);
+    return;
+  }
 
   const durationMs = Math.min(900, Math.max(450, Math.abs(delta) * 0.55));
   const t0 = performance.now();
