@@ -28,6 +28,57 @@ const LINKS = {
 
 type Role = "public" | "student" | "teacher";
 
+function scrollPaddingTopPx(): number {
+  const raw = getComputedStyle(document.documentElement).scrollPaddingTop;
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Token so a new jump cancels any in-flight eased scroll */
+let scrollAnimationToken = 0;
+
+function easeOutCubic(t: number) {
+  return 1 - (1 - t) ** 3;
+}
+
+/** Eased vertical scroll (rAF) — avoids native smooth scroll being cancelled mid-flight. */
+function scrollToYSmooth(targetY: number) {
+  const token = ++scrollAnimationToken;
+  const startY = window.scrollY;
+  const delta = targetY - startY;
+
+  if (Math.abs(delta) < 2) return;
+
+  const durationMs = Math.min(900, Math.max(450, Math.abs(delta) * 0.55));
+  const t0 = performance.now();
+
+  function frame(now: number) {
+    if (token !== scrollAnimationToken) return;
+    const elapsed = now - t0;
+    const t = Math.min(1, elapsed / durationMs);
+    window.scrollTo(0, startY + delta * easeOutCubic(t));
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      window.scrollTo(0, targetY);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function scrollToTopSmooth() {
+  scrollToYSmooth(0);
+}
+
+function scrollToIdSmooth(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const pad = scrollPaddingTopPx();
+  const targetY = el.getBoundingClientRect().top + window.scrollY - pad;
+  scrollToYSmooth(targetY);
+}
+
 function navRoleFromPathname(pathname: string): Role {
   if (pathname.startsWith("/teacher")) return "teacher";
   if (pathname.startsWith("/student")) return "student";
@@ -42,10 +93,17 @@ export default function Navbar() {
   const role = navRoleFromPathname(pathname);
   const links = LINKS[role];
 
+  const logoHref =
+    role === "public" ? "/" : role === "teacher" ? "/teacher/classroom" : "/student/dashboard";
+
   const handleScroll = (href: string) => {
-    const id = href.replace("#", "");
+    const id = href.replace(/^#/, "");
+    if (id === "") {
+      scrollToTopSmooth();
+      return;
+    }
     if (pathname === "/") {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+      scrollToIdSmooth(id);
     } else {
       router.push(`/#${id}`);
     }
@@ -55,8 +113,14 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 relative flex h-14 items-center justify-between border-b border-foreground/10 bg-background px-6">
 
       <Link
-        href={role === "public" ? "/" : role === "teacher" ? "/teacher/classroom" : "/student/dashboard"}
+        href={logoHref}
         className="mr-4 flex items-center gap-2 whitespace-nowrap text-sm font-medium text-foreground transition-opacity duration-200 hover:opacity-80"
+        onClick={(e) => {
+          if (pathname === logoHref) {
+            e.preventDefault();
+            scrollToTopSmooth();
+          }
+        }}
       >
         <Image src="/favicon.svg" alt="ChemClicks logo" width={20} height={20} priority />
         ChemClicks
@@ -67,6 +131,7 @@ export default function Navbar() {
           link.href.startsWith("#") ? (
             <button
               key={link.label}
+              type="button"
               onClick={() => handleScroll(link.href)}
               className="px-3 py-1.5 text-sm font-medium text-foreground/50 hover:text-foreground transition-colors duration-200 whitespace-nowrap"
             >
@@ -152,7 +217,12 @@ export default function Navbar() {
             link.href.startsWith("#") ? (
               <button
                 key={link.label}
-                onClick={() => { handleScroll(link.href); setMobileOpen(false); }}
+                type="button"
+                onClick={() => {
+                  handleScroll(link.href);
+                  // Let the window scroll start before unmounting the menu (otherwise some browsers stop the animation).
+                  window.setTimeout(() => setMobileOpen(false), 320);
+                }}
                 className="block w-full text-left text-sm font-medium text-foreground/50 hover:text-foreground hover:bg-foreground/10 px-3 py-2 rounded-md transition-colors duration-200"
               >
                 {link.label}

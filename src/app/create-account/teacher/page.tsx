@@ -41,11 +41,11 @@ export default function TeacherCreateAccountPage() {
       <AuthCard
         title="Create account"
         footer={
-          <AuthFooter className="text-zinc-600 dark:text-zinc-400">
+          <AuthFooter className="text-muted-foreground">
             Already have an account?{" "}
             <Link
               href="/login/teacher"
-              className="font-medium text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               Sign in
             </Link>

@@ -45,7 +45,7 @@
 
 ### Tailwind CSS
 
-- Prefer **design tokens** from the theme (e.g. `bg-background`, spacing scale) over one-off arbitrary values unless the design calls for it.
+- Prefer **design tokens** from the theme in globals.css (e.g. `bg-background`, spacing scale) over one-off arbitrary values unless the design calls for it.
 - Keep **class order** consistent with surrounding files; extract repeated clusters into components or small helpers when it improves clarity.
 
 ### Supabase
