@@ -166,7 +166,7 @@ export default function Navbar() {
         {role === "public" ? (
           <Link
             href="/login"
-            className="text-sm font-medium px-4 py-1.5 rounded-full border border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40 transition-colors duration-200 whitespace-nowrap"
+            className="text-sm font-semibold px-4 py-1.5 rounded-lg bg-accent text-accent-foreground transition-opacity hover:opacity-90 whitespace-nowrap"
           >
             Sign in
           </Link>
@@ -254,7 +254,7 @@ export default function Navbar() {
           {role === "public" && (
             <Link
               href="/login"
-              className="block text-sm font-medium text-center bg-foreground text-background px-4 py-2 rounded-lg mt-2"
+              className="block text-sm font-semibold text-center bg-accent text-accent-foreground px-4 py-2 rounded-lg mt-2 transition-opacity hover:opacity-90"
               onClick={() => setMobileOpen(false)}
             >
               Sign in
