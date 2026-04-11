@@ -18,6 +18,10 @@ export default function TeacherLoginPage() {
   const [emailError, setEmailError] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
 
+  async function handleForgottenPassword() {
+    // TODO. Blank for SCRUM-184.
+  }
+
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setEmailError(undefined);
@@ -46,7 +50,7 @@ export default function TeacherLoginPage() {
             <Link href="/create-account/teacher" className={authSecondaryLinkClassName}>
               Create account
             </Link>
-            <button type="button" className={authSecondaryLinkClassName}>
+            <button type="button" onSubmit={handleForgottenPassword} className={authSecondaryLinkClassName}>
               Forgot password?
             </button>
           </AuthFooter>

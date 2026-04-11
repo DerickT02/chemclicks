@@ -1,18 +1,18 @@
 import type { ComponentProps, ReactNode } from "react";
 
 export const authInputClassName =
-  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50";
+  "rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring";
 
 export const authPrimaryButtonClassName =
-  "mt-1 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200";
+  "mt-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90";
 
 /** Inline links / text buttons below the form (e.g. Create account, Forgot password) */
 export const authSecondaryLinkClassName =
-  "self-start text-left text-zinc-600 underline-offset-4 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100";
+  "self-start text-left text-muted-foreground underline-offset-4 hover:text-foreground hover:underline";
 
 export function AuthPageLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-zinc-950">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       {children}
     </div>
   );
@@ -28,8 +28,8 @@ export function AuthCard({
   footer?: ReactNode;
 }) {
   return (
-    <div className="w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h1 className="mb-6 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+    <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-sm">
+      <h1 className="mb-6 text-xl font-semibold text-foreground">
         {title}
       </h1>
       {children}
@@ -39,7 +39,7 @@ export function AuthCard({
 }
 
 const authInputErrorClassName =
-  "border-red-500 focus:border-red-500 focus:ring-red-500 dark:border-red-500";
+  "border-destructive focus:border-destructive focus:ring-destructive";
 
 export function AuthField({
   label,
@@ -55,7 +55,7 @@ export function AuthField({
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        className="text-sm font-medium text-foreground"
       >
         {label}
       </label>
@@ -69,7 +69,7 @@ export function AuthField({
       {error ? (
         <p
           id={`${id}-error`}
-          className="text-sm text-red-600 dark:text-red-400"
+          className="text-sm text-destructive"
           role="alert"
         >
           {error}
@@ -103,7 +103,7 @@ export function AuthFooter({
 }) {
   return (
     <div
-      className={`mt-6 border-t border-zinc-200 pt-6 text-sm dark:border-zinc-800 ${className}`}
+      className={`mt-6 border-t border-border pt-6 text-sm ${className}`}
     >
       {children}
     </div>
