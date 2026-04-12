@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
 import {
   AuthCard,
   AuthField,
-  AuthFooter,
   AuthPageLayout,
   AuthPrimaryButton,
-  authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentUsername, validateStudentCode } from "@/lib/auth/validate-student-signup";
 
@@ -41,13 +38,7 @@ export default function StudentLoginPage() {
     <AuthPageLayout>
       <AuthCard
         title="Login"
-        footer={
-          <AuthFooter className="flex flex-col gap-2">
-            <Link href="/create-account/student" className={authSecondaryLinkClassName}>
-              Create account
-            </Link>
-          </AuthFooter>
-        }
+        footer={undefined}
       >
         <form className="flex flex-col gap-4" onSubmit={handleLogin} noValidate>
           <AuthField
@@ -82,3 +73,4 @@ export default function StudentLoginPage() {
     </AuthPageLayout>
   );
 }
+
