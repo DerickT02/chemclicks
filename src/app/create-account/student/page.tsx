@@ -1,60 +1,60 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useState, type FormEvent } from "react";
 import {
   AuthCard,
   AuthField,
   AuthFooter,
   AuthPageLayout,
   AuthPrimaryButton,
-  authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
-import { validateAuthUsernameInput } from "@/lib/auth/validate-auth-username";
-import { validateStudentCode } from "@/lib/auth/validate-student-signup";
+import { normalizeAuthUsername } from "@/lib/auth/validate-auth-username";
+import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
 
-export default function StudentLoginPage() {
+export default function StudentCreateAccountPage() {
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [usernameError, setUsernameError] = useState<string | undefined>();
   const [codeError, setCodeError] = useState<string | undefined>();
 
-  function handleLogin(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setUsernameError(undefined);
     setCodeError(undefined);
 
-    const { trimmedUsername, error: usernameValidationError } =
-      validateAuthUsernameInput(username);
-    if (usernameValidationError) {
-      setUsernameError(usernameValidationError);
+    const result = validateStudentSignup(username, code);
+    if (!result.valid) {
+      setUsernameError(result.usernameError);
+      setCodeError(result.codeError);
       return;
     }
-    setUsername(trimmedUsername);
 
-    const codeValidationError = validateStudentCode(code);
-    if (codeValidationError) {
-      setCodeError(codeValidationError);
-      return;
-    }
+    setUsername(normalizeAuthUsername(username));
     setCode(code.trim());
+
+    // Supabase sign-up will be wired here later
   }
 
   return (
     <AuthPageLayout>
       <AuthCard
-        title="Login"
+        title="Create account"
         footer={
-          <AuthFooter className="flex flex-col gap-2">
-            <Link href="/create-account/student" className={authSecondaryLinkClassName}>
-              Create account
+          <AuthFooter className="text-muted-foreground">
+            Already have an account?{" "}
+            <Link
+              href="/login/student"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Sign in
             </Link>
           </AuthFooter>
         }
       >
-        <form className="flex flex-col gap-4" onSubmit={handleLogin} noValidate>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <AuthField
-            id="username"
+            id="signup-username"
             label="Username"
             type="text"
             placeholder="myName123"
@@ -67,11 +67,11 @@ export default function StudentLoginPage() {
             error={usernameError}
           />
           <AuthField
-            id="code"
+            id="signup-classroom-code"
             label="Classroom code"
             type="text"
             placeholder="123456"
-            autoComplete="current-code"
+            autoComplete="off"
             value={code}
             onChange={(e) => {
               setCode(e.target.value);
@@ -79,7 +79,7 @@ export default function StudentLoginPage() {
             }}
             error={codeError}
           />
-          <AuthPrimaryButton type="submit">Sign in</AuthPrimaryButton>
+          <AuthPrimaryButton>Create account</AuthPrimaryButton>
         </form>
       </AuthCard>
     </AuthPageLayout>

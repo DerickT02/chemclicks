@@ -41,6 +41,16 @@ export function AuthCard({
 const authInputErrorClassName =
   "border-destructive focus:border-destructive focus:ring-destructive";
 
+/** Form-level validation or auth failure message (below fields, above actions). */
+export function AuthFormError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="text-sm text-destructive" role="alert">
+      {message}
+    </p>
+  );
+}
+
 export function AuthField({
   label,
   id,
