@@ -1,4 +1,5 @@
-// Logic and types regarding the STUDENTS table.
+// Defines the STUDENTS table and attributes
+// Enforces data types and constraints at compile time
 
 export type Student = {
   id: string          // UUID, auto-generated
