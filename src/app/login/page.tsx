@@ -12,12 +12,12 @@ export default function LoginRolePage() {
         title="Sign in as"
         footer={
           <AuthFooter className="text-muted-foreground">
-            Don&apos;t have an account?{" "}
+            Teacher?{" "}
             <Link
-              href="/create-account"
+              href="/create-account/teacher"
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              Create one
+              Create an account
             </Link>
           </AuthFooter>
         }
