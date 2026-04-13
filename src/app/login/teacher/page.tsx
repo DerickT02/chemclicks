@@ -50,7 +50,11 @@ export default function TeacherLoginPage() {
             <Link href="/create-account/teacher" className={authSecondaryLinkClassName}>
               Create account
             </Link>
-            <button type="button" onSubmit={handleForgottenPassword} className={authSecondaryLinkClassName}>
+            <button
+              type="button"
+              onClick={() => void handleForgottenPassword()}
+              className={authSecondaryLinkClassName}
+            >
               Forgot password?
             </button>
           </AuthFooter>

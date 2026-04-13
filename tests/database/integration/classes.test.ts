@@ -9,7 +9,7 @@ import { beforeAll, afterAll, describe, it, expect } from 'vitest'
 //   DELETE — authenticated only, USING (teacher_id = auth.uid())
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 
@@ -69,16 +69,20 @@ async function deleteAuthUser(userId: string): Promise<void> {
 
 const PASSWORD = 'test-password-123'
 
+/** Unique to this file so Vitest can run DB suites in parallel without auth email collisions. */
+const TEACHER_A_EMAIL = 'integration-classes-rls-a@test.com'
+const TEACHER_B_EMAIL = 'integration-classes-rls-b@test.com'
+
 let teacherAId: string
 let teacherBId: string
 let classAId: string
 let classBId: string
 
 beforeAll(async () => {
-  teacherAId = await createAuthUser('teacher-a@test.com', PASSWORD)
-  teacherBId = await createAuthUser('teacher-b@test.com', PASSWORD)
-  await insertTeacher(teacherAId, 'teacher-a@test.com', 'Teacher A')
-  await insertTeacher(teacherBId, 'teacher-b@test.com', 'Teacher B')
+  teacherAId = await createAuthUser(TEACHER_A_EMAIL, PASSWORD)
+  teacherBId = await createAuthUser(TEACHER_B_EMAIL, PASSWORD)
+  await insertTeacher(teacherAId, TEACHER_A_EMAIL, 'Teacher A')
+  await insertTeacher(teacherBId, TEACHER_B_EMAIL, 'Teacher B')
 
   classAId = await insertClass(teacherAId, "Teacher A's Class")
   classBId = await insertClass(teacherBId, "Teacher B's Class")
@@ -95,7 +99,7 @@ describe('classes table RLS', () => {
 
   describe('SELECT policy', () => {
     it('teacher can read their own classes', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { data, error } = await client.from('classes').select('id, name, teacher_id')
 
       expect(error).toBeNull()
@@ -104,7 +108,7 @@ describe('classes table RLS', () => {
     })
 
     it("teacher never sees another teacher's classes", async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { data, error } = await client.from('classes').select('id')
 
       expect(error).toBeNull()
@@ -132,7 +136,7 @@ describe('classes table RLS', () => {
 
   describe('INSERT policy', () => {
     it('teacher can insert a class owned by themselves', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { data, error } = await client
         .from('classes')
         .insert({
@@ -152,7 +156,7 @@ describe('classes table RLS', () => {
     })
 
     it('teacher cannot insert a class owned by another teacher', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client
         .from('classes')
         .insert({
@@ -174,7 +178,7 @@ describe('classes table RLS', () => {
       // Throwaway row so this test does not mutate suite fixtures
       const throwawayId = await insertClass(teacherAId, 'Update Target')
 
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client
         .from('classes')
         .update({ name: 'Update Target Updated' })
@@ -189,7 +193,7 @@ describe('classes table RLS', () => {
     })
 
     it("teacher cannot update another teacher's class", async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client
         .from('classes')
         .update({ name: 'Hacked' })
@@ -207,7 +211,7 @@ describe('classes table RLS', () => {
       // Throwaway row so this test does not disturb suite fixtures
       const throwawayId = await insertClass(teacherAId, 'Delete Target')
 
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client.from('classes').delete().eq('id', throwawayId)
 
       expect(error).toBeNull()
@@ -217,7 +221,7 @@ describe('classes table RLS', () => {
     })
 
     it("teacher cannot delete another teacher's class", async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client.from('classes').delete().eq('id', classBId)
 
       expect(error).toBeNull() // RLS silently affects 0 rows
