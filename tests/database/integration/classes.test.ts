@@ -7,6 +7,9 @@ import { beforeAll, afterAll, describe, it, expect } from 'vitest'
 //   INSERT — authenticated only, WITH CHECK (teacher_id = auth.uid())
 //   UPDATE — authenticated only, USING (teacher_id = auth.uid()) WITH CHECK (teacher_id = auth.uid())
 //   DELETE — authenticated only, USING (teacher_id = auth.uid())
+//
+// If these tests fail with empty SELECT or 42501 on self-insert, apply the SQL migration:
+//   src/lib/supabase/migration/20260412194500_classes_rls.sql
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

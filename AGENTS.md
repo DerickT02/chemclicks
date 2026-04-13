@@ -50,6 +50,7 @@
 
 ### Supabase
 
+- **DO NOT** under any circumstances make any writes, edits or alterations without asking and explaining
 - **Row Level Security (RLS)** — enable and test policies for any table exposed to the client; never rely on the client alone for authorization.
 - **Clients** — server-side session/cookie flows via `@supabase/ssr`; avoid exposing service-role keys to the browser.
 - **Keys** — `NEXT_PUBLIC_*` is visible to users; only put anon-safe values there.
