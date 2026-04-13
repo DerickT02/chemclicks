@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="H2O Orbit logo">
+  <defs>
+    <radialGradient id="o" cx="35%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#FF6B6B"></stop>
+      <stop offset="1" stop-color="#C91D3A"></stop>
+    </radialGradient>
+    <radialGradient id="h" cx="35%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#FFFFFF"></stop>
+      <stop offset="1" stop-color="#D7E2FF"></stop>
+    </radialGradient>
+  </defs>
+
+  <!-- Bonds -->
+  <g stroke="#0B1A2A" stroke-width="10" stroke-linecap="round" opacity="0.9">
+    <line x1="64" y1="64" x2="26" y2="86"></line>
+    <line x1="64" y1="64" x2="102" y2="86"></line>
+  </g>
+
+  <!-- Orbit ring -->
+  <ellipse cx="64" cy="72" rx="56" ry="26" fill="none" stroke="#4F8CFF" stroke-width="6" opacity="0.9"></ellipse>
+
+  <!-- Atoms -->
+  <circle cx="64" cy="64" r="22" fill="url(#o)" stroke="#0B1A2A" stroke-width="6"></circle>
+  <circle cx="26" cy="86" r="16" fill="url(#h)" stroke="#0B1A2A" stroke-width="6"></circle>
+  <circle cx="102" cy="86" r="16" fill="url(#h)" stroke="#0B1A2A" stroke-width="6"></circle>
+
+</svg>

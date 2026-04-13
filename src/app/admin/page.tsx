@@ -1,31 +1,31 @@
 export default function AdminPage() {
   return (
-    <div style={{ padding: '40px', backgroundColor: '#0f1419', minHeight: '100vh', color: 'white' }}>
-      <h1>Classrooms</h1>
-      <p style={{ color: '#999', marginBottom: '30px' }}>
+    <div className="min-h-screen bg-background p-10 text-foreground">
+      <h1 className="text-3xl font-semibold">Classrooms</h1>
+      <p className="mb-8 mt-2 text-muted-foreground">
         Teacher admin view. Create classes, share classroom codes, and see where students are in the lesson.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {/* Left Panel - Your Classes */}
-        <div style={{ backgroundColor: '#1a2332', padding: '20px', borderRadius: '8px' }}>
-          <h2>Your classes</h2>
-          <p style={{ color: '#666', marginTop: '20px' }}>Class list component goes here</p>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="text-xl font-medium">Your classes</h2>
+          <p className="mt-5 text-muted-foreground">Class list component goes here</p>
           
-          <div style={{ marginTop: '40px' }}>
-            <h3>Add a class</h3>
-            <p style={{ color: '#666', marginTop: '20px' }}>Add class form component goes here</p>
+          <div className="mt-10">
+            <h3 className="text-lg font-medium">Add a class</h3>
+            <p className="mt-5 text-muted-foreground">Add class form component goes here</p>
           </div>
         </div>
 
         {/* Right Panel - Class Detail */}
-        <div style={{ backgroundColor: '#1a2332', padding: '20px', borderRadius: '8px' }}>
-          <h2>Chemistry Period 1</h2>
-          <p style={{ color: '#666', marginTop: '20px' }}>Class detail component goes here</p>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="text-xl font-medium">Chemistry Period 1</h2>
+          <p className="mt-5 text-muted-foreground">Class detail component goes here</p>
           
-          <div style={{ marginTop: '40px' }}>
-            <h3>Active students</h3>
-            <p style={{ color: '#666', marginTop: '20px' }}>Student list component goes here</p>
+          <div className="mt-10">
+            <h3 className="text-lg font-medium">Active students</h3>
+            <p className="mt-5 text-muted-foreground">Student list component goes here</p>
           </div>
         </div>
       </div>
