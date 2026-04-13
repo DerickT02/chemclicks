@@ -103,7 +103,7 @@ export default function Navbar() {
   const links = LINKS[role];
 
   const logoHref =
-    role === "public" ? "/" : role === "teacher" ? "/teacher/classroom" : "/student/dashboard";
+    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
 
   const handleScroll = (href: string) => {
     const id = href.replace(/^#/, "");

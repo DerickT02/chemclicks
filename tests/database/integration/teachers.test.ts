@@ -9,7 +9,7 @@ import { beforeAll, afterAll, describe, it, expect } from 'vitest'
 //   DELETE — no policy (admin operation only)
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 
@@ -52,14 +52,18 @@ async function deleteAuthUser(userId: string): Promise<void> {
 
 const PASSWORD = 'test-password-123'
 
+/** Unique to this file so Vitest can run DB suites in parallel without auth email collisions. */
+const TEACHER_A_EMAIL = 'integration-teachers-rls-a@test.com'
+const TEACHER_B_EMAIL = 'integration-teachers-rls-b@test.com'
+
 let teacherAId: string
 let teacherBId: string
 
 beforeAll(async () => {
-  teacherAId = await createAuthUser('teacher-a@test.com', PASSWORD)
-  teacherBId = await createAuthUser('teacher-b@test.com', PASSWORD)
-  await insertTeacher(teacherAId, 'teacher-a@test.com', 'Teacher A')
-  await insertTeacher(teacherBId, 'teacher-b@test.com', 'Teacher B')
+  teacherAId = await createAuthUser(TEACHER_A_EMAIL, PASSWORD)
+  teacherBId = await createAuthUser(TEACHER_B_EMAIL, PASSWORD)
+  await insertTeacher(teacherAId, TEACHER_A_EMAIL, 'Teacher A')
+  await insertTeacher(teacherBId, TEACHER_B_EMAIL, 'Teacher B')
 })
 
 afterAll(async () => {
@@ -73,7 +77,7 @@ describe('teachers table RLS', () => {
 
   describe('SELECT policy', () => {
     it('teacher can read their own row', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { data, error } = await client.from('teachers').select('id, email, display_name')
 
       expect(error).toBeNull()
@@ -82,7 +86,7 @@ describe('teachers table RLS', () => {
     })
 
     it('teacher never sees another teacher\'s row', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { data, error } = await client.from('teachers').select('id')
 
       expect(error).toBeNull()
@@ -101,7 +105,7 @@ describe('teachers table RLS', () => {
 
   describe('UPDATE policy', () => {
     it('teacher can update their own display_name', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client
         .from('teachers')
         .update({ display_name: 'Teacher A Updated' })
@@ -115,7 +119,7 @@ describe('teachers table RLS', () => {
     })
 
     it('teacher cannot update another teacher\'s display_name', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client
         .from('teachers')
         .update({ display_name: 'Hacked' })
@@ -129,20 +133,20 @@ describe('teachers table RLS', () => {
     })
 
     it('teacher cannot update another teacher\'s email', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       await client
         .from('teachers')
         .update({ email: 'hacked@test.com' })
         .eq('id', teacherBId)
 
       const { data } = await admin.from('teachers').select('email').eq('id', teacherBId).single()
-      expect(data!.email).toBe('teacher-b@test.com')
+      expect(data!.email).toBe(TEACHER_B_EMAIL)
     })
   })
 
   describe('INSERT policy', () => {
     it('authenticated teacher cannot insert directly — no INSERT policy exists', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client
         .from('teachers')
         .insert({ id: teacherAId, email: 'direct-insert@test.com', display_name: 'Direct' })
@@ -156,7 +160,7 @@ describe('teachers table RLS', () => {
 
   describe('DELETE policy', () => {
     it('authenticated teacher cannot delete their own row — no DELETE policy exists', async () => {
-      const client = await signInAsTeacher('teacher-a@test.com', PASSWORD)
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
       const { error } = await client
         .from('teachers')
         .delete()
