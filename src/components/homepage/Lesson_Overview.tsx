@@ -34,17 +34,17 @@ export default function Lesson_Overview() {
             id="how-it-works"
             className="max-w-6xl mx-auto w-full border-t border-border px-4 pt-20"
         >
-            <div className="rounded-2xl border border-border bg-card p-12 md:p-16">
-                <h2 className="text-foreground text-center text-xl font-medium mb-16">How it works</h2>
+            <h2 className="text-foreground text-center text-xl font-medium mb-12">How it works</h2>
+            <div className="rounded-2xl border border-border bg-card p-12 md:p-16 transition-colors hover:border-accent/40">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                     {steps.map((s, i) => (
-                    <div key={i} className="flex flex-col items-center text-center">
-                        <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-full border border-accent/50 bg-muted">
-                        <span className="font-bold text-accent">{s.number}</span>
+                        <div key={i} className="flex flex-col items-center text-center">
+                            <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-full border border-accent/50 bg-muted">
+                                <span className="font-bold text-accent">{s.number}</span>
+                            </div>
+                            <h3 className="text-foreground font-semibold mb-2">{s.title}</h3>
+                            <p className="text-muted-foreground text-sm max-w-xs">{s.description}</p>
                         </div>
-                        <h3 className="text-foreground font-semibold mb-2">{s.title}</h3>
-                        <p className="text-muted-foreground text-sm max-w-xs">{s.description}</p>
-                    </div>
                     ))}
                 </div>
             </div>
