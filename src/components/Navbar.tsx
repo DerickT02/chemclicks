@@ -126,12 +126,22 @@ export default function Navbar() {
     if (isSigningOut) return;
 
     setIsSigningOut(true);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-    setMobileOpen(false);
-    setIsSigningOut(false);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Sign out failed:", error.message);
+        return;
+      }
+
+      router.push("/login");
+      router.refresh();
+      setMobileOpen(false);
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    } finally {
+      setIsSigningOut(false);
+    }
   }
 
   return (

@@ -1,5 +1,5 @@
-import { getTeacherAccessRedirect } from "@/lib/auth/teacher-access";
-import { getAuthUser } from "@/lib/auth/server";
+import { getTeacherAccessRedirectFromClaims } from "@/lib/auth/teacher-access";
+import { getAuthClaims } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 
 export default async function TeacherGroupLayout({
@@ -7,10 +7,8 @@ export default async function TeacherGroupLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const {
-    data: { user },
-  } = await getAuthUser();
-  const redirectPath = getTeacherAccessRedirect(user);
+  const { data } = await getAuthClaims();
+  const redirectPath = getTeacherAccessRedirectFromClaims(data?.claims ?? null);
 
   if (redirectPath) {
     redirect(redirectPath);
