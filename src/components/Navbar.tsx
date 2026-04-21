@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const LINKS = {
   public: [
@@ -98,6 +99,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const role = navRoleFromPathname(pathname);
   const links = LINKS[role];
@@ -119,6 +121,18 @@ export default function Navbar() {
       router.push(`/#${id}`);
     }
   };
+
+  async function handleSignOut() {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+    setMobileOpen(false);
+    setIsSigningOut(false);
+  }
 
   return (
     <nav className="sticky top-0 z-50 relative flex h-14 items-center justify-between border-b border-foreground/10 bg-background px-6">
@@ -173,8 +187,13 @@ export default function Navbar() {
             Sign in
           </Link>
         ) : (
-          <button className={navbarCtaClassName}>
-            Sign out
+          <button
+            type="button"
+            className={navbarCtaClassName}
+            onClick={() => void handleSignOut()}
+            disabled={isSigningOut}
+          >
+            {isSigningOut ? "Signing out..." : "Sign out"}
           </button>
         )}
       </div>
@@ -236,8 +255,13 @@ export default function Navbar() {
             </Link>
           )}
           {(role === "teacher" || role === "student") && (
-            <button className="block w-full text-center text-sm font-semibold bg-accent text-accent-foreground px-4 py-2 rounded-lg mt-2 transition-opacity hover:opacity-90">
-              Sign out
+            <button
+              type="button"
+              className="block w-full text-center text-sm font-semibold bg-accent text-accent-foreground px-4 py-2 rounded-lg mt-2 transition-opacity hover:opacity-90"
+              onClick={() => void handleSignOut()}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "Signing out..." : "Sign out"}
             </button>
           )}
         </div>
