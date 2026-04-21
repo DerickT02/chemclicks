@@ -10,6 +10,10 @@ import {
   AuthPageLayout,
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
+import {
+  buildTeacherEmailRedirectTo,
+  getTeacherVerificationMessage,
+} from "@/lib/auth/teacher-email-verification";
 import { validateTeacherSignup } from "@/lib/auth/validate-teacher-signup";
 import { createClient } from "@/lib/supabase/client";
 
@@ -42,9 +46,7 @@ export default function TeacherCreateAccountPage() {
           }
         >
           <p className="text-sm text-muted-foreground" role="status">
-            We sent a verification link to <span className="font-medium text-foreground">{email}</span>.
-            Open your inbox and click the link to finish creating your teacher
-            account.
+            {getTeacherVerificationMessage(email)}
           </p>
         </AuthCard>
       </AuthPageLayout>
@@ -70,7 +72,7 @@ export default function TeacherCreateAccountPage() {
 
     const supabase = createClient();
     const normalizedEmail = email.trim();
-    const emailRedirectTo = `${window.location.origin}/auth/callback?redirect_to=${encodeURIComponent("/teacher/dashboard")}`;
+    const emailRedirectTo = buildTeacherEmailRedirectTo(window.location.origin);
 
     const { error } = await supabase.auth.signUp({
       email: normalizedEmail,
