@@ -6,15 +6,17 @@ import type { User } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
 function makeTeacherUser(emailConfirmedAt: string | null): User {
+  const normalizedEmailConfirmedAt = emailConfirmedAt ?? undefined;
+
   return {
     id: "5bf5f641-c426-4ec1-a683-df07d3e47f0a",
     aud: "authenticated",
     role: "authenticated",
     email: "teacher@example.com",
-    email_confirmed_at: emailConfirmedAt,
+    email_confirmed_at: normalizedEmailConfirmedAt,
     phone: "",
-    confirmed_at: emailConfirmedAt,
-    last_sign_in_at: null,
+    confirmed_at: normalizedEmailConfirmedAt,
+    last_sign_in_at: undefined,
     app_metadata: {},
     user_metadata: {},
     identities: [],
