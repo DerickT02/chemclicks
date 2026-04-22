@@ -3,8 +3,11 @@ import type { ComponentProps, ReactNode } from "react";
 export const authInputClassName =
   "rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring";
 
-export const authPrimaryButtonClassName =
-  "mt-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90";
+/** Matches navbar “Sign in” and homepage “Get Started” accent CTAs. */
+export const authAccentCtaClassName =
+  "inline-flex w-full items-center justify-center rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+export const authPrimaryButtonClassName = authAccentCtaClassName;
 
 /** Inline links / text buttons below the form (e.g. Create account, Forgot password) */
 export const authSecondaryLinkClassName =
