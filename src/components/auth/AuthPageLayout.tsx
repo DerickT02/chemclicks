@@ -23,13 +23,13 @@ export function AuthCard({
   children,
   footer,
 }: {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
 }) {
   return (
     <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-sm">
-      <h1 className="mb-6 text-xl font-semibold text-foreground">
+      <h1 className={`mb-6 font-semibold text-foreground`}>
         {title}
       </h1>
       {children}
