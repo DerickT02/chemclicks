@@ -48,7 +48,7 @@ export default function TeacherLoginPage() {
   return (
     <AuthPageLayout>
       <AuthCard
-        title="Login"
+        title="Teacher Login"
         footer={
           <AuthFooter className="flex flex-col gap-2">
             <Link href="/create-account/teacher" className={authSecondaryLinkClassName}>
@@ -61,6 +61,9 @@ export default function TeacherLoginPage() {
             >
               Forgot password?
             </button>
+            <Link href="/login/student" className={authSecondaryLinkClassName}>
+              Not a teacher?
+            </Link>
           </AuthFooter>
         }
       >
