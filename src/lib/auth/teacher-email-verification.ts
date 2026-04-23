@@ -1,4 +1,4 @@
-export const TEACHER_POST_VERIFY_PATH = "/teacher/dashboard";
+export const TEACHER_POST_VERIFY_PATH = "/admin";
 
 export function buildTeacherEmailRedirectTo(origin: string): string {
   return `${origin}/auth/callback?redirect_to=${encodeURIComponent(TEACHER_POST_VERIFY_PATH)}`;
