@@ -37,7 +37,9 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
 
-  return response;
+  // Refresh auth status
+  const { data: { user }, } = await supabase.auth.getUser();
+
+  return { response, user };
 }
