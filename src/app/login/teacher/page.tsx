@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   AuthCard,
@@ -13,9 +14,11 @@ import {
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
+import { FormEvent, useState } from "react";
 
 export default function TeacherLoginPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | undefined>();
@@ -26,7 +29,7 @@ export default function TeacherLoginPage() {
     // TODO. Blank for SCRUM-184.
   }
 
-  async function handleLogin(e: FormEvent) {
+  function handleLogin(e: FormEvent) {
     e.preventDefault();
     setEmailError(undefined);
     setPasswordError(undefined);
@@ -42,7 +45,8 @@ export default function TeacherLoginPage() {
       return;
     }
 
-    // Later: Supabase signInWithPassword logic will be wired here
+    // TODO: Supabase signInWithPassword; for now navigate to admin after client validation.
+    router.push("/admin");
   }
 
   return (
