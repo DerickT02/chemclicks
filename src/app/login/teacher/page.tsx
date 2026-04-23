@@ -2,9 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AuthCard,
   AuthField,
+  AuthFormError,
   AuthFooter,
   AuthPageLayout,
   AuthPrimaryButton,
@@ -13,10 +15,12 @@ import {
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
 
 export default function TeacherLoginPage() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
+  const verificationRequired = searchParams.get("verification") === "required";
 
   async function handleForgottenPassword() {
     // TODO. Blank for SCRUM-184.
@@ -87,6 +91,9 @@ export default function TeacherLoginPage() {
             }}
             error={passwordError}
           />
+          {verificationRequired ? (
+            <AuthFormError message="Please verify your email before signing in to teacher features." />
+          ) : null}
           <AuthPrimaryButton type="submit">Sign in</AuthPrimaryButton>
         </form>
       </AuthCard>
