@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AuthCard,
   AuthField,
@@ -13,13 +13,17 @@ import {
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
+import { createClient } from "@/lib/supabase/client";
 
 export default function TeacherLoginPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
+  const [formError, setFormError] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const verificationRequired = searchParams.get("verification") === "required";
 
   async function handleForgottenPassword() {
@@ -30,6 +34,7 @@ export default function TeacherLoginPage() {
     e.preventDefault();
     setEmailError(undefined);
     setPasswordError(undefined);
+    setFormError(undefined);
 
     const nextEmailError = validateTeacherEmail(email);
     if (nextEmailError) {
@@ -42,7 +47,37 @@ export default function TeacherLoginPage() {
       return;
     }
 
-    // Later: Supabase signInWithPassword logic will be wired here
+    setIsSubmitting(true);
+
+    const supabase = createClient();
+    const normalizedEmail = email.trim();
+
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (signInError) {
+      setFormError("Invalid email or password.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Confirm the user has an approved teacher account in public.teachers
+    const { data: teacher, error: teacherError } = await supabase
+      .from("teachers")
+      .select("id")
+      .eq("id", signInData.user.id)
+      .maybeSingle();
+
+    if (teacherError || !teacher) {
+      await supabase.auth.signOut();
+      setFormError("This account is not approved as a teacher. Please contact your administrator.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    router.push("/admin");
   }
 
   return (
@@ -97,7 +132,10 @@ export default function TeacherLoginPage() {
           {verificationRequired ? (
             <AuthFormError message="Please verify your email before signing in to teacher features." />
           ) : null}
-          <AuthPrimaryButton type="submit">Sign in</AuthPrimaryButton>
+          <AuthFormError message={formError} />
+          <AuthPrimaryButton type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in..." : "Sign in"}
+          </AuthPrimaryButton>
         </form>
       </AuthCard>
     </AuthPageLayout>
