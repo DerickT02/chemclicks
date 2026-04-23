@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function AdminPage() {
   return (
     <div className="min-h-screen bg-background p-10 text-foreground">
@@ -14,7 +16,15 @@ export default function AdminPage() {
           
           <div className="mt-10">
             <h3 className="text-lg font-medium">Add a class</h3>
-            <p className="mt-5 text-muted-foreground">Add class form component goes here</p>
+            <p className="mt-3 text-muted-foreground">
+              Set up a new class and share its join code with students.
+            </p>
+            <Link
+              href="/admin/create-class"
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Create class
+            </Link>
           </div>
         </div>
 
