@@ -7,7 +7,6 @@ export default function AdminPage() {
       <p className="mb-8 mt-2 text-muted-foreground">
         Teacher admin view. Create classes, share classroom codes, and see where students are in the lesson.
       </p>
-
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {/* Left Panel - Your Classes */}
         <div className="rounded-lg border border-border bg-card p-5">

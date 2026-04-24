@@ -7,6 +7,13 @@ function isAdminRoute(pathname: string): boolean {
     return ADMIN_ROUTES.some((adminRoute) => pathname.startsWith(adminRoute));
 }
 
+function getUserRole(user: User): string {
+    // TODO: we do not yet have role set up in JWT. after we do, connect this up
+    // OR, if we decide a DB call is fine here instead of JWT, implement
+    void user;
+    return "admin";
+}
+
 /**
  * Session refresh for Supabase (formerly `middleware.ts` in Next.js).
  * @see https://nextjs.org/docs/messages/middleware-to-proxy
@@ -23,6 +30,10 @@ export default async function proxy(request: NextRequest) {
   // Next pathname is an admin route
 
   if (!user) {
+    if (process.env.NODE_ENV === "development") {
+      // Scaffold: teacher login does not set a session yet; allow /admin locally.
+      return response;
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/login/teacher";
     url.searchParams.set("redirectedFrom", pathname);
