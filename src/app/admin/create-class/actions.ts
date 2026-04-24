@@ -1,4 +1,4 @@
-"use server";
+'use server';
 
 import { createClient } from "@/lib/supabase/server";
 import { insertClass } from "@/lib/db/classes";

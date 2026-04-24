@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -18,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function TeacherLoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | undefined>();
@@ -30,7 +30,7 @@ export default function TeacherLoginPage() {
     // TODO. Blank for SCRUM-184.
   }
 
-  async function handleLogin(e: FormEvent) {
+  function handleLogin(e: FormEvent) {
     e.preventDefault();
     setEmailError(undefined);
     setPasswordError(undefined);
