@@ -15,7 +15,7 @@ export type Class = {
 export type InsertClass = Pick<Class, "teacher_id" | "name" | "section" | "class_code">;
 
 /**
- * Inserts a row into `classes`. Call with the request-scoped client from
+ * Inserts a row into `classes`. Use the request-scoped client from
  * `@/lib/supabase/server` so RLS applies (`teacher_id` must match `auth.uid()`).
  */
 export async function insertClass(

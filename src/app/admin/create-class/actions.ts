@@ -5,8 +5,11 @@ import { insertClass } from "@/lib/db/classes";
 
 type CreateClassInput = {
   className: string;
-  classCode: number;
+  section: string;
+  classCode: string;
 };
+
+const CLASS_CODE_PATTERN = /^[A-Za-z0-9]{6}$/;
 
 export async function createClass(input: CreateClassInput): Promise<
   | { ok: true; classId: string }
@@ -15,13 +18,16 @@ export async function createClass(input: CreateClassInput): Promise<
   const name = input.className.trim();
   if (!name) return { ok: false, message: "Class name is required." };
 
-  if (!Number.isInteger(input.classCode)) {
-    return { ok: false, message: "Class code must be a 6-digit number." };
+  const rawCode = input.classCode.trim();
+  if (!CLASS_CODE_PATTERN.test(rawCode)) {
+    return {
+      ok: false,
+      message: "Class code must be exactly 6 letters or digits (e.g. A1B2C3).",
+    };
   }
 
-  if (input.classCode < 100_000 || input.classCode > 999_999) {
-    return { ok: false, message: "Class code must be 6 digits (100000–999999)." };
-  }
+  const class_code = rawCode.toUpperCase();
+  const section = input.section.trim();
 
   const supabase = await createClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -32,8 +38,8 @@ export async function createClass(input: CreateClassInput): Promise<
   const { data, error } = await insertClass(supabase, {
     teacher_id: userData.user.id,
     name,
-    section: "",
-    class_code: String(input.classCode),
+    section,
+    class_code,
   });
 
   if (error || !data) {
@@ -42,4 +48,3 @@ export async function createClass(input: CreateClassInput): Promise<
 
   return { ok: true, classId: data.id };
 }
-

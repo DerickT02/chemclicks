@@ -1,48 +1,23 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { createClass } from "./actions";
 
-const panelBg = "#1e2530";
-const fieldBg = "#2c3543";
-const labelColor = "#94a3b8";
-const accent = "#3d7d6e";
-
-type SaveClassButtonProps = {
-  disabled?: boolean;
-};
-
-function SaveClassButton({ disabled }: SaveClassButtonProps) {
-  return (
-    <button
-      type="submit"
-      disabled={disabled}
-      className="w-full rounded-lg py-3.5 text-base font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-      style={{ backgroundColor: accent, color: panelBg }}
-    >
-      Save class
-    </button>
-  );
-}
-
 export default function CreateClassPage() {
+  const router = useRouter();
   const [className, setClassName] = useState("");
-  const [classCode, setClassCode] = useState<number | "">("");
+  const [section, setSection] = useState("");
+  const [classCode, setClassCode] = useState("");
   const [classCodeError, setClassCodeError] = useState<string | undefined>();
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [submitSuccess, setSubmitSuccess] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
 
   function handleClassCodeChange(value: string) {
-    if (value === "") {
-      setClassCode("");
-      setClassCodeError(undefined);
-      return;
-    }
-    const n = Number.parseInt(value, 10);
-    if (Number.isNaN(n)) return;
-    if (n > 999_999) return;
-    setClassCode(n);
+    const next = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6);
+    setClassCode(next);
     if (classCodeError) setClassCodeError(undefined);
   }
 
@@ -55,8 +30,8 @@ export default function CreateClassPage() {
     const trimmedName = className.trim();
     if (!trimmedName) return;
 
-    if (classCode === "" || classCode < 100_000 || classCode > 999_999) {
-      setClassCodeError("Enter a 6-digit code (100000–999999).");
+    if (classCode.length !== 6) {
+      setClassCodeError("Enter a 6-character code using letters A–Z and digits 0–9.");
       return;
     }
 
@@ -64,6 +39,7 @@ export default function CreateClassPage() {
       void (async () => {
         const result = await createClass({
           className: trimmedName,
+          section,
           classCode,
         });
 
@@ -72,30 +48,40 @@ export default function CreateClassPage() {
           return;
         }
 
-        setSubmitSuccess("Class saved.");
+        setSubmitSuccess("Class created.");
         setClassName("");
+        setSection("");
         setClassCode("");
+        router.refresh();
       })();
     });
   }
 
-  const isCodeComplete =
-    classCode !== "" && classCode >= 100_000 && classCode <= 999_999;
+  const isCodeComplete = classCode.length === 6;
 
   return (
-    <div
-      className="flex min-h-screen items-center justify-center p-6"
-      style={{ backgroundColor: panelBg }}
-    >
-      <div
-        className="w-full max-w-md rounded-xl p-6 shadow-lg"
-        style={{ backgroundColor: panelBg }}
-      >
-        <h1 className="mb-6 text-lg font-bold text-white">Add a class</h1>
+    <div className="min-h-screen bg-background p-6 text-foreground md:p-10">
+      <div className="mx-auto max-w-md">
+        <Link
+          href="/admin"
+          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        >
+          ← Back to classrooms
+        </Link>
 
-        <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="className" className="text-sm" style={{ color: labelColor }}>
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight">Add a class</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Choose a display name, section label (optional), and a unique 6-character code
+          students will use to join.
+        </p>
+
+        <form
+          className="mt-8 flex flex-col gap-5 rounded-lg border border-border bg-card p-6 shadow-sm"
+          onSubmit={handleSubmit}
+          noValidate
+        >
+          <div className="flex flex-col gap-2">
+            <label htmlFor="className" className="text-sm font-medium">
               Class name
             </label>
             <input
@@ -106,44 +92,65 @@ export default function CreateClassPage() {
               placeholder="e.g. Chemistry Period 3"
               value={className}
               onChange={(e) => setClassName(e.target.value)}
-              className="w-full rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#3d7d6e]/50"
-              style={{ backgroundColor: fieldBg }}
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="classCode" className="text-sm" style={{ color: labelColor }}>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="section" className="text-sm font-medium">
+              Section{" "}
+              <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <input
+              id="section"
+              name="section"
+              type="text"
+              autoComplete="off"
+              placeholder="e.g. Fall 2026 · Room 204"
+              value={section}
+              onChange={(e) => setSection(e.target.value)}
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="classCode" className="text-sm font-medium">
               Class code
             </label>
             <input
               id="classCode"
               name="classCode"
-              type="number"
-              inputMode="numeric"
-              min={100_000}
-              max={999_999}
-              step={1}
-              placeholder="e.g. 482931"
-              value={classCode === "" ? "" : classCode}
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              maxLength={6}
+              placeholder="e.g. A1B2C3"
+              value={classCode}
               onChange={(e) => handleClassCodeChange(e.target.value)}
-              className="w-full rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#3d7d6e]/50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              style={{ backgroundColor: fieldBg }}
+              className="rounded-md border border-border bg-background px-3 py-2 font-mono text-sm uppercase tracking-widest outline-none ring-ring focus:ring-2"
             />
+            <p className="text-xs text-muted-foreground">
+              Six letters or numbers only. Stored in uppercase.
+            </p>
             {classCodeError ? (
-              <p className="text-sm text-red-400">{classCodeError}</p>
+              <p className="text-sm text-destructive">{classCodeError}</p>
             ) : null}
           </div>
 
           {submitError ? (
-            <p className="text-sm text-red-400">{submitError}</p>
+            <p className="text-sm text-destructive">{submitError}</p>
           ) : null}
           {submitSuccess ? (
-            <p className="text-sm text-emerald-300">{submitSuccess}</p>
+            <p className="text-sm text-accent">{submitSuccess}</p>
           ) : null}
 
-          <SaveClassButton
+          <button
+            type="submit"
             disabled={!className.trim() || !isCodeComplete || isPending}
-          />
+            className="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isPending ? "Saving…" : "Create class"}
+          </button>
         </form>
       </div>
     </div>

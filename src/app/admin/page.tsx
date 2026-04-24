@@ -16,7 +16,7 @@ export default function AdminPage() {
           <div className="mt-10">
             <h3 className="text-lg font-medium">Add a class</h3>
             <p className="mt-3 text-muted-foreground">
-              Set up a new class and get a code to share with students.
+              Set up a new class and share its join code with students.
             </p>
             <Link
               href="/admin/create-class"
