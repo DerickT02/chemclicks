@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const LINKS = {
@@ -90,7 +90,7 @@ function scrollToIdSmooth(id: string) {
 }
 
 function navRoleFromPathname(pathname: string): Role {
-  if (pathname.startsWith("/teacher")) return "teacher";
+  if (pathname.startsWith("/teacher") || pathname.startsWith("/admin")) return "teacher";
   if (pathname.startsWith("/student")) return "student";
   return "public";
 }
@@ -100,9 +100,11 @@ export default function Navbar() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const role = navRoleFromPathname(pathname);
   const links = LINKS[role];
+  const showPublicAuthCta = role === "public" && !isAuthenticated;
 
   const logoHref =
     role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
@@ -121,6 +123,24 @@ export default function Navbar() {
       router.push(`/#${id}`);
     }
   };
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    void supabase.auth.getSession().then(({ data }) => {
+      setIsAuthenticated(Boolean(data.session));
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session));
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   async function handleSignOut() {
     if (isSigningOut) return;
@@ -189,7 +209,7 @@ export default function Navbar() {
       </div>
 
       <div className="hidden md:flex items-center gap-3 ml-4">
-        {role === "public" ? (
+        {showPublicAuthCta ? (
           <Link
             href="/login"
             className={navbarCtaClassName}
@@ -255,7 +275,7 @@ export default function Navbar() {
               </Link>
             )
           )}
-          {role === "public" && (
+          {showPublicAuthCta && (
             <Link
               href="/login"
               className="block text-sm font-semibold text-center bg-accent text-accent-foreground px-4 py-2 rounded-lg mt-2 transition-opacity hover:opacity-90"
