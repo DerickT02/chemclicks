@@ -5,11 +5,13 @@ import { useState, type FormEvent } from "react";
 import {
   AuthCard,
   AuthField,
+  AuthFormError,
   AuthFooter,
   AuthPageLayout,
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
+import { createStudentAccount } from "./actions";
 
 export default function StudentCreateAccountPage() {
   const [firstName, setFirstName] = useState("");
@@ -20,13 +22,17 @@ export default function StudentCreateAccountPage() {
   const [lastNameError, setLastNameError] = useState<string | undefined>();
   const [studentIDError, setStudentIDError] = useState<string | undefined>();
   const [codeError, setCodeError] = useState<string | undefined>();
+  const [formError, setFormError] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [accountCreated, setAccountCreated] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFirstNameError(undefined);
     setLastNameError(undefined);
     setStudentIDError(undefined);
     setCodeError(undefined);
+    setFormError(undefined);
 
     const result = validateStudentSignup(firstName, lastName, studentID, code);
     if (!result.valid) {
@@ -37,12 +43,48 @@ export default function StudentCreateAccountPage() {
       return;
     }
 
-    setFirstName(firstName.trim());
-    setLastName(lastName.trim());
-    setStudentID(studentID.trim());
-    setCode(code.trim());
+    setIsSubmitting(true);
 
-    // Supabase sign-up will be wired here later
+    const response = await createStudentAccount({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      studentID: studentID.trim(),
+      code: code.trim(),
+    });
+
+    setIsSubmitting(false);
+
+    if (!response.ok) {
+      setFormError(response.message);
+      return;
+    }
+
+    setAccountCreated(true);
+  }
+
+  if (accountCreated) {
+    return (
+      <AuthPageLayout>
+        <AuthCard
+          title="Account pending"
+          footer={
+            <AuthFooter className="text-muted-foreground">
+              Already approved?{" "}
+              <Link
+                href="/login/student"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Sign in
+              </Link>
+            </AuthFooter>
+          }
+        >
+          <p className="text-sm text-muted-foreground" role="status">
+            Your account has been created. Your teacher needs to approve you before you can log in.
+          </p>
+        </AuthCard>
+      </AuthPageLayout>
+    );
   }
 
   return (
@@ -90,7 +132,7 @@ export default function StudentCreateAccountPage() {
             id="signup-student-id"
             label="Student ID"
             type="text"
-            placeholder="Student ID Placeholder" // TODO SCRUM-228: we do not yet know the format, this may be invalid
+            placeholder="Student ID Placeholder"
             value={studentID}
             onChange={(e) => {
               setStudentID(e.target.value);
@@ -111,7 +153,10 @@ export default function StudentCreateAccountPage() {
             }}
             error={codeError}
           />
-          <AuthPrimaryButton>Create account</AuthPrimaryButton>
+          <AuthFormError message={formError} />
+          <AuthPrimaryButton type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating account..." : "Create account"}
+          </AuthPrimaryButton>
         </form>
       </AuthCard>
     </AuthPageLayout>

@@ -31,6 +31,11 @@ function generateClassCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
+/** Returns a unique student_id for tests so parallel runs don't collide. */
+function generateStudentId(): string {
+  return `TEST-${Math.random().toString(36).slice(2, 10).toUpperCase()}`
+}
+
 async function insertTestClass(teacherId: string): Promise<string> {
   const { data, error } = await supabase
     .from('classes')
@@ -41,10 +46,15 @@ async function insertTestClass(teacherId: string): Promise<string> {
   return data.id
 }
 
-async function insertStudent(classId: string, firstName = 'Alice', lastName = 'Smith') {
+async function insertStudent(
+  classId: string,
+  firstName = 'Alice',
+  lastName = 'Smith',
+  studentId: string = generateStudentId(),
+) {
   return supabase
     .from('students')
-    .insert({ class_id: classId, first_name: firstName, last_name: lastName })
+    .insert({ class_id: classId, student_id: studentId, first_name: firstName, last_name: lastName })
     .select('*')
     .single()
 }
@@ -134,13 +144,30 @@ describe('students table schema', () => {
       expect(createdAt).toBeGreaterThanOrEqual(before)
       expect(createdAt).toBeLessThanOrEqual(after)
     })
+
+    it('defaults verified to false', async () => {
+      const { data, error } = await insertStudent(primaryClassId)
+      if (data?.id) track.studentIds.push(data.id)
+
+      expect(error).toBeNull()
+      expect(data!.verified).toBe(false)
+    })
   })
 
   describe('NOT NULL constraints (pg error 23502)', () => {
     it('rejects insert without class_id', async () => {
       const { error } = await supabase
         .from('students')
-        .insert({ first_name: 'Alice', last_name: 'Smith' })
+        .insert({ student_id: generateStudentId(), first_name: 'Alice', last_name: 'Smith' })
+        .select()
+
+      expect(error?.code).toBe('23502')
+    })
+
+    it('rejects insert without student_id', async () => {
+      const { error } = await supabase
+        .from('students')
+        .insert({ class_id: primaryClassId, first_name: 'Alice', last_name: 'Smith' })
         .select()
 
       expect(error?.code).toBe('23502')
@@ -149,7 +176,7 @@ describe('students table schema', () => {
     it('rejects insert without first_name', async () => {
       const { error } = await supabase
         .from('students')
-        .insert({ class_id: primaryClassId, last_name: 'Smith' })
+        .insert({ class_id: primaryClassId, student_id: generateStudentId(), last_name: 'Smith' })
         .select()
 
       expect(error?.code).toBe('23502')
@@ -158,31 +185,46 @@ describe('students table schema', () => {
     it('rejects insert without last_name', async () => {
       const { error } = await supabase
         .from('students')
-        .insert({ class_id: primaryClassId, first_name: 'Alice' })
+        .insert({ class_id: primaryClassId, student_id: generateStudentId(), first_name: 'Alice' })
         .select()
 
       expect(error?.code).toBe('23502')
     })
   })
 
-  describe('UNIQUE constraint — (class_id, first_name, last_name) (pg error 23505)', () => {
-    it('rejects a duplicate student in the same class', async () => {
-      const { data: first } = await insertStudent(primaryClassId, 'Alice', 'Smith')
+  describe('UNIQUE constraint — (class_id, student_id) (pg error 23505)', () => {
+    it('rejects a duplicate student_id in the same class', async () => {
+      const sharedId = generateStudentId()
+
+      const { data: first } = await insertStudent(primaryClassId, 'Alice', 'Smith', sharedId)
       if (first?.id) track.studentIds.push(first.id)
 
-      const { error } = await insertStudent(primaryClassId, 'Alice', 'Smith')
+      const { error } = await insertStudent(primaryClassId, 'Bob', 'Jones', sharedId)
 
       expect(error?.code).toBe('23505')
     })
 
-    it('allows the same name in a different class', async () => {
+    it('allows the same student_id in a different class', async () => {
       const secondClassId = await insertTestClass(teacherId)
       track.classIds.push(secondClassId)
 
-      const { data: s1 } = await insertStudent(primaryClassId, 'Alice', 'Smith')
+      const sharedId = generateStudentId()
+
+      const { data: s1 } = await insertStudent(primaryClassId, 'Alice', 'Smith', sharedId)
       if (s1?.id) track.studentIds.push(s1.id)
 
-      const { data: s2, error } = await insertStudent(secondClassId, 'Alice', 'Smith')
+      const { data: s2, error } = await insertStudent(secondClassId, 'Alice', 'Smith', sharedId)
+      if (s2?.id) track.studentIds.push(s2.id)
+
+      expect(error).toBeNull()
+      expect(s2).not.toBeNull()
+    })
+
+    it('allows two students with the same name in the same class if student_id differs', async () => {
+      const { data: s1 } = await insertStudent(primaryClassId, 'Alice', 'Smith', generateStudentId())
+      if (s1?.id) track.studentIds.push(s1.id)
+
+      const { data: s2, error } = await insertStudent(primaryClassId, 'Alice', 'Smith', generateStudentId())
       if (s2?.id) track.studentIds.push(s2.id)
 
       expect(error).toBeNull()
@@ -196,6 +238,7 @@ describe('students table schema', () => {
         .from('students')
         .insert({
           class_id: '00000000-0000-0000-0000-000000000000',
+          student_id: generateStudentId(),
           first_name: 'Alice',
           last_name: 'Smith',
         })
