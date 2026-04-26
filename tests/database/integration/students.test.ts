@@ -58,9 +58,10 @@ async function insertClass(teacherId: string): Promise<string> {
 }
 
 async function insertStudent(classId: string, firstName: string, lastName: string): Promise<string> {
+  const studentId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const { data, error } = await supabase
     .from('students')
-    .insert({ class_id: classId, first_name: firstName, last_name: lastName })
+    .insert({ class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
     .select('id')
     .single()
   if (error) throw new Error(`insertStudent failed: ${error.message}`)

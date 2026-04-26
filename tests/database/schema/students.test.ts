@@ -42,9 +42,10 @@ async function insertTestClass(teacherId: string): Promise<string> {
 }
 
 async function insertStudent(classId: string, firstName = 'Alice', lastName = 'Smith') {
+  const studentId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   return supabase
     .from('students')
-    .insert({ class_id: classId, first_name: firstName, last_name: lastName })
+    .insert({ class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
     .select('*')
     .single()
 }
@@ -140,7 +141,7 @@ describe('students table schema', () => {
     it('rejects insert without class_id', async () => {
       const { error } = await supabase
         .from('students')
-        .insert({ first_name: 'Alice', last_name: 'Smith' })
+        .insert({ first_name: 'Alice', last_name: 'Smith', student_id: 'test-no-class' })
         .select()
 
       expect(error?.code).toBe('23502')
@@ -149,7 +150,7 @@ describe('students table schema', () => {
     it('rejects insert without first_name', async () => {
       const { error } = await supabase
         .from('students')
-        .insert({ class_id: primaryClassId, last_name: 'Smith' })
+        .insert({ class_id: primaryClassId, last_name: 'Smith', student_id: 'test-no-first' })
         .select()
 
       expect(error?.code).toBe('23502')
@@ -158,31 +159,37 @@ describe('students table schema', () => {
     it('rejects insert without last_name', async () => {
       const { error } = await supabase
         .from('students')
-        .insert({ class_id: primaryClassId, first_name: 'Alice' })
+        .insert({ class_id: primaryClassId, first_name: 'Alice', student_id: 'test-no-last' })
         .select()
 
       expect(error?.code).toBe('23502')
     })
   })
 
-  describe('UNIQUE constraint — (class_id, first_name, last_name) (pg error 23505)', () => {
-    it('rejects a duplicate student in the same class', async () => {
-      const { data: first } = await insertStudent(primaryClassId, 'Alice', 'Smith')
+  describe('UNIQUE constraint — student_id (pg error 23505)', () => {
+    it('rejects a duplicate student_id', async () => {
+      const sharedStudentId = `test-dup-${Date.now()}`
+
+      const { data: first } = await supabase
+        .from('students')
+        .insert({ class_id: primaryClassId, first_name: 'Alice', last_name: 'Smith', student_id: sharedStudentId })
+        .select('id')
+        .single()
       if (first?.id) track.studentIds.push(first.id)
 
-      const { error } = await insertStudent(primaryClassId, 'Alice', 'Smith')
+      const { error } = await supabase
+        .from('students')
+        .insert({ class_id: primaryClassId, first_name: 'Bob', last_name: 'Jones', student_id: sharedStudentId })
+        .select()
 
       expect(error?.code).toBe('23505')
     })
 
-    it('allows the same name in a different class', async () => {
-      const secondClassId = await insertTestClass(teacherId)
-      track.classIds.push(secondClassId)
-
+    it('allows the same student name with a different student_id', async () => {
       const { data: s1 } = await insertStudent(primaryClassId, 'Alice', 'Smith')
       if (s1?.id) track.studentIds.push(s1.id)
 
-      const { data: s2, error } = await insertStudent(secondClassId, 'Alice', 'Smith')
+      const { data: s2, error } = await insertStudent(primaryClassId, 'Alice', 'Smith')
       if (s2?.id) track.studentIds.push(s2.id)
 
       expect(error).toBeNull()
@@ -198,6 +205,7 @@ describe('students table schema', () => {
           class_id: '00000000-0000-0000-0000-000000000000',
           first_name: 'Alice',
           last_name: 'Smith',
+          student_id: 'test-bad-class',
         })
         .select()
 

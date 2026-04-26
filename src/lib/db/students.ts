@@ -7,6 +7,8 @@ export type Student = {
   first_name: string
   last_name: string
   created_at: string  // ISO 8601 timestamp, auto-set
+  student_id: string  // text, unique username / PIN, NOT NULL
+  verified: boolean   // defaults to false
 }
 
-export type InsertStudent = Pick<Student, 'class_id' | 'first_name' | 'last_name'>
+export type InsertStudent = Pick<Student, 'class_id' | 'first_name' | 'last_name' | 'student_id'>
