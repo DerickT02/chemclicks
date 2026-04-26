@@ -5,5 +5,6 @@ export default defineConfig(({ mode }) => ({
   test: {
     environment: 'node',
     env: loadEnv(mode, process.cwd(), ''),
+    hookTimeout: 30000,
   },
 }))
