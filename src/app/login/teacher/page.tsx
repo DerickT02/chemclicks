@@ -13,11 +13,12 @@ import {
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
 import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { type FormEvent } from "react";
 
 export default function TeacherLoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | undefined>();
@@ -30,7 +31,7 @@ export default function TeacherLoginPage() {
     // TODO. Blank for SCRUM-184.
   }
 
-  function handleLogin(e: FormEvent) {
+  async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setEmailError(undefined);
     setPasswordError(undefined);
