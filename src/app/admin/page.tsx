@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 type ProgressStatus = "not_started" | "in_progress" | "completed";
@@ -114,6 +115,21 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
+  async function removeSelectedClass(formData: FormData) {
+    "use server";
+    const id = formData.get("classId") as string;
+    if (!id) return;
+    const supabase = await createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+    await supabase
+      .from("classes")
+      .delete()
+      .eq("id", id)
+      .eq("teacher_id", userData.user.id);
+    redirect("/admin");
+  }
+
   return (
     <div className="min-h-screen bg-background px-6 py-10 text-foreground md:px-10">
       <div className="mx-auto max-w-6xl">
@@ -184,11 +200,22 @@ export default async function AdminPage({
               </div>
             ) : (
               <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-2xl font-semibold text-foreground">{selectedClass.name}</h2>
-                  <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-foreground">
-                    {selectedClass.class_code}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="text-2xl font-semibold text-foreground">{selectedClass.name}</h2>
+                    <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-foreground">
+                      {selectedClass.class_code}
+                    </span>
+                  </div>
+                  <form action={removeSelectedClass}>
+                    <input type="hidden" name="classId" value={selectedClass.id} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-destructive px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      Remove class
+                    </button>
+                  </form>
                 </div>
                 {selectedClass.section ? (
                   <p className="mt-2 text-sm text-muted-foreground">{selectedClass.section}</p>
