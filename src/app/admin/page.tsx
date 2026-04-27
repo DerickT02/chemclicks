@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { deleteClass } from "@/lib/db/classes";
 
 type ProgressStatus = "not_started" | "in_progress" | "completed";
 
@@ -122,11 +123,7 @@ export default async function AdminPage({
     const supabase = await createClient();
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    await supabase
-      .from("classes")
-      .delete()
-      .eq("id", id)
-      .eq("teacher_id", userData.user.id);
+    await deleteClass(supabase, id);
     redirect("/admin");
   }
 
