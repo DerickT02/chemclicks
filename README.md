@@ -33,7 +33,7 @@ ChemClicks is developed as a senior capstone project at **California State Unive
 
 ## 🗂️ Entity Relationship Diagram
 
-![ChemClicks ERD](public/erd.png)
+![ChemClicks ERD](public/ERD.png)
 
 **Tables:** `STUDENTS` · `TEACHERS` · `CLASSES` · `CLASS_ACTIVITIES` · `ACTIVITES` · `QUESTIONS` · `ANSWERS` · `STUDENT_ATTEMPTS` · `ATTEMPT_RESPONSES` · `STUDENT_PROGRESS`
 
