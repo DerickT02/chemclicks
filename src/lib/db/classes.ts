@@ -1,5 +1,7 @@
 // Logic and types regarding the CLASSES table.
 
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+
 export type Class = {
   id: string          // UUID, auto-generated
   teacher_id: string  // UUID, FK → teachers.id
@@ -10,4 +12,39 @@ export type Class = {
   created_at: string  // ISO 8601 timestamp, auto-set
 }
 
-export type InsertClass = Pick<Class, 'teacher_id' | 'name' | 'section' | 'class_code'>
+export type InsertClass = Pick<Class, "teacher_id" | "name" | "section" | "class_code">;
+
+/**
+ * Deletes a row from `classes` by id. RLS enforces that only the owning teacher
+ * can delete (teacher_id = auth.uid()), so use the request-scoped server client.
+ */
+export async function deleteClass(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<{ error: PostgrestError | null }> {
+  const { error } = await supabase.from("classes").delete().eq("id", id);
+  return { error };
+}
+
+/**
+ * Inserts a row into `classes`. Use the request-scoped client from
+ * `@/lib/supabase/server` so RLS applies (`teacher_id` must match `auth.uid()`).
+ */
+export async function insertClass(
+  supabase: SupabaseClient,
+  row: InsertClass,
+): Promise<{ data: Class | null; error: PostgrestError | null }> {
+  const { data, error } = await supabase
+    .from("classes")
+    .insert(row)
+    .select(
+      "id, teacher_id, name, section, class_code, is_active, created_at",
+    )
+    .single();
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  return { data: data as Class, error: null };
+}

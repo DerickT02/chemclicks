@@ -3,6 +3,7 @@ import {
   AuthCard,
   AuthFooter,
   AuthPageLayout,
+  authAccentCtaClassName,
 } from "@/components/auth/AuthPageLayout";
 
 export default function LoginRolePage() {
@@ -23,10 +24,10 @@ export default function LoginRolePage() {
         }
       >
         <div className="flex flex-col gap-3">
-          <Link href="/login/teacher" className="rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+          <Link href="/login/teacher" className={authAccentCtaClassName}>
             Teacher
           </Link>
-          <Link href="/login/student" className="rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+          <Link href="/login/student" className={authAccentCtaClassName}>
             Student
           </Link>
         </div>

@@ -9,28 +9,37 @@ import {
   AuthPageLayout,
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
-import { normalizeAuthUsername } from "@/lib/auth/validate-auth-username";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
 
 export default function StudentCreateAccountPage() {
-  const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [studentID, setStudentID] = useState("");
   const [code, setCode] = useState("");
-  const [usernameError, setUsernameError] = useState<string | undefined>();
+  const [firstNameError, setFirstNameError] = useState<string | undefined>();
+  const [lastNameError, setLastNameError] = useState<string | undefined>();
+  const [studentIDError, setStudentIDError] = useState<string | undefined>();
   const [codeError, setCodeError] = useState<string | undefined>();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setUsernameError(undefined);
+    setFirstNameError(undefined);
+    setLastNameError(undefined);
+    setStudentIDError(undefined);
     setCodeError(undefined);
 
-    const result = validateStudentSignup(username, code);
+    const result = validateStudentSignup(firstName, lastName, studentID, code);
     if (!result.valid) {
-      setUsernameError(result.usernameError);
+      setFirstNameError(result.firstNameError);
+      setLastNameError(result.lastNameError);
+      setStudentIDError(result.studentIDError);
       setCodeError(result.codeError);
       return;
     }
 
-    setUsername(normalizeAuthUsername(username));
+    setFirstName(firstName.trim());
+    setLastName(lastName.trim());
+    setStudentID(studentID.trim());
     setCode(code.trim());
 
     // Supabase sign-up will be wired here later
@@ -54,17 +63,40 @@ export default function StudentCreateAccountPage() {
       >
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <AuthField
-            id="signup-username"
-            label="Username"
+            id="signup-first-name"
+            label="First Name"
             type="text"
-            placeholder="myName123"
-            autoComplete="username"
-            value={username}
+            placeholder="John"
+            value={firstName}
             onChange={(e) => {
-              setUsername(e.target.value);
-              if (usernameError) setUsernameError(undefined);
+              setFirstName(e.target.value);
+              if (firstNameError) setFirstNameError(undefined);
             }}
-            error={usernameError}
+            error={firstNameError}
+          />
+          <AuthField
+            id="signup-last-name"
+            label="Last Name"
+            type="text"
+            placeholder="Smith"
+            value={lastName}
+            onChange={(e) => {
+              setLastName(e.target.value);
+              if (lastNameError) setLastNameError(undefined);
+            }}
+            error={lastNameError}
+          />
+          <AuthField
+            id="signup-student-id"
+            label="Student ID"
+            type="text"
+            placeholder="Student ID Placeholder" // TODO SCRUM-228: we do not yet know the format, this may be invalid
+            value={studentID}
+            onChange={(e) => {
+              setStudentID(e.target.value);
+              if (studentIDError) setStudentIDError(undefined);
+            }}
+            error={studentIDError}
           />
           <AuthField
             id="signup-classroom-code"

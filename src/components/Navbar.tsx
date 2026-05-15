@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const LINKS = {
   public: [
@@ -89,7 +90,7 @@ function scrollToIdSmooth(id: string) {
 }
 
 function navRoleFromPathname(pathname: string): Role {
-  if (pathname.startsWith("/teacher")) return "teacher";
+  if (pathname.startsWith("/teacher") || pathname.startsWith("/admin")) return "teacher";
   if (pathname.startsWith("/student")) return "student";
   return "public";
 }
@@ -98,12 +99,17 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const role = navRoleFromPathname(pathname);
   const links = LINKS[role];
+  const showPublicAuthCta = role === "public" && !isAuthenticated;
 
   const logoHref =
     role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
+  const navbarCtaClassName =
+    "text-sm font-semibold px-4 py-1.5 rounded-lg bg-accent text-accent-foreground transition-opacity hover:opacity-90 whitespace-nowrap";
 
   const handleScroll = (href: string) => {
     const id = href.replace(/^#/, "");
@@ -117,6 +123,46 @@ export default function Navbar() {
       router.push(`/#${id}`);
     }
   };
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    void supabase.auth.getSession().then(({ data }) => {
+      setIsAuthenticated(Boolean(data.session));
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session));
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function handleSignOut() {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Sign out failed:", error.message);
+        return;
+      }
+
+      router.push("/login");
+      router.refresh();
+      setMobileOpen(false);
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
 
   return (
     <nav className="sticky top-0 z-50 relative flex h-14 items-center justify-between border-b border-foreground/10 bg-background px-6">
@@ -163,44 +209,22 @@ export default function Navbar() {
       </div>
 
       <div className="hidden md:flex items-center gap-3 ml-4">
-        {role === "public" ? (
+        {showPublicAuthCta ? (
           <Link
             href="/login"
-            className="text-sm font-semibold px-4 py-1.5 rounded-lg bg-accent text-accent-foreground transition-opacity hover:opacity-90 whitespace-nowrap"
+            className={navbarCtaClassName}
           >
             Sign in
           </Link>
-        ) : role === "teacher" ? (
-          <button className="text-sm font-medium px-4 py-1.5 rounded-full border border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40 transition-colors duration-200 whitespace-nowrap">
-            Sign out
-          </button>
         ) : (
-          <>
-            <button
-              aria-label="Notifications"
-              className="p-2 rounded-full text-foreground/50 hover:text-foreground hover:bg-foreground/10 transition-colors duration-200"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-            </button>
-            <button
-              aria-label="Profile"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-foreground/20 text-foreground/60 hover:text-foreground hover:border-foreground/40 transition-colors duration-200"
-            >
-              <div className="w-5 h-5 rounded-full bg-foreground/20 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium capitalize">{role}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-          </>
+          <button
+            type="button"
+            className={navbarCtaClassName}
+            onClick={() => void handleSignOut()}
+            disabled={isSigningOut}
+          >
+            {isSigningOut ? "Signing out..." : "Sign out"}
+          </button>
         )}
       </div>
 
@@ -251,7 +275,7 @@ export default function Navbar() {
               </Link>
             )
           )}
-          {role === "public" && (
+          {showPublicAuthCta && (
             <Link
               href="/login"
               className="block text-sm font-semibold text-center bg-accent text-accent-foreground px-4 py-2 rounded-lg mt-2 transition-opacity hover:opacity-90"
@@ -260,9 +284,14 @@ export default function Navbar() {
               Sign in
             </Link>
           )}
-          {role === "teacher" && (
-            <button className="block w-full text-left text-sm font-medium text-foreground/50 hover:text-foreground px-3 py-2 rounded-md transition-colors duration-200">
-              Sign out
+          {(role === "teacher" || role === "student") && (
+            <button
+              type="button"
+              className="block w-full text-center text-sm font-semibold bg-accent text-accent-foreground px-4 py-2 rounded-lg mt-2 transition-opacity hover:opacity-90"
+              onClick={() => void handleSignOut()}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "Signing out..." : "Sign out"}
             </button>
           )}
         </div>
