@@ -206,16 +206,8 @@ npm run start
 
 ---
 
-### 🔲 Sprint 4
-**Status:** *(placeholder — update with JIRA milestones)*
 
-| Story | Description | Status |
-|-------|-------------|--------|
-| *(Sprint 4 story)* | *(Description)* | 🔲 To Do |
-
----
-
-### 🔐 Sprint 5 — Authentication & Teacher Dashboard
+### 🔐 Sprint 4 — Authentication & Teacher Dashboard
 **Status:** ✅ Complete
 
 | Story | Description |
