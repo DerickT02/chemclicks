@@ -167,56 +167,86 @@ npm run start
 
 ## 📅 Project Timeline & Milestones
 
-> Managed via JIRA — Scrum methodology with 2-week sprints.
+> Planned for CSC 191 — continued Scrum development with 2-week sprints.
 
-### 🏁 Sprint 1 — Foundation
-**Status:** ✅ Complete
-
-| Story | Description |
-|-------|-------------|
-| Project scaffolding | Initialize Next.js + Tailwind + Supabase |
-| Repo setup | Branch strategy, ESLint config, `.gitignore` |
-| Database schema v1 | Users, modules, progress tables |
-| Auth flow | Supabase Auth: student & instructor login |
-| Landing page | Basic homepage and routing |
-
----
-
-### 🔨 Sprint 2 — Boilerplate & Project Setup
-**Status:** ✅ Complete
+### ⚛️ Sprint 5 — Bohr Model Learning Modules
+**Status:** 🔜 Planned
 
 | Story | Description |
 |-------|-------------|
-| Next.js scaffolding | Initialized app with TypeScript, Tailwind, ESLint configs |
-| Supabase integration | Connected Supabase client, set up environment variables |
-| Folder structure | Established `src/`, `database/`, `public/` directory layout |
-| Config files | Set up `next.config.ts`, `tsconfig.json`, `postcss.config.mjs` |
-| Git hygiene | `.gitignore`, `.hintrc`, initial branch strategy enforced |
+| Bohr model introduction | Build an interactive Bohr model builder for the first 20 elements, from Hydrogen through Calcium |
+| Element picker | Allow students to select an element and automatically generate the correct electron shell layout |
+| Shell visualization | Render concentric electron shells with glowing electron dots and a labeled nucleus |
+| Stability explorer | Add an interactive panel where students adjust protons and electrons to explore atomic stability |
+| Charge calculation | Display noble-gas stability, neutral-charge stability, and overall ionic charge |
+| Bohr model quiz | Add a quiz at the end of the Bohr Models section that must be completed before moving forward |
 
 ---
 
-### 🏠 Sprint 3 — Homepage
-**Status:** ✅ Complete
+### 🧪 Sprint 6 — Lewis Diagrams & Chemical Bonding
+**Status:** 🔜 Planned
 
 | Story | Description |
 |-------|-------------|
-| Homepage design | Built and styled the landing/homepage UI |
-| Navigation | Header, routing, and page layout structure |
-| Static content | Initial copy, layout components, and visual polish |
+| Lewis dot diagrams | Build a Lewis diagram module showing valence electrons for the first 20 elements |
+| Mini Bohr comparison | Display a mini Bohr model next to the Lewis dot diagram for the selected element |
+| Covalent compounds | Add interactive visualizations for compounds such as H₂, O₂, N₂, HF, H₂O, CO₂, NH₃, and CH₄ |
+| Bond visualization | Show single, double, and triple bonds using shared electron-pair diagrams |
+| Ionic compounds | Add ionic compound examples such as NaCl, MgO, CaF₂, and Al₂O₃ |
+| Charge balancing | Show how cations and anions combine to create neutral ionic compounds |
+| Lewis structures quiz | Add a quiz at the end of the Lewis Structures section that must be completed before moving forward |
 
 ---
 
-
-### 🔐 Sprint 4 — Authentication & Teacher Dashboard
-**Status:** ✅ Complete
+### 📏 Sprint 7 — Measurement Uncertainty Lab
+**Status:** 🔜 Planned
 
 | Story | Description |
 |-------|-------------|
-| Authentication | Supabase Auth integration — student & instructor login/signup |
-| Role-based access | Route protection based on user role (student vs. instructor) |
-| Teacher dashboard | Instructor-facing dashboard UI — class overview and management |
+| Ruler simulation | Build an interactive ruler with tick marks from 0 to 10 and a draggable cursor |
+| Tenths-place measurement | Display live ruler measurements rounded to the tenths place |
+| Hundredths-place measurement | Add a finer ruler mode for measurements rounded to the hundredths place |
+| Graduated cylinder simulation | Build a vertical graduated cylinder with a draggable water level |
+| Meniscus visualization | Display a curved meniscus and volume readout in milliliters |
+| Measurement quiz | Add a quiz where students estimate measurements using rulers and graduated cylinders |
+| Feedback pop-ups | Display immediate feedback such as “Correct!” or retry prompts after quiz answers |
 
 ---
+
+### 🧑‍🏫 Sprint 8 — Classroom Management & Student Progress
+**Status:** 🔜 Planned
+
+| Story | Description |
+|-------|-------------|
+| Class list page | Display all teacher-created classes in a scrollable list |
+| Class details | Show class name, student count, class login code, and active students |
+| Add class form | Allow teachers to create classes with unique names and 6-digit class codes |
+| Code generation | Support manual and automatic generation of unique class codes |
+| Student progress tracking | Show where each student is in the lesson sequence |
+| Remove class flow | Add class deletion with a confirmation pop-up before removal |
+| Progress persistence | Store and update student progress as students complete learning modules and quizzes |
+
+---
+
+### 🧰 Sprint 9 — Testing, Deployment & Final Delivery
+**Status:** 🔜 Planned
+
+| Story | Description |
+|-------|-------------|
+| Authentication errors | Add pop-ups for username not found, incorrect password, invalid class code, and invalid signup credentials |
+| Forgot password flow | Add teacher password reset support through email |
+| Unit tests | Add tests for components, utility functions, and quiz logic |
+| Integration tests | Test Supabase interactions, authentication flows, and student attempt submissions |
+| End-to-end tests | Add Playwright tests for major student and teacher workflows |
+| Accessibility review | Improve keyboard navigation, labels, and readability across interactive modules |
+| Production deployment | Deploy the application to a cloud-hosted environment |
+| Supabase production setup | Finalize hosted PostgreSQL tables, authentication, and environment variables |
+| Documentation updates | Update setup instructions, environment variable notes, and developer documentation |
+| Final demo preparation | Prepare demo materials showing the student and teacher workflows |
+| Product handoff | Deliver the source code, documentation, and deployed application to the product owner |
+
+---
+
 
 ## 📚 Resources
 
