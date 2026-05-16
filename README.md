@@ -24,7 +24,7 @@ ChemClicks is developed as a senior capstone project at **California State Unive
 
 | View | Preview |
 |------|---------|
-| Landing Page | `public/mockups/landing.png` *(placeholder)* |
+| Landing Page | (public/mockups/landing.png) *(placeholder)* |
 | Student Dashboard | `public/mockups/dashboard.png` *(placeholder)* |
 | Quiz Module | `public/mockups/quiz.png` *(placeholder)* |
 | Instructor View | `public/mockups/instructor.png` *(placeholder)* |
