@@ -12,6 +12,7 @@ export default function LoginRolePage() {
       <AuthCard
         title="Sign in as"
         footer={
+          <>
           <AuthFooter className="text-muted-foreground">
             Teacher?{" "}
             <Link
@@ -21,6 +22,16 @@ export default function LoginRolePage() {
               Create an account
             </Link>
           </AuthFooter>
+          <AuthFooter className="text-muted-foreground">
+            Student?{" "}
+            <Link
+              href="/create-account/student"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Create an account
+            </Link>
+          </AuthFooter>
+          </>
         }
       >
         <div className="flex flex-col gap-3">
