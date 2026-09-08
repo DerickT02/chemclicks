@@ -107,7 +107,7 @@ export default function Navbar() {
   const showPublicAuthCta = role === "public" && !isAuthenticated;
 
   const logoHref =
-    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student/labs/measurement";
+    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "#";
   const navbarCtaClassName =
     "text-sm font-semibold px-4 py-1.5 rounded-lg bg-accent text-accent-foreground transition-opacity hover:opacity-90 whitespace-nowrap";
 
