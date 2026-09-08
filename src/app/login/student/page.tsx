@@ -10,34 +10,54 @@ import {
   AuthPrimaryButton,
   authSecondaryLinkClassName
 } from "@/components/auth/AuthPageLayout";
-import { validateAuthUsernameInput } from "@/lib/auth/validate-auth-username";
-import { validateStudentCode } from "@/lib/auth/validate-student-signup";
+import { validateStudentID, validateStudentCode } from "@/lib/auth/validate-student-signup";
+import { loginStudent } from "./actions";
 
 export default function StudentLoginPage() {
-  const [username, setUsername] = useState("");
+  const [studentID, setStudentID] = useState("");
   const [code, setCode] = useState("");
-  const [usernameError, setUsernameError] = useState<string | undefined>();
+  const [studentIDError, setStudentIDError] = useState<string | undefined>();
   const [codeError, setCodeError] = useState<string | undefined>();
+  const [formError, setFormError] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  function handleLogin(e: FormEvent) {
+  async function handleLogin(e: FormEvent) {
     e.preventDefault();
-    setUsernameError(undefined);
+    setStudentIDError(undefined);
     setCodeError(undefined);
+    setFormError(undefined);
+    setIsLoggedIn(false);
 
-    const { trimmedUsername, error: usernameValidationError } =
-      validateAuthUsernameInput(username);
-    if (usernameValidationError) {
-      setUsernameError(usernameValidationError);
+    const normalizedStudentID = studentID.trim();
+    const normalizedCode = code.trim().toUpperCase();
+    const studentIDValidationError = validateStudentID(normalizedStudentID);
+    if (studentIDValidationError) {
+      setStudentIDError(studentIDValidationError);
       return;
     }
-    setUsername(trimmedUsername);
 
-    const codeValidationError = validateStudentCode(code);
+    const codeValidationError = validateStudentCode(normalizedCode);
     if (codeValidationError) {
       setCodeError(codeValidationError);
       return;
     }
-    setCode(code.trim());
+
+    setIsSubmitting(true);
+    const result = await loginStudent(normalizedStudentID, normalizedCode);
+    if (!result.ok) {
+      if (result.field === "studentID") setStudentIDError(result.message);
+      else if (result.field === "code") setCodeError(result.message);
+      else setFormError(result.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setStudentID(normalizedStudentID);
+    setCode(normalizedCode);
+    setIsSubmitting(false);
+    setIsLoggedIn(true);
+    window.location.href = "/";
   }
 
   return (
@@ -54,17 +74,17 @@ export default function StudentLoginPage() {
       >
         <form className="flex flex-col gap-4" onSubmit={handleLogin} noValidate>
           <AuthField
-            id="username"
-            label="Username"
+            id="student-id"
+            label="Student ID"
             type="text"
-            placeholder="myName123"
-            autoComplete="username"
-            value={username}
+            placeholder="Student ID"
+            autoComplete="off"
+            value={studentID}
             onChange={(e) => {
-              setUsername(e.target.value);
-              if (usernameError) setUsernameError(undefined);
+              setStudentID(e.target.value);
+              if (studentIDError) setStudentIDError(undefined);
             }}
-            error={usernameError}
+            error={studentIDError}
           />
           <AuthField
             id="code"
@@ -79,7 +99,13 @@ export default function StudentLoginPage() {
             }}
             error={codeError}
           />
-          <AuthPrimaryButton type="submit">Sign in</AuthPrimaryButton>
+          {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+          {isLoggedIn ? (
+            <p className="text-sm text-green-600">Student login successful.</p>
+          ) : null}
+          <AuthPrimaryButton type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in..." : "Sign in"}
+          </AuthPrimaryButton>
         </form>
       </AuthCard>
     </AuthPageLayout>
