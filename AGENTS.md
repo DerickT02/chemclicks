@@ -3,7 +3,7 @@
 ## Stack
 
 - **Framework**: Next.js 16 (App Router), React 19
-- **Language**: TypeScript 5 with `strict` mode (`tsconfig.json`)
+- **Language**: TypeScript 6 with `strict` mode (`tsconfig.json`)
 - **Styling**: Tailwind CSS v4 (`@tailwindcss/postcss`, `globals.css`)
 - **Backend / auth (planned or in use)**: Supabase (`@supabase/supabase-js`, `@supabase/ssr` for Next.js cookie/session patterns)
 - **Lint**: ESLint 9 + `eslint-config-next`
