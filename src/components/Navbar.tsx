@@ -13,7 +13,7 @@ const LINKS = {
   ],
   student: [
     { label: "Home", href: "#" },
-    { label: "Labs", href: "#" },
+    { label: "Labs", href: "/student/labs/measurement" },
     { label: "Models", href: "#" },
   ],
   teacher: [
@@ -107,7 +107,7 @@ export default function Navbar() {
   const showPublicAuthCta = role === "public" && !isAuthenticated;
 
   const logoHref =
-    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
+    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student/labs/measurement";
   const navbarCtaClassName =
     "text-sm font-semibold px-4 py-1.5 rounded-lg bg-accent text-accent-foreground transition-opacity hover:opacity-90 whitespace-nowrap";
 
@@ -177,7 +177,7 @@ export default function Navbar() {
           }
         }}
       >
-        <Image src="/favicon.svg" alt="ChemClicks logo" width={20} height={20} priority />
+        <Image src="/favicon.svg" alt="ChemClicks logo" width={20} height={20} loading="eager" />
         ChemClicks
       </Link>
 

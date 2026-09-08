@@ -19,6 +19,7 @@
 ## Code style
 
 - Match existing formatting and naming in the file you edit.
+- Use styling provided by the globals.css file.
 - Prefer functional components and explicit TypeScript types for exported APIs and props.
 - Run `npm run lint` after substantive edits; fix new issues in touched files.
 
