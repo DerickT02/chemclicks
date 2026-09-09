@@ -35,8 +35,17 @@ describe("route page behavior", () => {
     const html = renderToStaticMarkup(<MeasurementLabPage />);
 
     expect(html).toContain("Measurement Lab");
-    expect(html).toContain("Graduated Cylinder (Meniscus)");
+    expect(html).toContain("Graduated Cylinder");
     expect(html).toContain("32.0 mL");
     expect(html).not.toContain("Go to quiz");
+  });
+
+  it("renders the measurement lab with the precision ruler", () => {
+    const html = renderToStaticMarkup(<MeasurementLabPage />);
+
+    expect(html).toContain("Precision Ruler");
+    expect(html).toContain("7.50 cm");
+    expect(html).toContain('role="slider"');
+    expect(html).toContain('aria-valuenow="7.5"');
   });
 });
