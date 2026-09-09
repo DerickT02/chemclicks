@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import NotFound from "../../src/app/not-found";
 import AppError from "../../src/app/error";
 import LoginRolePage from "../../src/app/login/page";
+import MeasurementLabPage from "../../src/app/(student)/student/labs/measurement/page";
 
 describe("route page behavior", () => {
   it("renders the not-found page for unmatched routes", () => {
@@ -28,5 +29,14 @@ describe("route page behavior", () => {
     expect(html).toContain("Sign in as");
     expect(html).not.toContain("Page not found");
     expect(html).not.toContain("Something went wrong");
+  });
+
+  it("renders the measurement lab with the graduated cylinder", () => {
+    const html = renderToStaticMarkup(<MeasurementLabPage />);
+
+    expect(html).toContain("Measurement Lab");
+    expect(html).toContain("Graduated Cylinder (Meniscus)");
+    expect(html).toContain("32.0 mL");
+    expect(html).not.toContain("Go to quiz");
   });
 });
