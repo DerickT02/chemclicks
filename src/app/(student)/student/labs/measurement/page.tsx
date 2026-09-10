@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
+import PrecisionRuler from "@/components/measurement/PrecisionRuler";
 
 export const metadata: Metadata = {
   title: "Measurement Lab | ChemClicks",
@@ -20,6 +21,15 @@ export default function MeasurementLabPage() {
             Read at the bottom of the meniscus. Drag to set the water level.
           </p>
           <GraduatedCylinder />
+        </article>
+
+        <article className="rounded-xl border border-border bg-card p-6">
+          <h2 className="font-semibold text-foreground">Precision Ruler</h2>
+          <p className="mt-2 mb-6 text-sm text-muted-foreground">
+            Drag the cursor, or focus it and use the arrow keys, to read the ruler to the
+            hundredth of a centimeter.
+          </p>
+          <PrecisionRuler />
         </article>
       </div>
     </div>
