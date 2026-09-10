@@ -68,6 +68,10 @@ export default function LewisDotExplorer() {
           })}
         </div>
 
+        {/* <div className="mt-5 flex flex-1 items-center justify-center">
+          <BohrModel element={selectedElement} />
+        </div> */}
+
         <p className="mt-2 text-center text-xs font-medium text-accent">
           Valence electrons: {selectedElement.valenceElectrons}
         </p>
