@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { ELEMENTS, type Element } from "@/lib/chemistry/elements";
 import {
+  getElectronShells,
   getLewisDotPositions,
   type LewisDotPosition,
 } from "@/lib/chemistry/lewis";
@@ -10,6 +11,8 @@ import {
 type DiagramSide = "top" | "right" | "bottom" | "left";
 
 const SIDES: readonly DiagramSide[] = ["top", "right", "bottom", "left"];
+const BOHR_SIZE = 180;
+const BOHR_CENTER = BOHR_SIZE / 2;
 
 const SIDE_CLASS_NAMES: Record<DiagramSide, string> = {
   top: "col-start-2 row-start-1 flex items-end justify-center gap-3 pb-2",
@@ -23,6 +26,67 @@ function positionsForSide(
   side: DiagramSide,
 ): readonly LewisDotPosition[] {
   return positions.filter((position) => position.startsWith(`${side}-`));
+}
+
+function BohrModel({ element }: { element: Element }) {
+  const shells = getElectronShells(element.atomicNumber);
+  const shellRadii = shells.map((_, shellIndex) => 30 + shellIndex * 17);
+
+  return (
+    <svg
+      viewBox={`0 0 ${BOHR_SIZE} ${BOHR_SIZE}`}
+      className="mx-auto h-auto w-full max-w-44"
+      role="img"
+      aria-label={`Bohr model for ${element.name}, with ${shells.length} electron ${shells.length === 1 ? "shell" : "shells"}`}
+    >
+      {shellRadii.map((radius, shellIndex) => (
+        <circle
+          key={`shell-${shellIndex + 1}`}
+          cx={BOHR_CENTER}
+          cy={BOHR_CENTER}
+          r={radius}
+          fill="none"
+          stroke="#60a5fa"
+          strokeOpacity="0.35"
+          strokeWidth="1.5"
+          strokeDasharray="4 4"
+        />
+      ))}
+
+      {shells.flatMap((electronCount, shellIndex) => {
+        const radius = shellRadii[shellIndex];
+
+        return Array.from({ length: electronCount }, (_, electronIndex) => {
+          const angle =
+            (2 * Math.PI * electronIndex) / electronCount - Math.PI / 2;
+          const x = BOHR_CENTER + radius * Math.cos(angle);
+          const y = BOHR_CENTER + radius * Math.sin(angle);
+
+          return (
+            <circle
+              key={`shell-${shellIndex + 1}-electron-${electronIndex + 1}`}
+              cx={x}
+              cy={y}
+              r="3.5"
+              fill="#60a5fa"
+            />
+          );
+        });
+      })}
+
+      <circle cx={BOHR_CENTER} cy={BOHR_CENTER} r="16" fill="#f87171" />
+      <text
+        x={BOHR_CENTER}
+        y={BOHR_CENTER}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="white"
+        className="text-[11px] font-semibold"
+      >
+        {element.symbol}
+      </text>
+    </svg>
+  );
 }
 
 export default function LewisDotExplorer() {
@@ -68,9 +132,9 @@ export default function LewisDotExplorer() {
           })}
         </div>
 
-        {/* <div className="mt-5 flex flex-1 items-center justify-center">
+        <div className="mt-5 flex flex-1 items-center justify-center">
           <BohrModel element={selectedElement} />
-        </div> */}
+        </div>
 
         <p className="mt-2 text-center text-xs font-medium text-accent">
           Valence electrons: {selectedElement.valenceElectrons}
