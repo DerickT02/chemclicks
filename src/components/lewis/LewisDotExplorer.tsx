@@ -59,8 +59,10 @@ function BohrModel({ element }: { element: Element }) {
         return Array.from({ length: electronCount }, (_, electronIndex) => {
           const angle =
             (2 * Math.PI * electronIndex) / electronCount - Math.PI / 2;
-          const x = BOHR_CENTER + radius * Math.cos(angle);
-          const y = BOHR_CENTER + radius * Math.sin(angle);
+          // NextJS was throwing an error here because Math.cos/Math.sin differed between server / client
+          // Rounding fixes this error.
+          const x = (BOHR_CENTER + radius * Math.cos(angle)).toFixed(3);
+          const y = (BOHR_CENTER + radius * Math.sin(angle)).toFixed(3);
 
           return (
             <circle
