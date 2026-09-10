@@ -20,7 +20,7 @@ const LINKS = {
     { label: "Classroom", href: "#" },
     { label: "Bohr Models", href: "#" },
     { label: "Stability", href: "#" },
-    { label: "Lewis Diagram", href: "#" },
+    { label: "Lewis Diagram", href: "#student/models/lewis" },
     { label: "Lewis (Covalent)", href: "#" },
     { label: "Lewis (Ionic)", href: "#" },
     { label: "Measurement", href: "#" },
