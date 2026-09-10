@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
   AuthCard,
@@ -10,8 +11,11 @@ import {
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
+import { insertStudent } from "@/lib/db/students";
+import { createClient } from "@/lib/supabase/client";
 
 export default function StudentCreateAccountPage() {
+  const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [studentID, setStudentID] = useState("");
@@ -20,13 +24,16 @@ export default function StudentCreateAccountPage() {
   const [lastNameError, setLastNameError] = useState<string | undefined>();
   const [studentIDError, setStudentIDError] = useState<string | undefined>();
   const [codeError, setCodeError] = useState<string | undefined>();
+  const [formError, setFormError] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFirstNameError(undefined);
     setLastNameError(undefined);
     setStudentIDError(undefined);
     setCodeError(undefined);
+    setFormError(undefined);
 
     const result = validateStudentSignup(firstName, lastName, studentID, code);
     if (!result.valid) {
@@ -37,12 +44,57 @@ export default function StudentCreateAccountPage() {
       return;
     }
 
-    setFirstName(firstName.trim());
-    setLastName(lastName.trim());
-    setStudentID(studentID.trim());
-    setCode(code.trim());
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
+    const normalizedStudentID = studentID.trim();
+    const normalizedCode = code.trim().toUpperCase();
 
-    // Supabase sign-up will be wired here later
+    setIsSubmitting(true);
+
+    const supabase = createClient();
+    const { data: classRow, error: classError } = await supabase
+      .from("classes")
+      .select("id, is_active")
+      .eq("class_code", normalizedCode)
+      .maybeSingle();
+
+    if (classError) {
+      setFormError(classError.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!classRow) {
+      setCodeError("That classroom code was not found.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!classRow.is_active) {
+      setCodeError("That classroom is inactive.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { error: studentError } = await insertStudent(supabase, {
+      class_id: classRow.id,
+      first_name: normalizedFirstName,
+      last_name: normalizedLastName,
+      student_id: normalizedStudentID,
+    });
+
+    if (studentError) {
+      setFormError(studentError.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setFirstName(normalizedFirstName);
+    setLastName(normalizedLastName);
+    setStudentID(normalizedStudentID);
+    setCode(normalizedCode);
+    router.replace("/?accountCreated=true");
+
   }
 
   return (
@@ -111,7 +163,10 @@ export default function StudentCreateAccountPage() {
             }}
             error={codeError}
           />
-          <AuthPrimaryButton>Create account</AuthPrimaryButton>
+          {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+          <AuthPrimaryButton type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating account..." : "Create account"}
+          </AuthPrimaryButton>
         </form>
       </AuthCard>
     </AuthPageLayout>
