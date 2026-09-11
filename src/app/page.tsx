@@ -26,7 +26,8 @@ export default function Home() {
               width={400}
               height={400}
               className="h-52 w-52 md:h-64 md:w-64 lg:h-80 lg:w-80 xl:h-96 xl:w-96"
-              priority
+              loading="eager"
+              fetchPriority="high"
             />
           </div>
         </section>
