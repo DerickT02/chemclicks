@@ -5,6 +5,7 @@ import NotFound from "../../src/app/not-found";
 import AppError from "../../src/app/error";
 import LoginRolePage from "../../src/app/login/page";
 import MeasurementLabPage from "../../src/app/(student)/student/labs/measurement/page";
+import MeasurementQuestionsPage from "../../src/app/(student)/student/labs/measurement/questions/page";
 
 describe("route page behavior", () => {
   it("renders the not-found page for unmatched routes", () => {
@@ -47,5 +48,22 @@ describe("route page behavior", () => {
     expect(html).toContain("7.50 cm");
     expect(html).toContain('role="slider"');
     expect(html).toContain('aria-valuenow="7.5"');
+  });
+
+  it("links the measurement lab to its practice questions", () => {
+    const html = renderToStaticMarkup(<MeasurementLabPage />);
+
+    expect(html).toContain('href="/student/labs/measurement/questions"');
+    expect(html).toContain("Practice measurement questions");
+  });
+
+  it("renders the measurement questions page with the instrument chooser", () => {
+    const html = renderToStaticMarkup(<MeasurementQuestionsPage />);
+
+    expect(html).toContain("Measurement Questions");
+    expect(html).toContain("Start ruler questions");
+    expect(html).toContain("Start graduated cylinder questions");
+    expect(html).toContain('href="/student/labs/measurement"');
+    expect(html).not.toContain("Page not found");
   });
 });
