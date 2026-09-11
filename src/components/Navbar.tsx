@@ -13,7 +13,7 @@ const LINKS = {
   ],
   student: [
     { label: "Home", href: "#" },
-    { label: "Labs", href: "#" },
+    { label: "Labs", href: "/student/labs" },
     { label: "Models", href: "#" },
   ],
   teacher: [
