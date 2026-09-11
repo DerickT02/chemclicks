@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import BohrModelViewer from "@/components/bohr-models/BohrModelViewer";
 
 export const metadata: Metadata = {
@@ -32,6 +33,16 @@ export default function BohrModelsPage() {
 
         {/* Interactive viewer */}
         <BohrModelViewer />
+
+        {/* Quiz CTA */}
+        <div className="mt-10 flex justify-center">
+          <Link
+            href="/student/labs/bohr-models/quiz"
+            className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90"
+          >
+            Go to quiz →
+          </Link>
+        </div>
 
       </div>
     </div>

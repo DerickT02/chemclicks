@@ -165,11 +165,35 @@ export default function BohrModelViewer() {
     setActiveShell((prev) => (prev === idx ? null : idx));
   };
 
-  const valenceCount   = shells[shells.length - 1];
-  const totalElectrons = shells.reduce((a, b) => a + b, 0);
+  const valenceCount      = shells[shells.length - 1];
+  const totalElectrons    = shells.reduce((a, b) => a + b, 0);
+  const outerCapacity     = SHELL_CAPACITIES[shells.length - 1];
+  const isStable          = valenceCount === outerCapacity;
+  const electronsNeeded   = outerCapacity - valenceCount;
 
   return (
     <div className="flex flex-col gap-8">
+
+      {/* ── Key Concepts ──────────────────────────────────────────────── */}
+      <section className="rounded-2xl border border-border bg-card p-6">
+        <h2 className="text-sm font-semibold text-foreground mb-4">Key Concepts</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[
+            { icon: "🔵", title: "Electron (e⁻)",    body: "Negatively charged particles that orbit the nucleus in fixed shells. Each element has as many electrons as protons." },
+            { icon: "⚡", title: "Valence Electrons", body: "Electrons in the outermost shell. They determine how an element bonds and reacts with other elements." },
+            { icon: "🏠", title: "Shell Capacity",    body: "The K shell holds up to 2 electrons. The L and M shells hold up to 8. The N shell holds 2 for elements 1–20." },
+            { icon: "🛡️", title: "Stability",         body: "Noble gases (He, Ne, Ar) have completely full outer shells — they are the most chemically stable elements." },
+          ].map((c) => (
+            <div key={c.title} className="flex gap-3 rounded-xl bg-muted/40 border border-border p-4">
+              <span className="text-xl shrink-0">{c.icon}</span>
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-0.5">{c.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{c.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── Element Selector ───────────────────────────────────────────── */}
       <div
@@ -229,12 +253,23 @@ export default function BohrModelViewer() {
         {/* Info panel */}
         <div className="flex flex-col gap-4">
           <div className="rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-foreground">{element.symbol}</span>
-              <div>
-                <p className="text-lg font-semibold text-foreground leading-tight">{element.name}</p>
-                <p className="text-xs text-muted-foreground">Atomic number: {element.atomicNumber}</p>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-foreground">{element.symbol}</span>
+                <div>
+                  <p className="text-lg font-semibold text-foreground leading-tight">{element.name}</p>
+                  <p className="text-xs text-muted-foreground">Atomic number: {element.atomicNumber}</p>
+                </div>
               </div>
+              {isStable ? (
+                <span className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-accent/15 text-accent border border-accent/30">
+                  ✓ Stable
+                </span>
+              ) : (
+                <span className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-muted-foreground border border-border">
+                  Unstable
+                </span>
+              )}
             </div>
 
             {/* Config chips */}
@@ -266,18 +301,28 @@ export default function BohrModelViewer() {
 
             {/* Stats */}
             <div className="rounded-xl bg-muted/50 border border-border divide-y divide-border">
-              {(
-                [
-                  ["Valence electrons", valenceCount],
-                  ["Total electrons",   totalElectrons],
-                  ["Occupied shells",   shells.length],
-                ] as const
-              ).map(([label, value]) => (
-                <div key={label} className="flex justify-between items-center px-4 py-2.5 text-sm">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="font-semibold text-foreground">{value}</span>
-                </div>
-              ))}
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Valence electrons</span>
+                <span className="font-semibold text-foreground">{valenceCount}</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Total electrons</span>
+                <span className="font-semibold text-foreground">{totalElectrons}</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Occupied shells</span>
+                <span className="font-semibold text-foreground">{shells.length}</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Stability</span>
+                {isStable ? (
+                  <span className="font-semibold text-accent">Stable — outer shell full</span>
+                ) : (
+                  <span className="font-semibold text-foreground">
+                    Needs {electronsNeeded} more e⁻
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -341,26 +386,6 @@ export default function BohrModelViewer() {
         </div>
       </section>
 
-      {/* ── Key Concepts ──────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-sm font-semibold text-foreground mb-4">Key Concepts</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { icon: "🔵", title: "Electron (e⁻)",    body: "Negatively charged particles that orbit the nucleus in fixed shells. Each element has as many electrons as protons." },
-            { icon: "⚡", title: "Valence Electrons", body: "Electrons in the outermost shell. They determine how an element bonds and reacts with other elements." },
-            { icon: "🏠", title: "Shell Capacity",    body: "The K shell holds up to 2 electrons. The L and M shells hold up to 8. The N shell holds 2 for elements 1–20." },
-            { icon: "🛡️", title: "Stability",         body: "Noble gases (He, Ne, Ar) have completely full outer shells — they are the most chemically stable elements." },
-          ].map((c) => (
-            <div key={c.title} className="flex gap-3 rounded-xl bg-muted/40 border border-border p-4">
-              <span className="text-xl shrink-0">{c.icon}</span>
-              <div>
-                <p className="text-sm font-semibold text-foreground mb-0.5">{c.title}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{c.body}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
 
     </div>
   );
