@@ -148,15 +148,18 @@ function BohrModelDiagram({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const HYDROGEN = ELEMENTS.find((e) => e.atomicNumber === 1)!;
-const HYDROGEN_SHELLS = getElectronShells(HYDROGEN.atomicNumber);
-
 const SHELL_CAPACITIES_MAP = SHELL_CAPACITIES;
 
 export default function BohrModelViewer() {
-  const element = HYDROGEN;
-  const shells  = HYDROGEN_SHELLS;
+  const [element, setElement] = useState(ELEMENTS[0]);
   const [activeShell, setActiveShell] = useState<number | null>(null);
+
+  const shells = getElectronShells(element.atomicNumber);
+
+  const handleElementSelect = (el: typeof ELEMENTS[number]) => {
+    setElement(el);
+    setActiveShell(null);
+  };
 
   const handleShellToggle = (idx: number) => {
     setActiveShell((prev) => (prev === idx ? null : idx));
@@ -167,6 +170,33 @@ export default function BohrModelViewer() {
 
   return (
     <div className="flex flex-col gap-8">
+
+      {/* ── Element Selector ───────────────────────────────────────────── */}
+      <div
+        role="group"
+        aria-label="Choose an element"
+        className="grid grid-cols-5 sm:grid-cols-10 gap-1.5"
+      >
+        {ELEMENTS.map((el) => {
+          const isSelected = el.atomicNumber === element.atomicNumber;
+          return (
+            <button
+              key={el.atomicNumber}
+              type="button"
+              aria-pressed={isSelected}
+              aria-label={`${el.name}, ${el.symbol}`}
+              onClick={() => handleElementSelect(el)}
+              className={`min-h-9 rounded-md border px-2 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+                isSelected
+                  ? "border-accent bg-accent/15 text-foreground"
+                  : "border-border bg-muted text-foreground hover:border-accent"
+              }`}
+            >
+              {el.symbol}
+            </button>
+          );
+        })}
+      </div>
 
       {/* ── Bohr Diagram + Info ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
