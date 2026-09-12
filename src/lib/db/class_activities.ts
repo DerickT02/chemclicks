@@ -10,4 +10,7 @@ export type ClassActivity = {
   created_at: string          // ISO 8601 timestamp, auto-set
 }
 
-export type InsertClassActivity = Pick<ClassActivity, 'class_id' | 'activity_id'>
+export type InsertClassActivity = Pick<ClassActivity, 'class_id' | 'activity_id'> &
+Partial<Pick<ClassActivity, 'opens_at' | 'closes_at'>>
+
+export type UpdateClassActivity = Partial<Pick<ClassActivity, 'opens_at' | 'closes_at'>>
