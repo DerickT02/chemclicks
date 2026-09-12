@@ -91,3 +91,11 @@ cookie is not a Supabase Auth JWT. This client bypasses RLS: assignment reads mu
 verify the signed session, current student membership, active class, and date window.
 Teacher mutations continue to use the request-scoped client and teacher RLS.
 The student assignment page is `/student`; queries are not shared across requests.
+
+Open activities through `/student/assignments/[assignmentId]`. Each request checks
+membership and the current date window again; old `/student/labs/*` pages redirect
+to the assignment list. Open exercise tabs hide at their saved closing time and
+refresh access every 30 seconds and on focus. This cannot retract content already
+delivered to a browser; future scoring/submission endpoints must repeat authorization.
+Currently implemented exercises: Lewis diagrams, ruler practice, graduated cylinder.
+Other catalog entries remain visible when assigned but show an unavailable message.
