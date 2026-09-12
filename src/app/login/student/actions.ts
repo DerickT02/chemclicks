@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createStudentSession } from "@/lib/auth/student-session";
 
 export async function loginStudent(studentID: string, classroomCode: string): Promise<
@@ -9,7 +9,8 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
 > {
   const normalizedStudentID = studentID.trim();
   const normalizedCode = classroomCode.trim().toUpperCase();
-  const supabase = await createClient();
+  // Student ID and classroom code are the student login credentials.
+  const supabase = createAdminClient();
 
   const { data: classRow, error: classError } = await supabase
     .from("classes")
