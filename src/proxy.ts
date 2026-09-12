@@ -7,13 +7,6 @@ function isAdminRoute(pathname: string): boolean {
     return ADMIN_ROUTES.some((adminRoute) => pathname.startsWith(adminRoute));
 }
 
-function getUserRole(user: User): string {
-    // TODO: we do not yet have role set up in JWT. after we do, connect this up
-    // OR, if we decide a DB call is fine here instead of JWT, implement
-    void user;
-    return "admin";
-}
-
 /**
  * Session refresh for Supabase (formerly `middleware.ts` in Next.js).
  * @see https://nextjs.org/docs/messages/middleware-to-proxy

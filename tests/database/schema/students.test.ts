@@ -241,7 +241,7 @@ describe('students table schema', () => {
 
       const { data: remaining } = await fetchProgressByStudentId(studentId)
       expect(remaining).toHaveLength(0)
-    })
+    }, 15000) // Several remote database round trips can exceed Vitest's 5s default.
   })
 
 })
