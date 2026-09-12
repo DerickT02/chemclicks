@@ -16,7 +16,7 @@ export default function CreateClassPage() {
   const [isPending, startTransition] = useTransition();
 
   function handleClassCodeChange(value: string) {
-    const next = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6);
+    const next = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase();
     setClassCode(next);
     if (classCodeError) setClassCodeError(undefined);
   }
@@ -44,7 +44,11 @@ export default function CreateClassPage() {
         });
 
         if (!result.ok) {
-          setSubmitError(result.message);
+          if (result.field === "classCode") {
+            setClassCodeError(result.message);
+          } else {
+            setSubmitError(result.message);
+          }
           return;
         }
 
@@ -127,13 +131,15 @@ export default function CreateClassPage() {
               placeholder="e.g. A1B2C3"
               value={classCode}
               onChange={(e) => handleClassCodeChange(e.target.value)}
+              aria-invalid={classCodeError ? true : undefined}
+              aria-describedby={classCodeError ? "classCode-error" : undefined}
               className="rounded-md border border-border bg-background px-3 py-2 font-mono text-sm uppercase tracking-widest outline-none ring-ring focus:ring-2"
             />
             <p className="text-xs text-muted-foreground">
               Six letters or numbers only. Stored in uppercase.
             </p>
             {classCodeError ? (
-              <p className="text-sm text-destructive">{classCodeError}</p>
+              <p id="classCode-error" className="text-sm text-destructive">{classCodeError}</p>
             ) : null}
           </div>
 
