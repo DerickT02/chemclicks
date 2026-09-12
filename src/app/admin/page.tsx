@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { deleteClass } from "@/lib/db/classes";
+import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
+import { getClassActivities } from "@/lib/db/class_activities";
 
 type ProgressStatus = "not_started" | "in_progress" | "completed";
 
@@ -116,6 +118,21 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
+  const [activitiesResult, assignmentsResult] = await Promise.all([
+    supabase
+      .from("activities")
+      .select("id, title")
+      .order("order_index"),
+    selectedClass
+      ? getClassActivities(supabase, selectedClass.id)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const activities = activitiesResult.data ?? [];
+  const assignments = assignmentsResult.data ?? [];
+  const assignmentLoadFailed = Boolean(activitiesResult.error || assignmentsResult.error);
+
+
   async function removeSelectedClass(formData: FormData) {
     "use server";
     const id = formData.get("classId") as string;
@@ -220,6 +237,50 @@ export default async function AdminPage({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {(selectedClass.students?.length ?? 0).toString()} students enrolled
                 </p>
+                <section className="mt-7 space-y-6">
+                  <h3 className="text-lg font-semibold">Class activities</h3>
+
+                  {assignmentLoadFailed ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      Activities could not be loaded. Please refresh the page.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="space-y-4 rounded-lg border border-border p-4">
+                        <h4 className="font-medium">Assign an activity</h4>
+                        <AssignmentForm
+                          key={selectedClass.id}
+                          classId={selectedClass.id}
+                          activities={activities}
+                        />
+                      </div>
+
+                      {assignments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          This class has no assigned activities.
+                        </p>
+                      ) : (
+                        assignments.map((assignment) => (
+                          <div
+                            key={assignment.id}
+                            className="space-y-4 rounded-lg border border-border p-4"
+                          >
+                            <h4 className="font-medium">
+                              {activities.find(
+                                (activity) => activity.id === assignment.activity_id,
+                              )?.title ?? "Assigned activity"}
+                            </h4>
+                            <AssignmentForm
+                              classId={selectedClass.id}
+                              activities={activities}
+                              assignment={assignment}
+                            />
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )}
+                </section>
                 <div className="mt-7">
                   <h3 className="text-lg font-semibold text-foreground">Active students</h3>
                   {/* Live DB-backed list: once student signup writes records, students appear automatically here. */}
