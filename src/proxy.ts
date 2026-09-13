@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const ADMIN_ROUTES = ["/admin"];
