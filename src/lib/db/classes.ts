@@ -14,6 +14,32 @@ export type Class = {
 
 export type InsertClass = Pick<Class, "teacher_id" | "name" | "section" | "class_code">;
 
+export type ClassListItem = Pick<Class, "id" | "name" | "section" | "class_code">;
+
+/**
+ * Lists active classes owned by the given teacher, newest first. Filters by
+ * `teacher_id` explicitly (defense in depth alongside RLS) and `is_active`,
+ * so a teacher's classroom list never includes another teacher's classes or
+ * a class they've deactivated.
+ */
+export async function listActiveClassesForTeacher(
+  supabase: SupabaseClient,
+  teacherId: string,
+): Promise<{ data: ClassListItem[] | null; error: PostgrestError | null }> {
+  const { data, error } = await supabase
+    .from("classes")
+    .select("id, name, section, class_code")
+    .eq("teacher_id", teacherId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  return { data: data as ClassListItem[], error: null };
+}
+
 /**
  * True when a PostgrestError is the `classes.class_code` unique-constraint
  * violation (Postgres code 23505), as opposed to some other constraint
