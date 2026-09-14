@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
@@ -53,7 +55,9 @@ export async function getStudentSession(): Promise<StudentSession | null> {
   const value = (await cookies()).get(STUDENT_SESSION_COOKIE)?.value;
   if (!value) return null;
 
-  const [payload, signature] = value.split(".");
+  const parts = value.split(".");
+  if (parts.length !== 2) return null;
+  const [payload, signature] = parts;
   if (!payload || !signature) return null;
 
   const expectedSignature = sign(payload);
@@ -67,11 +71,19 @@ export async function getStudentSession(): Promise<StudentSession | null> {
   }
 
   try {
-    const session = JSON.parse(decode(payload)) as StudentSession;
-    if (!session.studentId || !session.classId || session.expiresAt <= Date.now()) {
+    const session: unknown = JSON.parse(decode(payload));
+    if (
+      !session || typeof session !== "object"
+      || !("studentId" in session) || typeof session.studentId !== "string"
+      || !("classId" in session) || typeof session.classId !== "string"
+      || !("expiresAt" in session) || typeof session.expiresAt !== "number"
+      || !Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session.studentId)
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session.classId)
+    ) {
       return null;
     }
-    return session;
+    return { studentId: session.studentId, classId: session.classId, expiresAt: session.expiresAt };
   } catch {
     return null;
   }

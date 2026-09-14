@@ -73,3 +73,29 @@ git push origin feat/student-login
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [Supabase](https://supabase.com/docs)
 - [Supabase Auth with Next.js](https://supabase.com/docs/guides/auth/server-side/nextjs)
+
+## Class assignments
+
+Teacher assignment forms use UTC. Opening is inclusive and closing exclusive:
+`(opens_at IS NULL OR opens_at <= now) AND (closes_at IS NULL OR now < closes_at)`.
+Blank dates remove that boundary; date edits preserve assignment IDs and progress.
+
+Student login uses student ID plus classroom code and a signed, HTTP-only session.
+Set `STUDENT_SESSION_SECRET` (generate with `openssl rand -hex 32`) and
+`SUPABASE_SERVICE_ROLE_KEY` in `.env.local` alongside the public URL and anon key.
+Keep both server secrets out of client code and Git. Restart development after changes.
+`.env.test.local` configures tests, not `npm run dev`.
+
+Student database reads use the server-only admin client because the custom student
+cookie is not a Supabase Auth JWT. This client bypasses RLS: assignment reads must
+verify the signed session, current student membership, active class, and date window.
+Teacher mutations continue to use the request-scoped client and teacher RLS.
+The student assignment page is `/student`; queries are not shared across requests.
+
+Open activities through `/student/assignments/[assignmentId]`. Each request checks
+membership and the current date window again; old `/student/labs/*` pages redirect
+to the assignment list. Open exercise tabs hide at their saved closing time and
+refresh access every 30 seconds and on focus. This cannot retract content already
+delivered to a browser; future scoring/submission endpoints must repeat authorization.
+Currently implemented exercises: Lewis diagrams, ruler practice, graduated cylinder.
+Other catalog entries remain visible when assigned but show an unavailable message.
