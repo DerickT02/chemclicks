@@ -1,11 +1,16 @@
 import Get_Started_Button from "@/components/homepage/Get_Started_Button";
 import Lesson_Overview from "@/components/homepage/Lesson_Overview";
+import AccountCreatedPopup from "@/components/homepage/AccountCreatedPopup";
 import Footer from "@/components/Footer";
 import Image from "next/image";
+import { Suspense } from "react";
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-sans">
+      <Suspense fallback={null}>
+        <AccountCreatedPopup />
+      </Suspense>
       {/* Main Content Area */}
       <main className="flex w-full flex-grow flex-col">
         {/* Fills viewport below sticky navbar so divider / next sections stay off-screen until scroll */}
@@ -26,7 +31,8 @@ export default function Home() {
               width={400}
               height={400}
               className="h-52 w-52 md:h-64 md:w-64 lg:h-80 lg:w-80 xl:h-96 xl:w-96"
-              priority
+              loading="eager"
+              fetchPriority="high"
             />
           </div>
         </section>

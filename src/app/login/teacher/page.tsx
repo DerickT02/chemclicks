@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import {
   AuthCard,
   AuthField,
@@ -13,10 +14,29 @@ import {
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { type FormEvent } from "react";
 
+
 export default function TeacherLoginPage() {
+  return (
+    <Suspense fallback={<TeacherLoginFallback />}>
+      <TeacherLoginForm />
+    </Suspense>
+  );
+}
+
+function TeacherLoginFallback() {
+  return (
+    <AuthPageLayout>
+      <AuthCard title="Teacher Login">
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </AuthCard>
+    </AuthPageLayout>
+  );
+}
+
+function TeacherLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -140,5 +160,13 @@ export default function TeacherLoginPage() {
         </form>
       </AuthCard>
     </AuthPageLayout>
+  );
+}
+
+export default function TeacherLoginPage() {
+  return (
+    <Suspense fallback={<AuthPageLayout><p role="status">Loading teacher login…</p></AuthPageLayout>}>
+      <TeacherLoginForm />
+    </Suspense>
   );
 }

@@ -3,7 +3,7 @@
 ## Stack
 
 - **Framework**: Next.js 16 (App Router), React 19
-- **Language**: TypeScript 5 with `strict` mode (`tsconfig.json`)
+- **Language**: TypeScript 6 with `strict` mode (`tsconfig.json`)
 - **Styling**: Tailwind CSS v4 (`@tailwindcss/postcss`, `globals.css`)
 - **Backend / auth (planned or in use)**: Supabase (`@supabase/supabase-js`, `@supabase/ssr` for Next.js cookie/session patterns)
 - **Lint**: ESLint 9 + `eslint-config-next`
@@ -19,6 +19,7 @@
 ## Code style
 
 - Match existing formatting and naming in the file you edit.
+- Use styling provided by the globals.css file.
 - Prefer functional components and explicit TypeScript types for exported APIs and props.
 - Run `npm run lint` after substantive edits; fix new issues in touched files.
 
@@ -64,3 +65,13 @@
 
 - Do not introduce alternate frameworks, CSS solutions, or state libraries unless the task explicitly requires it.
 - Avoid drive-by refactors outside the scope of the request.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -13,7 +13,7 @@ const LINKS = {
   ],
   student: [
     { label: "Home", href: "#" },
-    { label: "Labs", href: "#" },
+    { label: "Labs", href: "/student/labs" },
     { label: "Models", href: "#" },
   ],
   teacher: [
@@ -101,13 +101,15 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isStudentAuthenticated, setIsStudentAuthenticated] = useState(false);
 
   const role = navRoleFromPathname(pathname);
   const links = LINKS[role];
-  const showPublicAuthCta = role === "public" && !isAuthenticated;
+  const hasAuthenticatedSession = isAuthenticated || isStudentAuthenticated;
+  const showPublicAuthCta = role === "public" && !hasAuthenticatedSession;
 
   const logoHref =
-    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
+    role === "public" ? "/" : role === "teacher" ? "/admin" : "#";
   const navbarCtaClassName =
     "text-sm font-semibold px-4 py-1.5 rounded-lg bg-accent text-accent-foreground transition-opacity hover:opacity-90 whitespace-nowrap";
 
@@ -131,6 +133,11 @@ export default function Navbar() {
       setIsAuthenticated(Boolean(data.session));
     });
 
+    void fetch("/api/student/session")
+      .then((response) => response.json() as Promise<{ authenticated: boolean }>)
+      .then(({ authenticated }) => setIsStudentAuthenticated(authenticated))
+      .catch(() => setIsStudentAuthenticated(false));
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -147,6 +154,15 @@ export default function Navbar() {
 
     setIsSigningOut(true);
     try {
+      if (isStudentAuthenticated) {
+        const response = await fetch("/api/student/session", { method: "DELETE" });
+        if (!response.ok) {
+          console.error("Student sign out failed:", response.statusText);
+          return;
+        }
+        setIsStudentAuthenticated(false);
+      }
+
       const supabase = createClient();
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -177,7 +193,7 @@ export default function Navbar() {
           }
         }}
       >
-        <Image src="/favicon.svg" alt="ChemClicks logo" width={20} height={20} priority />
+        <Image src="/favicon.svg" alt="ChemClicks logo" width={20} height={20} loading="eager" />
         ChemClicks
       </Link>
 
@@ -284,7 +300,7 @@ export default function Navbar() {
               Sign in
             </Link>
           )}
-          {(role === "teacher" || role === "student") && (
+          {hasAuthenticatedSession && (
             <button
               type="button"
               className="block w-full text-center text-sm font-semibold bg-accent text-accent-foreground px-4 py-2 rounded-lg mt-2 transition-opacity hover:opacity-90"

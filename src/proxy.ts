@@ -1,17 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const ADMIN_ROUTES = ["/admin"];
 
 function isAdminRoute(pathname: string): boolean {
     return ADMIN_ROUTES.some((adminRoute) => pathname.startsWith(adminRoute));
-}
-
-function getUserRole(user: User): string {
-    // TODO: we do not yet have role set up in JWT. after we do, connect this up
-    // OR, if we decide a DB call is fine here instead of JWT, implement
-    void user;
-    return "admin";
 }
 
 /**
