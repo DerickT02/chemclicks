@@ -159,11 +159,3 @@ function TeacherLoginForm() {
     </AuthPageLayout>
   );
 }
-
-export default function TeacherLoginPage() {
-  return (
-    <Suspense fallback={<AuthPageLayout><p role="status">Loading teacher login…</p></AuthPageLayout>}>
-      <TeacherLoginForm />
-    </Suspense>
-  );
-}
