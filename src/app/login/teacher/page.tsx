@@ -14,9 +14,6 @@ import {
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
 import { createClient } from "@/lib/supabase/client";
-import { Suspense, useState } from "react";
-import { type FormEvent } from "react";
-
 
 export default function TeacherLoginPage() {
   return (
