@@ -14,9 +14,6 @@ import {
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
 import { createClient } from "@/lib/supabase/client";
-import { Suspense, useState } from "react";
-import { type FormEvent } from "react";
-
 
 export default function TeacherLoginPage() {
   return (
@@ -160,13 +157,5 @@ function TeacherLoginForm() {
         </form>
       </AuthCard>
     </AuthPageLayout>
-  );
-}
-
-export default function TeacherLoginPage() {
-  return (
-    <Suspense fallback={<AuthPageLayout><p role="status">Loading teacher login…</p></AuthPageLayout>}>
-      <TeacherLoginForm />
-    </Suspense>
   );
 }
