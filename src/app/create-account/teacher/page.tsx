@@ -131,6 +131,7 @@ export default function TeacherCreateAccountPage() {
             type="password"
             placeholder="••••••••"
             autoComplete="new-password"
+            hint="At least 8 characters with a letter, number, and special character (no spaces, and no &quot; ' \ / ` ; $)."
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
