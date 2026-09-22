@@ -23,7 +23,11 @@ export async function createStudentSupabaseSession(
       email: studentAuthEmail(student.id),
     });
     const authUserId = data.user?.id;
-    if (error || !authUserId || !data.properties?.hashed_token) return SESSION_ERROR;
+    const verificationType = data.properties?.verification_type;
+    if (
+      error || !authUserId || !data.properties?.hashed_token
+      || (verificationType !== "signup" && verificationType !== "magiclink")
+    ) return SESSION_ERROR;
     if (student.auth_user_id && student.auth_user_id !== authUserId) return SESSION_ERROR;
 
     if (!student.auth_user_id) {
@@ -45,7 +49,7 @@ export async function createStudentSupabaseSession(
     const supabase = await createClient();
     const { error: verifyError } = await supabase.auth.verifyOtp({
       token_hash: data.properties.hashed_token,
-      type: "magiclink",
+      type: verificationType,
     });
     return verifyError ? SESSION_ERROR : null;
   } catch {

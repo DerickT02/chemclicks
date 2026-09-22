@@ -13,9 +13,9 @@ const studentId = "11111111-1111-4111-8111-111111111111";
 const authUserId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const sessionError = "Could not create a student session. Please try again.";
 
-function adminClient(userId = authUserId) {
+function adminClient(userId = authUserId, verificationType: "signup" | "magiclink" = "signup") {
   const generateLink = vi.fn().mockResolvedValue({
-    data: { user: { id: userId }, properties: { hashed_token: "one-time-token" } },
+    data: { user: { id: userId }, properties: { hashed_token: "one-time-token", verification_type: verificationType } },
     error: null,
   });
   const updateSingle = vi.fn().mockResolvedValue({
@@ -49,15 +49,16 @@ describe("passwordless student Supabase Auth", () => {
       email: `student-${studentId}@students.auth.chemclicks.invalid`,
     });
     expect(admin.updateSingle).toHaveBeenCalled();
-    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: "one-time-token", type: "magiclink" });
+    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: "one-time-token", type: "signup" });
   });
 
   it("reuses the existing link without updating the student row", async () => {
-    const admin = adminClient();
+    const admin = adminClient(authUserId, "magiclink");
     expect(await createStudentSupabaseSession(admin.client, {
       id: studentId, auth_user_id: authUserId,
     })).toBeNull();
     expect(admin.updateSingle).not.toHaveBeenCalled();
+    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: "one-time-token", type: "magiclink" });
   });
 
   it("refuses to sign into a different Auth user", async () => {
