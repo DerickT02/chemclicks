@@ -1,13 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { beforeAll, afterAll, describe, it, expect } from 'vitest'
+import { createTestStudentAuthUser, deleteTestAuthUsers } from '../auth-fixtures'
 
 // ─── Context ──────────────────────────────────────────────────────────────────
-// Students have no Supabase auth accounts. Their data isolation is enforced
-// server-side: the Next.js layer reads { class_id } from the student's session
-// cookie and always scopes queries to that class_id.
-//
-// These tests verify that the server-side query pattern correctly isolates
-// student data — a student in Class A can never read data belonging to Class B.
+// Runtime student access uses a Supabase Auth session where auth.users.id and
+// students.id are the same UUID. These fixtures use the service role only to
+// set up cross-class records and verify the scoped query shape.
 
 // ─── Admin client ─────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -16,9 +14,8 @@ const supabase = createClient(
 )
 
 // ─── Server-side query functions ──────────────────────────────────────────────
-// These mirror exactly what Next.js server actions will execute on a student's
-// behalf. Each receives the student's class_id from their session — the server
-// never lets the student supply an arbitrary class_id.
+// Student-facing code derives class_id from the students row whose id equals
+// auth.uid(); it never accepts an arbitrary class_id from the client.
 
 function getClassForStudent(classId: string) {
   return supabase
@@ -57,11 +54,15 @@ async function insertClass(teacherId: string): Promise<string> {
   return data.id
 }
 
+const authUserIds: string[] = []
+
 async function insertStudent(classId: string, firstName: string, lastName: string): Promise<string> {
+  const authUserId = await createTestStudentAuthUser(supabase)
+  authUserIds.push(authUserId)
   const studentId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const { data, error } = await supabase
     .from('students')
-    .insert({ class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
+    .insert({ id: authUserId, class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
     .select('id')
     .single()
   if (error) throw new Error(`insertStudent failed: ${error.message}`)
@@ -89,6 +90,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await supabase.from('students').delete().in('id', [studentAId, studentBId])
   await supabase.from('classes').delete().in('id', [classAId, classBId])
+  await deleteTestAuthUsers(supabase, authUserIds)
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

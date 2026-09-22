@@ -1,50 +1,71 @@
-import { createHmac } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const jar = vi.hoisted(() => ({ value: undefined as string | undefined, set: vi.fn(), delete: vi.fn() }));
-vi.mock("next/headers", () => ({ cookies: async () => ({
-  get: () => jar.value ? { value: jar.value } : undefined,
-  set: jar.set, delete: jar.delete,
-}) }));
-import { createStudentSession, getStudentSession } from "@/lib/auth/student-session";
 
-const secret = "test-session-secret-never-used-outside-tests";
+const mocks = vi.hoisted(() => ({
+  claims: vi.fn(),
+  from: vi.fn(),
+  studentSingle: vi.fn(),
+  classSingle: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({
+    auth: {
+      getClaims: mocks.claims,
+    },
+    from: mocks.from,
+  }),
+}));
+
+import { getStudentSession } from "@/lib/auth/student-session";
+
+const authUserId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const studentId = "11111111-1111-4111-8111-111111111111";
 const classId = "22222222-2222-4222-8222-222222222222";
-function signed(payload: object): string {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${encoded}.${createHmac("sha256", secret).update(encoded).digest("base64url")}`;
-}
-beforeEach(() => { vi.stubEnv("STUDENT_SESSION_SECRET", secret); jar.value = undefined; vi.clearAllMocks(); });
-afterEach(() => vi.unstubAllEnvs());
 
-describe("signed student sessions", () => {
-  it("accepts only a valid unexpired signature", async () => {
-    jar.value = signed({ studentId, classId, expiresAt: Date.now() + 10000 });
-    expect(await getStudentSession()).toMatchObject({ studentId, classId });
-    jar.value += "tampered";
-    expect(await getStudentSession()).toBeNull();
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.claims.mockResolvedValue({ data: { claims: { sub: authUserId } }, error: null });
+  mocks.studentSingle.mockResolvedValue({
+    data: { id: studentId, class_id: classId },
+    error: null,
   });
-  it.each([
-    { studentId, classId, expiresAt: 0 },
-    { studentId, classId },
-    { studentId, classId, expiresAt: "9999999999999" },
-    { studentId: "not-a-uuid", classId, expiresAt: 9999999999999 },
-  ])("rejects invalid signed payload %j", async (payload) => {
-    jar.value = signed(payload);
-    expect(await getStudentSession()).toBeNull();
+  mocks.classSingle.mockResolvedValue({ data: { id: classId }, error: null });
+  mocks.from.mockImplementation((table: string) => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: table === "students" ? mocks.studentSingle : mocks.classSingle,
+      }),
+    }),
+  }));
+});
+
+describe("Supabase student sessions", () => {
+  it("resolves a verified Auth user to its student row", async () => {
+    await expect(getStudentSession()).resolves.toEqual({
+      authUserId,
+      studentId,
+      classId,
+    });
+    expect(mocks.from).toHaveBeenCalledWith("students");
+    expect(mocks.from).toHaveBeenCalledWith("classes");
   });
-  it("rejects missing cookies and extra signature segments", async () => {
-    expect(await getStudentSession()).toBeNull();
-    jar.value = `${signed({ studentId, classId, expiresAt: Date.now() + 10000 })}.extra`;
-    expect(await getStudentSession()).toBeNull();
+
+  it("rejects requests without verified claims", async () => {
+    mocks.claims.mockResolvedValue({ data: { claims: null }, error: null });
+    await expect(getStudentSession()).resolves.toBeNull();
+    expect(mocks.from).not.toHaveBeenCalled();
   });
-  it("creates an HTTP-only cookie that can be verified", async () => {
-    await createStudentSession(studentId, classId);
-    const [, value, options] = jar.set.mock.calls[0];
-    expect(options).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/" });
-    jar.value = value;
-    expect(await getStudentSession()).toMatchObject({ studentId, classId });
+
+  it("rejects authenticated users without a linked student row", async () => {
+    mocks.studentSingle.mockResolvedValue({ data: null, error: null });
+    await expect(getStudentSession()).resolves.toBeNull();
   });
+
+  it("rejects students whose classroom is inactive or unavailable", async () => {
+    mocks.classSingle.mockResolvedValue({ data: null, error: null });
+    await expect(getStudentSession()).resolves.toBeNull();
+  });
+
 });

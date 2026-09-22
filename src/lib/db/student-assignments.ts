@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getStudentSession } from "@/lib/auth/student-session";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { isAssignmentAvailable } from "@/lib/assignments/availability";
 import type { Activity } from "@/lib/db/activities";
 
@@ -23,22 +23,9 @@ export async function getStudentAssignments(): Promise<Result> {
     const session = await getStudentSession();
     if (!session) return { status: "unauthenticated" };
 
-    const supabase = createAdminClient();
-    const { data: student, error: studentError } = await supabase
-      .from("students")
-      .select("id, class_id")
-      .eq("id", session.studentId)
-      .eq("class_id", session.classId)
-      .maybeSingle();
-    if (studentError) throw studentError;
-    if (!student) return { status: "unauthenticated" };
-
-    const { data: classroom, error: classError } = await supabase
-      .from("classes").select("id")
-      .eq("id", student.class_id).eq("is_active", true).maybeSingle();
-    if (classError) throw classError;
-    if (!classroom) return { status: "unauthenticated" };
-
+    // Use the request-scoped user client so Postgres RLS, rather than the
+    // service-role key, enforces access to this student's active classroom.
+    const supabase = await createClient();
     const now = new Date().toISOString();
     const assignments: StudentAssignment[] = [];
     const pageSize = 100;
@@ -46,7 +33,7 @@ export async function getStudentAssignments(): Promise<Result> {
       const { data, error } = await supabase
         .from("class_activities")
         .select("id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
-        .eq("class_id", classroom.id)
+        .eq("class_id", session.classId)
         .or(`opens_at.is.null,opens_at.lte.${now}`)
         .or(`closes_at.is.null,closes_at.gt.${now}`)
         .order("id")

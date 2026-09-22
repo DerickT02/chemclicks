@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getClassActivities, insertClassActivity, updateClassActivity } from "@/lib/db/class_activities";
+import { createTestStudentAuthUser } from "../auth-fixtures";
 
 vi.mock("server-only", () => ({}));
-const session = vi.hoisted(() => ({ value: null as null | { studentId: string; classId: string; expiresAt: number } }));
+const session = vi.hoisted(() => ({ value: null as null | { authUserId: string; studentId: string; classId: string } }));
 vi.mock("@/lib/auth/student-session", () => ({ getStudentSession: async () => session.value }));
 import { getStudentAssignments } from "@/lib/db/student-assignments";
 
@@ -47,15 +48,21 @@ beforeAll(async () => {
   teacherA = await createTeacher();
   teacherB = await createTeacher();
   [classA, classB] = classIds;
+  const studentAuthUserId = await createTestStudentAuthUser(admin);
+  userIds.push(studentAuthUserId);
   const student = await admin.from("students").insert({
-    class_id: classA, first_name: "Assignment", last_name: "Test", student_id: `test-${randomUUID()}`,
+    id: studentAuthUserId,
+    class_id: classA,
+    first_name: "Assignment",
+    last_name: "Test",
+    student_id: `test-${randomUUID()}`,
   }).select("id").single();
   if (student.error) throw student.error;
   studentId = student.data.id;
 }, 60_000);
 
 beforeEach(async () => {
-  session.value = { studentId, classId: classA, expiresAt: Date.now() + 100000 };
+  session.value = { authUserId: studentId, studentId, classId: classA };
   const result = await admin.from("class_activities").delete().in("class_id", classIds);
   if (result.error) throw result.error;
 });
@@ -167,7 +174,7 @@ describe("student assignment reader against Supabase", () => {
   it("rejects missing sessions and mismatched membership", async () => {
     session.value = null;
     expect((await getStudentAssignments()).status).toBe("unauthenticated");
-    session.value = { studentId, classId: classB, expiresAt: Date.now() + 10000 };
+    session.value = { authUserId: studentId, studentId, classId: classB };
     expect((await getStudentAssignments()).status).toBe("unauthenticated");
   });
 

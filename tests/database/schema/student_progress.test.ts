@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { beforeAll, afterAll, afterEach, describe, it, expect } from 'vitest'
+import { createTestStudentAuthUser, deleteTestAuthUsers } from '../auth-fixtures'
 
 // ─── Admin client ─────────────────────────────────────────────────────────────
 // Service role key bypasses RLS so tests exercise constraints directly.
@@ -9,6 +10,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
+const authUserIds: string[] = []
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 // Each function does exactly one thing: create or read one type of row.
@@ -52,10 +54,12 @@ async function insertTestClassActivity(classId: string, activityId: string): Pro
 }
 
 async function insertStudent(classId: string, firstName = 'Alice', lastName = 'Smith'): Promise<string> {
+  const authUserId = await createTestStudentAuthUser(supabase)
+  authUserIds.push(authUserId)
   const studentId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const { data, error } = await supabase
     .from('students')
-    .insert({ class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
+    .insert({ id: authUserId, class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
     .select('id')
     .single()
   if (error) throw new Error(`insertStudent failed: ${error.message}`)
@@ -151,6 +155,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await supabase.from('classes').delete().in('id', [primaryClassId, secondaryClassId])
+  await deleteTestAuthUsers(supabase, authUserIds)
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
