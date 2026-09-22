@@ -100,12 +100,20 @@ Keep the service-role key out of source control and configure it in the
 deployment environment as well as `.env.local`. It is used only by trusted
 server code for passwordless student Auth provisioning.
 
-Apply the SQL files in `src/lib/supabase/migration/` to the Supabase project in
-timestamp order. Student login requires
-`20260922191858_student_supabase_auth.sql`; it resets existing test student
-data, makes `students.id` the Supabase Auth user ID, and installs the student
-RLS policies. Students still sign in with only their Student ID and classroom
-code.
+Link the CLI and apply database migrations with:
+
+```bash
+supabase link --project-ref cprrlddivmtrlkubluyt
+supabase db push --dry-run
+supabase db push
+```
+
+Student login requires
+`supabase/migrations/20260922191858_student_supabase_auth.sql`. This destructive
+testing migration removes existing student Auth identities and student-dependent
+data, makes `students.id` the Supabase Auth user ID, and installs the student RLS
+policies. Teachers, classrooms, activities, questions, and answers are preserved.
+Students still sign in with only their Student ID and classroom code.
 
 ### Branch Strategy
 
