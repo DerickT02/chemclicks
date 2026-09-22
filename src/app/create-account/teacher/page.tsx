@@ -15,6 +15,7 @@ import {
   getTeacherVerificationMessage,
 } from "@/lib/auth/teacher-email-verification";
 import { validateTeacherSignup } from "@/lib/auth/validate-teacher-signup";
+import { DATABASE_RETRY_MESSAGE, isDuplicateAuthError } from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TeacherCreateAccountPage() {
@@ -65,6 +66,8 @@ export default function TeacherCreateAccountPage() {
       setEmailError(result.emailError);
       setPasswordError(result.passwordError);
       setConfirmError(result.confirmError);
+      setPassword("");
+      setConfirmPassword("");
       return;
     }
 
@@ -87,19 +90,21 @@ export default function TeacherCreateAccountPage() {
     // See: https://stackoverflow.com/questions/73802604/how-to-check-if-user-already-exists-in-supabase
     if (
       data.user?.identities?.length === 0 ||
-      error?.code === "user_already_exists" || // note: these checks are fallbacks for if supabase email confirmation is changed
-      error?.message.toLowerCase().includes("already registered") ||
-      error?.message.toLowerCase().includes("already exists")
+      isDuplicateAuthError(error)
     ) {
       setEmailError(
         "This email is already registered. Please use a different email or sign in.",
       );
+      setPassword("");
+      setConfirmPassword("");
       setIsSubmitting(false);
       return;
     }
 
     if (error) {
-      setFormError(error.message || "Could not create account. Please try again.");
+      setFormError(DATABASE_RETRY_MESSAGE);
+      setPassword("");
+      setConfirmPassword("");
       setIsSubmitting(false);
       return;
     }
