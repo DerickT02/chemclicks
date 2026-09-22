@@ -31,3 +31,13 @@ export async function insertStudent(
 
   return { data: data as Student, error: null };
 }
+
+/**
+ * The database is the authoritative duplicate check. This also covers two
+ * signup attempts that happen at nearly the same time.
+ */
+export function isDuplicateStudentUsernameError(
+  error: PostgrestError | null,
+): boolean {
+  return error?.code === "23505";
+}

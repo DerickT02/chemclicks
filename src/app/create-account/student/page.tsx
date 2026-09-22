@@ -11,7 +11,10 @@ import {
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
-import { insertStudent } from "@/lib/db/students";
+import {
+  insertStudent,
+  isDuplicateStudentUsernameError,
+} from "@/lib/db/students";
 import { createClient } from "@/lib/supabase/client";
 
 export default function StudentCreateAccountPage() {
@@ -84,6 +87,14 @@ export default function StudentCreateAccountPage() {
     });
 
     if (studentError) {
+      if (isDuplicateStudentUsernameError(studentError)) {
+        setStudentIDError(
+          `Student ID "${normalizedStudentID}" is already taken. Please choose a different Student ID.`,
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       setFormError(studentError.message);
       setIsSubmitting(false);
       return;

@@ -74,13 +74,29 @@ export default function TeacherCreateAccountPage() {
     const normalizedEmail = email.trim();
     const emailRedirectTo = buildTeacherEmailRedirectTo(window.location.origin);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         emailRedirectTo,
       },
     });
+
+    // With email confirmation enabled, Supabase can return an obfuscated user
+    // with no identities instead of an AuthError for an existing email.
+    // See: https://stackoverflow.com/questions/73802604/how-to-check-if-user-already-exists-in-supabase
+    if (
+      data.user?.identities?.length === 0 ||
+      error?.code === "user_already_exists" || // note: these checks are fallbacks for if supabase email confirmation is changed
+      error?.message.toLowerCase().includes("already registered") ||
+      error?.message.toLowerCase().includes("already exists")
+    ) {
+      setEmailError(
+        "This email is already registered. Please use a different email or sign in.",
+      );
+      setIsSubmitting(false);
+      return;
+    }
 
     if (error) {
       setFormError(error.message || "Could not create account. Please try again.");
