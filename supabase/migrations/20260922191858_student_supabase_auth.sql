@@ -48,9 +48,23 @@ $$;
 REVOKE ALL ON FUNCTION private.current_active_student_class_id() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION private.current_active_student_class_id() TO authenticated;
 
--- Existing teacher policies remain in place; permissive SELECT policies add
--- access for a student to only their own application row and active classroom.
+-- The linked project currently has no students SELECT policies. Preserve
+-- teacher access to students in their own classes as well as student self-read.
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chemclicks_students_select_teacher_class" ON public.students;
+CREATE POLICY "chemclicks_students_select_teacher_class"
+  ON public.students
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.classes AS c
+      WHERE c.id = students.class_id
+        AND c.teacher_id = (SELECT auth.uid())
+    )
+  );
+
 DROP POLICY IF EXISTS "chemclicks_students_select_self" ON public.students;
 CREATE POLICY "chemclicks_students_select_self"
   ON public.students
@@ -77,6 +91,18 @@ CREATE POLICY "chemclicks_class_activities_select_student_class"
   USING (
     class_id = (SELECT private.current_active_student_class_id())
   );
+
+-- Activities are shared catalog entries, not class-specific data. The linked
+-- project's activities table has RLS enabled without a SELECT policy, which
+-- hides rows in the student assignment reader's activities!inner join (and in
+-- the teacher activity picker). Anonymous access remains denied.
+ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chemclicks_activities_select_authenticated" ON public.activities;
+CREATE POLICY "chemclicks_activities_select_authenticated"
+  ON public.activities
+  FOR SELECT
+  TO authenticated
+  USING (true);
 
 -- Student progress was previously isolated only by service-role server queries.
 -- These policies move isolation to Postgres while retaining teacher visibility.
