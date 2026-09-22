@@ -1,14 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { beforeAll, afterAll, describe, it, expect } from 'vitest'
-import { createTestStudentAuthUser, deleteTestAuthUsers } from '../auth-fixtures'
 
 // ─── Context ──────────────────────────────────────────────────────────────────
-// Runtime student access uses a Supabase Auth session and RLS. These fixtures
-// use the service role only to set up cross-class records and verify the scoped
-// query shape independently of authentication.
+// Students have no RLS-based access control; their progress data isolation is
+// enforced server-side: the Next.js layer reads the student's id from their
+// session cookie and always scopes progress queries to that student_id.
 //
-// A student in Class A must never read progress belonging to a student in
-// Class B.
+// These tests verify that the server-side query pattern correctly isolates
+// progress data — a student in Class A can never read progress belonging to
+// a student in Class B.
 
 // ─── Admin client ─────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -17,8 +17,9 @@ const supabase = createClient(
 )
 
 // ─── Server-side query functions ──────────────────────────────────────────────
-// Student-facing code uses auth.uid(), which is also the public.students UUID;
-// it never accepts an arbitrary student_id from the client.
+// These mirror exactly what Next.js server actions will execute on a student's
+// behalf. Each receives the student's id from their session — the server
+// never lets the student supply an arbitrary student_id.
 
 function getProgressForStudent(studentId: string) {
   return supabase
@@ -66,15 +67,11 @@ async function insertClassActivity(classId: string, activityId: string): Promise
   return data.id
 }
 
-const authUserIds: string[] = []
-
 async function insertStudent(classId: string, firstName: string, lastName: string): Promise<string> {
-  const authUserId = await createTestStudentAuthUser(supabase)
-  authUserIds.push(authUserId)
   const studentId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const { data, error } = await supabase
     .from('students')
-    .insert({ id: authUserId, class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
+    .insert({ class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
     .select('id')
     .single()
   if (error) throw new Error(`insertStudent failed: ${error.message}`)
@@ -121,7 +118,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await supabase.from('classes').delete().in('id', [classAId, classBId])
-  await deleteTestAuthUsers(supabase, authUserIds)
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

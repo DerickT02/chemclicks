@@ -1,56 +1,54 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
-const STUDENT_AUTH_DOMAIN = "students.auth.chemclicks.invalid";
-const SESSION_ERROR_MESSAGE = "Could not create a student session. Please try again.";
+const SESSION_ERROR = "Could not create a student session. Please try again.";
 
-type StudentAuthRecord = {
-  id: string;
-};
+type Student = { id: string; auth_user_id: string | null };
 
-/** Create a unique, non-deliverable email used only as a Supabase Auth identity. */
-export function createStudentAuthEmail(): string {
-  return `student-${randomUUID()}@${STUDENT_AUTH_DOMAIN}`;
+// Supabase Auth needs an email identity; students never see or receive mail at
+// this reserved address. Their credentials remain Student ID + classroom code.
+function studentAuthEmail(studentId: string): string {
+  return `student-${studentId}@students.auth.chemclicks.invalid`;
 }
 
-/**
- * Converts validated Student ID/class-code credentials into a normal Supabase
- * Auth session. The student row UUID is also the auth.users UUID, so the admin
- * lookup can recover the hidden identity without an extra mapping column.
- */
 export async function createStudentSupabaseSession(
   admin: SupabaseClient,
-  student: StudentAuthRecord,
+  student: Student,
 ): Promise<string | null> {
   try {
-    const { data: userData, error: userError } = await admin.auth.admin.getUserById(student.id);
-    const email = userData.user?.email;
-    if (userError || !email) return SESSION_ERROR_MESSAGE;
-
-    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    const { data, error } = await admin.auth.admin.generateLink({
       type: "magiclink",
-      email,
+      email: studentAuthEmail(student.id),
     });
+    const authUserId = data.user?.id;
+    if (error || !authUserId || !data.properties?.hashed_token) return SESSION_ERROR;
+    if (student.auth_user_id && student.auth_user_id !== authUserId) return SESSION_ERROR;
 
-    if (
-      linkError
-      || linkData.user?.id !== student.id
-      || !linkData.properties?.hashed_token
-    ) {
-      return SESSION_ERROR_MESSAGE;
+    if (!student.auth_user_id) {
+      const linked = await admin.from("students")
+        .update({ auth_user_id: authUserId })
+        .eq("id", student.id)
+        .is("auth_user_id", null)
+        .select("auth_user_id")
+        .maybeSingle();
+      if (linked.error) return SESSION_ERROR;
+      if (linked.data?.auth_user_id !== authUserId) {
+        // Another login may have linked the same Auth user concurrently.
+        const current = await admin.from("students")
+          .select("auth_user_id").eq("id", student.id).maybeSingle();
+        if (current.error || current.data?.auth_user_id !== authUserId) return SESSION_ERROR;
+      }
     }
 
     const supabase = await createClient();
     const { error: verifyError } = await supabase.auth.verifyOtp({
-      token_hash: linkData.properties.hashed_token,
+      token_hash: data.properties.hashed_token,
       type: "magiclink",
     });
-
-    return verifyError ? SESSION_ERROR_MESSAGE : null;
+    return verifyError ? SESSION_ERROR : null;
   } catch {
-    return SESSION_ERROR_MESSAGE;
+    return SESSION_ERROR;
   }
 }

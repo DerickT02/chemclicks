@@ -1,16 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getClassActivities, insertClassActivity, updateClassActivity } from "@/lib/db/class_activities";
-import { createTestStudentAuthUser } from "../auth-fixtures";
 
 vi.mock("server-only", () => ({}));
-const session = vi.hoisted(() => ({
-  value: null as null | { authUserId: string; studentId: string; classId: string },
-  client: null as SupabaseClient | null,
-}));
+const session = vi.hoisted(() => ({ value: null as null | { studentId: string; classId: string; expiresAt: number } }));
 vi.mock("@/lib/auth/student-session", () => ({ getStudentSession: async () => session.value }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => session.client }));
 import { getStudentAssignments } from "@/lib/db/student-assignments";
 
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -52,34 +47,19 @@ beforeAll(async () => {
   teacherA = await createTeacher();
   teacherB = await createTeacher();
   [classA, classB] = classIds;
-  const studentAuthUserId = await createTestStudentAuthUser(admin);
-  userIds.push(studentAuthUserId);
   const student = await admin.from("students").insert({
-    id: studentAuthUserId,
-    class_id: classA,
-    first_name: "Assignment",
-    last_name: "Test",
-    student_id: `test-${randomUUID()}`,
+    class_id: classA, first_name: "Assignment", last_name: "Test", student_id: `test-${randomUUID()}`,
   }).select("id").single();
   if (student.error) throw student.error;
   studentId = student.data.id;
-  const authUser = await admin.auth.admin.getUserById(studentId);
-  if (authUser.error || !authUser.data.user?.email) throw new Error("Student fixture email not found.");
-  const link = await admin.auth.admin.generateLink({ type: "magiclink", email: authUser.data.user.email });
-  if (link.error || !link.data.properties?.hashed_token) throw new Error("Student fixture link failed.");
-  session.client = anonymous();
-  const signedIn = await session.client.auth.verifyOtp({
-    token_hash: link.data.properties.hashed_token,
-    type: "magiclink",
-  });
-  if (signedIn.error) throw signedIn.error;
 }, 60_000);
 
 beforeEach(async () => {
-  session.value = { authUserId: studentId, studentId, classId: classA };
+  session.value = { studentId, classId: classA, expiresAt: Date.now() + 100000 };
   const result = await admin.from("class_activities").delete().in("class_id", classIds);
   if (result.error) throw result.error;
 });
+afterEach(() => vi.useRealTimers());
 afterAll(async () => {
   // Only IDs created by this suite are ever deleted.
   const errors: string[] = [];
@@ -167,61 +147,35 @@ describe("class assignments persistence and RLS", () => {
 });
 
 describe("student assignment reader against Supabase", () => {
-  it("preserves teacher access to their own student roster and progress", async () => {
-    const own = await assign(classA);
-    const progress = await admin.from("student_progress").insert({
-      student_id: studentId,
-      class_activity_id: own.id,
-    }).select("id").single();
-    if (progress.error) throw progress.error;
-
-    const ownStudents = await teacherA.from("students").select("id").eq("id", studentId);
-    const otherStudents = await teacherB.from("students").select("id").eq("id", studentId);
-    const ownProgress = await teacherA.from("student_progress").select("id").eq("id", progress.data.id);
-    const otherProgress = await teacherB.from("student_progress").select("id").eq("id", progress.data.id);
-    expect(ownStudents.error).toBeNull();
-    expect(ownStudents.data).toEqual([{ id: studentId }]);
-    expect(otherStudents.error).toBeNull();
-    expect(otherStudents.data).toEqual([]);
-    expect(ownProgress.error).toBeNull();
-    expect(ownProgress.data).toEqual([{ id: progress.data.id }]);
-    expect(otherProgress.error).toBeNull();
-    expect(otherProgress.data).toEqual([]);
-  });
-
   it.each([
     [null, null, true],
-    [-60_000, null, true],
-    [60_000, null, false],
-    [null, -60_000, false],
-    [null, 60_000, true],
-  ])("enforces opening %s and closing %s", async (opensOffset, closesOffset, visible) => {
-    const now = Date.now();
-    const opens_at = opensOffset === null ? null : new Date(now + opensOffset).toISOString();
-    const closes_at = closesOffset === null ? null : new Date(now + closesOffset).toISOString();
+    ["2026-09-12T12:00:00Z", null, true],
+    ["2026-09-12T12:00:00.001Z", null, false],
+    [null, "2026-09-12T12:00:00Z", false],
+    [null, "2026-09-12T12:00:00.001Z", true],
+  ])("enforces opening %s and closing %s", async (opens_at, closes_at, visible) => {
     const own = await assign(classA, { opens_at, closes_at });
     await assign(classB);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-12T12:00:00Z"));
     const result = await getStudentAssignments();
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error("Reader failed");
     expect(result.assignments.map((a) => a.id)).toEqual(visible ? [own.id] : []);
   });
 
-  it("rejects missing sessions and hides assignments from other classes", async () => {
+  it("rejects missing sessions and mismatched membership", async () => {
     session.value = null;
     expect((await getStudentAssignments()).status).toBe("unauthenticated");
-    session.value = { authUserId: studentId, studentId, classId: classB };
-    await assign(classB);
-    const result = await getStudentAssignments();
-    expect(result).toEqual({ status: "ok", assignments: [] });
+    session.value = { studentId, classId: classB, expiresAt: Date.now() + 10000 };
+    expect((await getStudentAssignments()).status).toBe("unauthenticated");
   });
 
-  it("hides assignments from inactive classes", async () => {
-    await assign(classA);
+  it("rejects inactive classes", async () => {
     const result = await admin.from("classes").update({ is_active: false }).eq("id", classA);
     if (result.error) throw result.error;
     try {
-      expect(await getStudentAssignments()).toEqual({ status: "ok", assignments: [] });
+      expect((await getStudentAssignments()).status).toBe("unauthenticated");
     } finally {
       const restored = await admin.from("classes").update({ is_active: true }).eq("id", classA);
       if (restored.error) throw restored.error;

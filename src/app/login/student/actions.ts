@@ -44,7 +44,7 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
 
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("id")
+    .select("id, auth_user_id")
     .eq("class_id", classRow.id)
     .eq("student_id", normalizedStudentID)
     .maybeSingle();

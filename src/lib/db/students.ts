@@ -4,16 +4,16 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
 export type Student = {
-  id: string          // UUID, same value as auth.users.id
+  id: string          // UUID, auto-generated
   class_id: string    // UUID, FK → classes.id
   first_name: string
   last_name: string
   created_at: string  // ISO 8601 timestamp, auto-set
-  student_id: string  // text, unique login identifier, NOT NULL
+  student_id: string  // text, unique username / PIN, NOT NULL
   verified: boolean   // defaults to false
 }
 
-export type InsertStudent = Pick<Student, 'id' | 'class_id' | 'first_name' | 'last_name' | 'student_id'>
+export type InsertStudent = Pick<Student, 'class_id' | 'first_name' | 'last_name' | 'student_id'>
 
 export async function insertStudent(
   supabase: SupabaseClient,

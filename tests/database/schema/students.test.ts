@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 import { beforeAll, afterAll, afterEach, describe, it, expect } from 'vitest'
-import { createTestStudentAuthUser, deleteTestAuthUsers } from '../auth-fixtures'
 
 // ─── Admin client ─────────────────────────────────────────────────────────────
 // Service role key bypasses RLS so tests exercise constraints directly.
@@ -10,7 +9,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
-const authUserIds: string[] = []
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 // Each function does exactly one thing: create or read one type of row.
@@ -43,18 +41,11 @@ async function insertTestClass(teacherId: string): Promise<string> {
   return data.id
 }
 
-async function newStudentAuthUserId(): Promise<string> {
-  const authUserId = await createTestStudentAuthUser(supabase)
-  authUserIds.push(authUserId)
-  return authUserId
-}
-
 async function insertStudent(classId: string, firstName = 'Alice', lastName = 'Smith') {
-  const authUserId = await newStudentAuthUserId()
   const studentId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   return supabase
     .from('students')
-    .insert({ id: authUserId, class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
+    .insert({ class_id: classId, first_name: firstName, last_name: lastName, student_id: studentId })
     .select('*')
     .single()
 }
@@ -118,7 +109,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await supabase.from('classes').delete().eq('id', primaryClassId)
-  await deleteTestAuthUsers(supabase, authUserIds)
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -126,7 +116,7 @@ afterAll(async () => {
 describe('students table schema', () => {
 
   describe('column defaults', () => {
-    it('uses the Supabase Auth uuid for id', async () => {
+    it('auto-generates a uuid for id', async () => {
       const { data, error } = await insertStudent(primaryClassId)
       if (data?.id) track.studentIds.push(data.id)
 
@@ -149,30 +139,27 @@ describe('students table schema', () => {
 
   describe('NOT NULL constraints (pg error 23502)', () => {
     it('rejects insert without class_id', async () => {
-      const id = await newStudentAuthUserId()
       const { error } = await supabase
         .from('students')
-        .insert({ id, first_name: 'Alice', last_name: 'Smith', student_id: 'test-no-class' })
+        .insert({ first_name: 'Alice', last_name: 'Smith', student_id: 'test-no-class' })
         .select()
 
       expect(error?.code).toBe('23502')
     })
 
     it('rejects insert without first_name', async () => {
-      const id = await newStudentAuthUserId()
       const { error } = await supabase
         .from('students')
-        .insert({ id, class_id: primaryClassId, last_name: 'Smith', student_id: 'test-no-first' })
+        .insert({ class_id: primaryClassId, last_name: 'Smith', student_id: 'test-no-first' })
         .select()
 
       expect(error?.code).toBe('23502')
     })
 
     it('rejects insert without last_name', async () => {
-      const id = await newStudentAuthUserId()
       const { error } = await supabase
         .from('students')
-        .insert({ id, class_id: primaryClassId, first_name: 'Alice', student_id: 'test-no-last' })
+        .insert({ class_id: primaryClassId, first_name: 'Alice', student_id: 'test-no-last' })
         .select()
 
       expect(error?.code).toBe('23502')
@@ -183,18 +170,16 @@ describe('students table schema', () => {
     it('rejects a duplicate student_id', async () => {
       const sharedStudentId = `test-dup-${Date.now()}`
 
-      const firstId = await newStudentAuthUserId()
       const { data: first } = await supabase
         .from('students')
-        .insert({ id: firstId, class_id: primaryClassId, first_name: 'Alice', last_name: 'Smith', student_id: sharedStudentId })
+        .insert({ class_id: primaryClassId, first_name: 'Alice', last_name: 'Smith', student_id: sharedStudentId })
         .select('id')
         .single()
       if (first?.id) track.studentIds.push(first.id)
 
-      const secondId = await newStudentAuthUserId()
       const { error } = await supabase
         .from('students')
-        .insert({ id: secondId, class_id: primaryClassId, first_name: 'Bob', last_name: 'Jones', student_id: sharedStudentId })
+        .insert({ class_id: primaryClassId, first_name: 'Bob', last_name: 'Jones', student_id: sharedStudentId })
         .select()
 
       expect(error?.code).toBe('23505')
@@ -214,11 +199,9 @@ describe('students table schema', () => {
 
   describe('FOREIGN KEY constraint (pg error 23503)', () => {
     it('rejects insert with a non-existent class_id', async () => {
-      const id = await newStudentAuthUserId()
       const { error } = await supabase
         .from('students')
         .insert({
-          id,
           class_id: '00000000-0000-0000-0000-000000000000',
           first_name: 'Alice',
           last_name: 'Smith',

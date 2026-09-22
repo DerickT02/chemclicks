@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   AuthCard,
   AuthField,
@@ -15,7 +14,6 @@ import { validateStudentID, validateStudentCode } from "@/lib/auth/validate-stud
 import { loginStudent } from "./actions";
 
 export default function StudentLoginPage() {
-  const router = useRouter();
   const [studentID, setStudentID] = useState("");
   const [code, setCode] = useState("");
   const [studentIDError, setStudentIDError] = useState<string | undefined>();
@@ -59,8 +57,7 @@ export default function StudentLoginPage() {
     setCode(normalizedCode);
     setIsSubmitting(false);
     setIsLoggedIn(true);
-    router.replace("/student");
-    router.refresh();
+    window.location.href = "/student";
   }
 
   return (

@@ -1,45 +1,35 @@
 import "server-only";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export type StudentSession = {
-  authUserId: string;
-  studentId: string;
-  classId: string;
-};
+type StudentSession = { studentId: string; classId: string };
 
-/** Resolve the verified Supabase Auth user to their student application row. */
+/** Verify the Supabase cookie, then resolve its user to an existing student. */
 export async function getStudentSession(): Promise<StudentSession | null> {
   try {
     const supabase = await createClient();
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-    const authUserId = claimsData?.claims?.sub;
+    const { data, error } = await supabase.auth.getClaims();
+    const authUserId = data?.claims?.sub;
+    if (error || !authUserId) return null;
 
-    if (claimsError || typeof authUserId !== "string") return null;
-
-    const { data: student, error: studentError } = await supabase
-      .from("students")
+    // Student table RLS is still teacher-only; continue to authorize all
+    // student data on the server, exactly as before this session migration.
+    const admin = createAdminClient();
+    const { data: student, error: studentError } = await admin.from("students")
       .select("id, class_id")
-      .eq("id", authUserId)
+      .eq("auth_user_id", authUserId)
       .maybeSingle();
-
     if (studentError || !student) return null;
 
-    // The student classes policy exposes this row only while the classroom is
-    // active, preserving the previous inactive-class login behavior.
-    const { data: classroom, error: classError } = await supabase
-      .from("classes")
+    const { data: classroom, error: classError } = await admin.from("classes")
       .select("id")
       .eq("id", student.class_id)
+      .eq("is_active", true)
       .maybeSingle();
-
     if (classError || !classroom) return null;
 
-    return {
-      authUserId,
-      studentId: student.id,
-      classId: classroom.id,
-    };
+    return { studentId: student.id, classId: classroom.id };
   } catch {
     return null;
   }

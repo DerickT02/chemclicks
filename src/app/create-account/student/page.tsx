@@ -11,7 +11,8 @@ import {
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
-import { createStudentAccount } from "./actions";
+import { insertStudent } from "@/lib/db/students";
+import { createClient } from "@/lib/supabase/client";
 
 export default function StudentCreateAccountPage() {
   const router = useRouter();
@@ -50,19 +51,40 @@ export default function StudentCreateAccountPage() {
 
     setIsSubmitting(true);
 
-    const signupResult = await createStudentAccount(
-      normalizedFirstName,
-      normalizedLastName,
-      normalizedStudentID,
-      normalizedCode,
-    );
+    const supabase = createClient();
+    const { data: classRow, error: classError } = await supabase
+      .from("classes")
+      .select("id, is_active")
+      .eq("class_code", normalizedCode)
+      .maybeSingle();
 
-    if (!signupResult.ok) {
-      if (signupResult.field === "firstName") setFirstNameError(signupResult.message);
-      else if (signupResult.field === "lastName") setLastNameError(signupResult.message);
-      else if (signupResult.field === "studentID") setStudentIDError(signupResult.message);
-      else if (signupResult.field === "code") setCodeError(signupResult.message);
-      else setFormError(signupResult.message);
+    if (classError) {
+      setFormError(classError.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!classRow) {
+      setCodeError("That classroom code was not found.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!classRow.is_active) {
+      setCodeError("That classroom is inactive.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { error: studentError } = await insertStudent(supabase, {
+      class_id: classRow.id,
+      first_name: normalizedFirstName,
+      last_name: normalizedLastName,
+      student_id: normalizedStudentID,
+    });
+
+    if (studentError) {
+      setFormError(studentError.message);
       setIsSubmitting(false);
       return;
     }
