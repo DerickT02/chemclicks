@@ -80,7 +80,7 @@ npm install
 
 # 3. Set up environment variables
 cp .env.example .env.local
-# Fill in your Supabase URL and anon key in .env.local
+# Fill in your Supabase credentials in .env.local
 
 # 4. Run the development server
 npm run dev
@@ -93,7 +93,19 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_server_only_service_role_key
 ```
+
+Keep the service-role key out of source control and configure it in the
+deployment environment as well as `.env.local`. It is used only by trusted
+server code for passwordless student Auth provisioning.
+
+Apply the SQL files in `src/lib/supabase/migration/` to the Supabase project in
+timestamp order. Student login requires
+`20260922191858_student_supabase_auth.sql`; it resets existing test student
+data, makes `students.id` the Supabase Auth user ID, and installs the student
+RLS policies. Students still sign in with only their Student ID and classroom
+code.
 
 ### Branch Strategy
 
