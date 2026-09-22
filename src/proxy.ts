@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import type { User } from "@supabase/supabase-js";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const ADMIN_ROUTES = ["/admin"];
@@ -24,10 +23,6 @@ export default async function proxy(request: NextRequest) {
   // Next pathname is an admin route
 
   if (!user) {
-    if (process.env.NODE_ENV === "development") {
-      // Scaffold: teacher login does not set a session yet; allow /admin locally.
-      return response;
-    }
     const url = request.nextUrl.clone();
     url.pathname = "/login/teacher";
     url.searchParams.set("redirectedFrom", pathname);
