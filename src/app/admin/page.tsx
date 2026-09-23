@@ -42,6 +42,14 @@ function statusText(status: ProgressStatus | null): string {
   return "Not started";
 }
 
+function formatAssignmentTimestamp(value: string): string {
+  return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
+function scheduleTimestamp(value: string | null, whenEmpty: string): string {
+  return value ? formatAssignmentTimestamp(value) : whenEmpty;
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -133,6 +141,9 @@ export default async function AdminPage({
 
   const activities = catalogResult.data ?? [];
   const assignments = assignmentsResult.data ?? [];
+  const assignedActivityIds = assignments.map(
+    (assignment) => assignment.activity_id,
+  );
   const catalogLoadFailed = Boolean(catalogResult.error);
   const assignmentsLoadFailed = Boolean(assignmentsResult.error);
 
@@ -267,6 +278,7 @@ export default async function AdminPage({
                           key={selectedClass.id}
                           classId={selectedClass.id}
                           activities={activities}
+                          assignedActivityIds={assignedActivityIds}
                         />
                       </div>
 
@@ -279,23 +291,66 @@ export default async function AdminPage({
                           This class has no assigned activities.
                         </p>
                       ) : (
-                        assignments.map((assignment) => (
-                          <div
-                            key={assignment.id}
-                            className="space-y-4 rounded-lg border border-border p-4"
-                          >
-                            <h4 className="font-medium">
-                              {activities.find(
-                                (activity) => activity.id === assignment.activity_id,
-                              )?.title ?? "Assigned activity"}
-                            </h4>
-                            <AssignmentForm
-                              classId={selectedClass.id}
-                              activities={activities}
-                              assignment={assignment}
-                            />
-                          </div>
-                        ))
+                        assignments.map((assignment) => {
+                          const activity = activities.find(
+                            (item) => item.id === assignment.activity_id,
+                          );
+
+                          return (
+                            <div
+                              key={assignment.id}
+                              className="flex items-start justify-between gap-4 rounded-lg border border-border p-4"
+                            >
+                              <div>
+                                <h4 className="font-medium">
+                                  {activity?.title ?? "Assigned activity"}
+                                </h4>
+                                {activity ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {activity.description}
+                                  </p>
+                                ) : null}
+                                <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Assigned
+                                    </dt>
+                                    <dd>
+                                      {formatAssignmentTimestamp(
+                                        assignment.created_at,
+                                      )}
+                                    </dd>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Opens
+                                    </dt>
+                                    <dd>
+                                      {scheduleTimestamp(
+                                        assignment.opens_at,
+                                        "Available immediately",
+                                      )}
+                                    </dd>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Closes
+                                    </dt>
+                                    <dd>
+                                      {scheduleTimestamp(
+                                        assignment.closes_at,
+                                        "No deadline",
+                                      )}
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </div>
+                              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                Assigned
+                              </span>
+                            </div>
+                          );
+                        })
                       )}
                     </>
                   )}

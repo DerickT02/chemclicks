@@ -58,10 +58,12 @@ describe("activity catalog retrieval", () => {
       {
         ...activities[0],
         description: "Practice ruler measurements to the nearest tenth",
+        category: "Measurement",
       },
       {
         ...activities[1],
         description: "Practice ruler measurements to the nearest hundredth",
+        category: "Measurement",
       },
     ]);
   });

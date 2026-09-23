@@ -22,6 +22,7 @@ const activities: ActivityCatalogEntry[] = [
     type: "measurement_ruler_tenths",
     order_index: 1,
     description: "Practice ruler measurements to the nearest tenth",
+    category: "Measurement",
   },
   {
     id: "22222222-2222-4222-8222-222222222222",
@@ -29,6 +30,7 @@ const activities: ActivityCatalogEntry[] = [
     type: "measurement_ruler_hundredths",
     order_index: 2,
     description: "Practice ruler measurements to the nearest hundredth",
+    category: "Measurement",
   },
 ];
 
@@ -42,21 +44,40 @@ describe("assignment activity selection", () => {
       />,
     );
 
-    const select = screen.getByRole("combobox", { name: "Activity" });
+    expect(screen.getAllByText("Ruler Practice")).toHaveLength(2);
+    expect(screen.getAllByText("Measurement")).toHaveLength(2);
     expect(
-      screen.getByRole("option", {
-        name: "Ruler Practice — Practice ruler measurements to the nearest tenth",
-      }),
+      screen.getByText("Practice ruler measurements to the nearest tenth"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", {
-        name: "Ruler Practice — Practice ruler measurements to the nearest hundredth",
-      }),
+      screen.getByText("Practice ruler measurements to the nearest hundredth"),
     ).toBeInTheDocument();
+    expect(screen.getByText("Opens at — optional")).toBeInTheDocument();
+    expect(screen.getByText("Closes at — optional")).toBeInTheDocument();
 
-    await user.selectOptions(select, activities[1].id);
+    const radios = screen.getAllByRole("radio");
+    const submit = screen.getByRole("button", { name: "Assign activity" });
+    expect(submit).toBeDisabled();
 
-    expect(select).toHaveValue(activities[1].id);
+    await user.click(radios[1]);
+
+    expect(radios[1]).toBeChecked();
+    expect(radios[1]).toHaveAttribute("value", activities[1].id);
+    expect(submit).toBeEnabled();
+  });
+
+  it("marks assigned activities and prevents selecting them again", () => {
+    render(
+      <AssignmentForm
+        classId="33333333-3333-4333-8333-333333333333"
+        activities={activities}
+        assignedActivityIds={[activities[0].id]}
+      />,
+    );
+
+    expect(screen.getByText("Assigned")).toBeInTheDocument();
+    expect(screen.getAllByRole("radio")[0]).toBeDisabled();
+    expect(screen.getAllByRole("radio")[1]).toBeEnabled();
   });
 
   it("shows an explicit empty state and disables assignment", () => {

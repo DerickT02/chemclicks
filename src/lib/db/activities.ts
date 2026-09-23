@@ -23,6 +23,7 @@ export type InsertActivity = Pick<Activity, 'title' | 'type' | 'order_index'>
 
 export type ActivityCatalogEntry = Activity & {
   description: string
+  category: string
 }
 
 type CatalogError = {
@@ -46,6 +47,17 @@ const ACTIVITY_DESCRIPTIONS: Record<ActivityType, string> = {
   measurement_graduated_cylinder: 'Read liquid volume from a graduated cylinder',
 }
 
+const ACTIVITY_CATEGORIES: Record<ActivityType, string> = {
+  bohr_model_intro: 'Bohr Models',
+  bohr_model_stability: 'Bohr Models',
+  lewis_diagram: 'Lewis Structures',
+  lewis_structures_covalent: 'Lewis Structures',
+  lewis_structures_ionic: 'Lewis Structures',
+  measurement_ruler_tenths: 'Measurement',
+  measurement_ruler_hundredths: 'Measurement',
+  measurement_graduated_cylinder: 'Measurement',
+}
+
 /**
  * The current schema has no publication column, so every catalog row is
  * considered available. A secondary ID ordering keeps ties deterministic.
@@ -65,6 +77,7 @@ export async function listActivityCatalog(
     data: ((data ?? []) as Activity[]).map((activity) => ({
       ...activity,
       description: ACTIVITY_DESCRIPTIONS[activity.type],
+      category: ACTIVITY_CATEGORIES[activity.type],
     })),
     error: null,
   }
