@@ -98,7 +98,7 @@ export default function TeacherCreateAccountPage() {
     // with no identities instead of an AuthError for an existing email.
     // See: https://stackoverflow.com/questions/73802604/how-to-check-if-user-already-exists-in-supabase
     if (
-      data.user?.identities?.length === 0 ||
+      authData.user?.identities?.length === 0 ||
       isDuplicateAuthError(error)
     ) {
       setEmailError(
