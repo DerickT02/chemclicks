@@ -4,6 +4,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const TEACHER_PASSWORD_MIN_LENGTH = 8;
 
+export function validateTeacherDisplayName(displayName: string): string | undefined {
+  const normalized = displayName.trim();
+  if (!normalized) return "Display name is required.";
+  return undefined;
+}
+
 export function validateTeacherEmail(email: string): string | undefined {
   const normalized = email.trim();
   if (!normalized) return "Email is required.";
@@ -15,16 +21,21 @@ export type TeacherSignupResult =
   | { valid: true }
   | {
       valid: false;
+      displayNameError?: string;
       emailError?: string;
       passwordError?: string;
       confirmError?: string;
     };
 
 export function validateTeacherSignup(
+  displayName: string,
   email: string,
   password: string,
   confirmPassword: string,
 ): TeacherSignupResult {
+  // Validate display name
+  const displayNameError = validateTeacherDisplayName(displayName);
+
   // Validate email
   const emailError = validateTeacherEmail(email);
 
@@ -48,8 +59,8 @@ export function validateTeacherSignup(
   }
 
   // Final check
-  if (emailError || passwordError || confirmError) {
-    return { valid: false, emailError, passwordError, confirmError };
+  if (displayNameError || emailError || passwordError || confirmError) {
+    return { valid: false, displayNameError, emailError, passwordError, confirmError };
   }
 
   return { valid: true };

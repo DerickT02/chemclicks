@@ -15,13 +15,16 @@ import {
   getTeacherVerificationMessage,
 } from "@/lib/auth/teacher-email-verification";
 import { validateTeacherSignup } from "@/lib/auth/validate-teacher-signup";
+import { insertTeacher } from "@/lib/db/teachers";
 import { DATABASE_RETRY_MESSAGE, isDuplicateAuthError } from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TeacherCreateAccountPage() {
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayNameError, setDisplayNameError] = useState<string | undefined>();
   const [emailError, setEmailError] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [confirmError, setConfirmError] = useState<string | undefined>();
@@ -56,13 +59,15 @@ export default function TeacherCreateAccountPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setDisplayNameError(undefined);
     setEmailError(undefined);
     setPasswordError(undefined);
     setConfirmError(undefined);
     setFormError(undefined);
 
-    const result = validateTeacherSignup(email, password, confirmPassword);
+    const result = validateTeacherSignup(displayName, email, password, confirmPassword);
     if (!result.valid) {
+      setDisplayNameError(result.displayNameError);
       setEmailError(result.emailError);
       setPasswordError(result.passwordError);
       setConfirmError(result.confirmError);
@@ -74,14 +79,18 @@ export default function TeacherCreateAccountPage() {
     setIsSubmitting(true);
 
     const supabase = createClient();
+    const normalizedDisplayName = displayName.trim();
     const normalizedEmail = email.trim();
     const emailRedirectTo = buildTeacherEmailRedirectTo(window.location.origin);
 
-    const { data, error } = await supabase.auth.signUp({
+    const { data: authData, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         emailRedirectTo,
+        data: {
+          display_name: normalizedDisplayName,
+        },
       },
     });
 
@@ -89,7 +98,7 @@ export default function TeacherCreateAccountPage() {
     // with no identities instead of an AuthError for an existing email.
     // See: https://stackoverflow.com/questions/73802604/how-to-check-if-user-already-exists-in-supabase
     if (
-      data.user?.identities?.length === 0 ||
+      authData.user?.identities?.length === 0 ||
       isDuplicateAuthError(error)
     ) {
       setEmailError(
@@ -109,6 +118,25 @@ export default function TeacherCreateAccountPage() {
       return;
     }
 
+    if (!authData.user) {
+      setFormError("Could not create account. Please try again.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { error: teacherError } = await insertTeacher(supabase, {
+      id: authData.user.id,
+      email: normalizedEmail,
+      display_name: normalizedDisplayName,
+    });
+
+    if (teacherError) {
+      setFormError(teacherError.message || "Could not create teacher profile.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    setDisplayName("");
     setEmail(normalizedEmail);
     setPassword("");
     setConfirmPassword("");
@@ -133,6 +161,19 @@ export default function TeacherCreateAccountPage() {
         }
       >
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <AuthField
+            id="signup-display-name"
+            label="Display name"
+            type="text"
+            placeholder="e.g. Ms. Smith"
+            autoComplete="name"
+            value={displayName}
+            onChange={(e) => {
+              setDisplayName(e.target.value);
+              if (displayNameError) setDisplayNameError(undefined);
+            }}
+            error={displayNameError}
+          />
           <AuthField
             id="signup-email"
             label="Email"
