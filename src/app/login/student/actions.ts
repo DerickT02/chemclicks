@@ -9,6 +9,8 @@ import {
   INVALID_STUDENT_ID_MESSAGE,
   SESSION_RETRY_MESSAGE,
 } from "@/lib/errors/user-facing-errors";
+import { createStudentSupabaseSession } from "@/lib/auth/student-supabase-auth";
+import { validateStudentCode, validateStudentID } from "@/lib/auth/validate-student-signup";
 
 export async function loginStudent(studentID: string, classroomCode: string): Promise<
   | { ok: true }
@@ -16,7 +18,17 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
 > {
   const normalizedStudentID = studentID.trim();
   const normalizedCode = classroomCode.trim().toUpperCase();
-  // Student ID and classroom code are the student login credentials.
+  const studentIDError = validateStudentID(normalizedStudentID);
+  if (studentIDError) {
+    return { ok: false, field: "studentID", message: studentIDError };
+  }
+  const codeError = validateStudentCode(normalizedCode);
+  if (codeError) {
+    return { ok: false, field: "code", message: codeError };
+  }
+
+  // Student ID and classroom code remain the student-facing credentials. The
+  // successful lookup is exchanged for a standard Supabase Auth session.
   const supabase = createAdminClient();
 
   const { data: classRow, error: classError } = await supabase
@@ -40,7 +52,7 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
 
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("id")
+    .select("id, auth_user_id")
     .eq("class_id", classRow.id)
     .eq("student_id", normalizedStudentID)
     .maybeSingle();
