@@ -5,16 +5,12 @@ import {
   saveAssignment,
   type AssignmentFormState,
 } from "@/app/admin/assignments/actions";
+import type { ActivityCatalogEntry } from "@/lib/db/activities";
 import type { ClassActivity } from "@/lib/db/class_activities";
-
-type ActivityOption = {
-  id: string;
-  title: string;
-};
 
 type Props = {
   classId: string;
-  activities: ActivityOption[];
+  activities: ActivityCatalogEntry[];
   assignment?: ClassActivity;
 };
 
@@ -88,7 +84,7 @@ export default function AssignmentForm({
             </option>
             {activities.map((activity) => (
               <option key={activity.id} value={activity.id}>
-                {activity.title}
+                {activity.title} — {activity.description}
               </option>
             ))}
           </select>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
+import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { deleteClass, listActiveClassesForTeacher } from "@/lib/db/classes";
 
@@ -123,19 +124,17 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
-  const [activitiesResult, assignmentsResult] = await Promise.all([
-    supabase
-      .from("activities")
-      .select("id, title")
-      .order("order_index"),
+  const [catalogResult, assignmentsResult] = await Promise.all([
+    listActivityCatalog(supabase),
     selectedClass
       ? getClassActivities(supabase, selectedClass.id)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const activities = activitiesResult.data ?? [];
+  const activities = catalogResult.data ?? [];
   const assignments = assignmentsResult.data ?? [];
-  const assignmentLoadFailed = Boolean(activitiesResult.error || assignmentsResult.error);
+  const catalogLoadFailed = Boolean(catalogResult.error);
+  const assignmentsLoadFailed = Boolean(assignmentsResult.error);
 
 
   async function removeSelectedClass(formData: FormData) {
@@ -256,9 +255,9 @@ export default async function AdminPage({
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
-                  {assignmentLoadFailed ? (
+                  {catalogLoadFailed ? (
                     <p role="alert" className="text-sm text-destructive">
-                      Activities could not be loaded. Please refresh the page.
+                      The activity catalog could not be loaded. Please refresh the page.
                     </p>
                   ) : (
                     <>
@@ -271,7 +270,11 @@ export default async function AdminPage({
                         />
                       </div>
 
-                      {assignments.length === 0 ? (
+                      {assignmentsLoadFailed ? (
+                        <p role="alert" className="text-sm text-destructive">
+                          Assigned activities could not be loaded. Please refresh the page.
+                        </p>
+                      ) : assignments.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                           This class has no assigned activities.
                         </p>
