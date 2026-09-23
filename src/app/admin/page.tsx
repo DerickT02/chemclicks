@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
+import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { deleteClass, listActiveClassesForTeacher } from "@/lib/db/classes";
 
@@ -39,6 +40,14 @@ function statusText(status: ProgressStatus | null): string {
   if (status === "completed") return "Completed current activity";
   if (status === "in_progress") return "In progress";
   return "Not started";
+}
+
+function formatAssignmentTimestamp(value: string): string {
+  return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
+function scheduleTimestamp(value: string | null, whenEmpty: string): string {
+  return value ? formatAssignmentTimestamp(value) : whenEmpty;
 }
 
 export default async function AdminPage({
@@ -123,19 +132,20 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
-  const [activitiesResult, assignmentsResult] = await Promise.all([
-    supabase
-      .from("activities")
-      .select("id, title")
-      .order("order_index"),
+  const [catalogResult, assignmentsResult] = await Promise.all([
+    listActivityCatalog(supabase),
     selectedClass
       ? getClassActivities(supabase, selectedClass.id)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const activities = activitiesResult.data ?? [];
+  const activities = catalogResult.data ?? [];
   const assignments = assignmentsResult.data ?? [];
-  const assignmentLoadFailed = Boolean(activitiesResult.error || assignmentsResult.error);
+  const assignedActivityIds = assignments.map(
+    (assignment) => assignment.activity_id,
+  );
+  const catalogLoadFailed = Boolean(catalogResult.error);
+  const assignmentsLoadFailed = Boolean(assignmentsResult.error);
 
 
   async function removeSelectedClass(formData: FormData) {
@@ -256,9 +266,9 @@ export default async function AdminPage({
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
-                  {assignmentLoadFailed ? (
+                  {catalogLoadFailed ? (
                     <p role="alert" className="text-sm text-destructive">
-                      Activities could not be loaded. Please refresh the page.
+                      The activity catalog could not be loaded. Please refresh the page.
                     </p>
                   ) : (
                     <>
@@ -268,31 +278,79 @@ export default async function AdminPage({
                           key={selectedClass.id}
                           classId={selectedClass.id}
                           activities={activities}
+                          assignedActivityIds={assignedActivityIds}
                         />
                       </div>
 
-                      {assignments.length === 0 ? (
+                      {assignmentsLoadFailed ? (
+                        <p role="alert" className="text-sm text-destructive">
+                          Assigned activities could not be loaded. Please refresh the page.
+                        </p>
+                      ) : assignments.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                           This class has no assigned activities.
                         </p>
                       ) : (
-                        assignments.map((assignment) => (
-                          <div
-                            key={assignment.id}
-                            className="space-y-4 rounded-lg border border-border p-4"
-                          >
-                            <h4 className="font-medium">
-                              {activities.find(
-                                (activity) => activity.id === assignment.activity_id,
-                              )?.title ?? "Assigned activity"}
-                            </h4>
-                            <AssignmentForm
-                              classId={selectedClass.id}
-                              activities={activities}
-                              assignment={assignment}
-                            />
-                          </div>
-                        ))
+                        assignments.map((assignment) => {
+                          const activity = activities.find(
+                            (item) => item.id === assignment.activity_id,
+                          );
+
+                          return (
+                            <div
+                              key={assignment.id}
+                              className="flex items-start justify-between gap-4 rounded-lg border border-border p-4"
+                            >
+                              <div>
+                                <h4 className="font-medium">
+                                  {activity?.title ?? "Assigned activity"}
+                                </h4>
+                                {activity ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {activity.description}
+                                  </p>
+                                ) : null}
+                                <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Assigned
+                                    </dt>
+                                    <dd>
+                                      {formatAssignmentTimestamp(
+                                        assignment.created_at,
+                                      )}
+                                    </dd>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Opens
+                                    </dt>
+                                    <dd>
+                                      {scheduleTimestamp(
+                                        assignment.opens_at,
+                                        "Available immediately",
+                                      )}
+                                    </dd>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Closes
+                                    </dt>
+                                    <dd>
+                                      {scheduleTimestamp(
+                                        assignment.closes_at,
+                                        "No deadline",
+                                      )}
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </div>
+                              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                Assigned
+                              </span>
+                            </div>
+                          );
+                        })
                       )}
                     </>
                   )}
