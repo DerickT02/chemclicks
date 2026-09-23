@@ -11,6 +11,7 @@ export default function CreateClassPage() {
   const [section, setSection] = useState("");
   const [classCode, setClassCode] = useState("");
   const [classCodeError, setClassCodeError] = useState<string | undefined>();
+  const [classNameError, setClassNameError] = useState<string | undefined>();
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [submitSuccess, setSubmitSuccess] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
@@ -19,16 +20,21 @@ export default function CreateClassPage() {
     const next = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase();
     setClassCode(next);
     if (classCodeError) setClassCodeError(undefined);
+    if (submitError) setSubmitError(undefined);
   }
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setClassCodeError(undefined);
+    setClassNameError(undefined);
     setSubmitError(undefined);
     setSubmitSuccess(undefined);
 
     const trimmedName = className.trim();
-    if (!trimmedName) return;
+    if (!trimmedName) {
+      setClassNameError("Enter a class name.");
+      return;
+    }
 
     if (classCode.length !== 6) {
       setClassCodeError("Enter a 6-character code using letters A–Z and digits 0–9.");
@@ -95,9 +101,20 @@ export default function CreateClassPage() {
               autoComplete="off"
               placeholder="e.g. Chemistry Period 3"
               value={className}
-              onChange={(e) => setClassName(e.target.value)}
+              onChange={(e) => {
+                setClassName(e.target.value);
+                if (classNameError) setClassNameError(undefined);
+                if (submitError) setSubmitError(undefined);
+              }}
+              aria-invalid={classNameError ? true : undefined}
+              aria-describedby={classNameError ? "className-error" : undefined}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
             />
+            {classNameError ? (
+              <p id="className-error" className="text-sm text-destructive" role="alert">
+                {classNameError}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -139,12 +156,12 @@ export default function CreateClassPage() {
               Six letters or numbers only. Stored in uppercase.
             </p>
             {classCodeError ? (
-              <p id="classCode-error" className="text-sm text-destructive">{classCodeError}</p>
+              <p id="classCode-error" className="text-sm text-destructive" role="alert">{classCodeError}</p>
             ) : null}
           </div>
 
           {submitError ? (
-            <p className="text-sm text-destructive">{submitError}</p>
+            <p className="text-sm text-destructive" role="alert">{submitError}</p>
           ) : null}
           {submitSuccess ? (
             <p className="text-sm text-accent">{submitSuccess}</p>

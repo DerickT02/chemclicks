@@ -11,7 +11,14 @@ import {
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
-import { insertStudent } from "@/lib/db/students";
+import {
+  insertStudent,
+  isDuplicateStudentUsernameError,
+} from "@/lib/db/students";
+import {
+  CLASS_CODE_LOOKUP_MESSAGE,
+  DATABASE_RETRY_MESSAGE,
+} from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export default function StudentCreateAccountPage() {
@@ -59,7 +66,7 @@ export default function StudentCreateAccountPage() {
       .maybeSingle();
 
     if (classError) {
-      setFormError(classError.message);
+      setCodeError(CLASS_CODE_LOOKUP_MESSAGE);
       setIsSubmitting(false);
       return;
     }
@@ -84,7 +91,15 @@ export default function StudentCreateAccountPage() {
     });
 
     if (studentError) {
-      setFormError(studentError.message);
+      if (isDuplicateStudentUsernameError(studentError)) {
+        setStudentIDError(
+          `Student ID "${normalizedStudentID}" is already taken. Please choose a different Student ID.`,
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      setFormError(DATABASE_RETRY_MESSAGE);
       setIsSubmitting(false);
       return;
     }
@@ -163,7 +178,11 @@ export default function StudentCreateAccountPage() {
             }}
             error={codeError}
           />
-          {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+          {formError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {formError}
+            </p>
+          ) : null}
           <AuthPrimaryButton type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating account..." : "Create account"}
           </AuthPrimaryButton>

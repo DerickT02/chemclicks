@@ -1,6 +1,14 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createStudentSession } from "@/lib/auth/student-session";
+import {
+  CLASS_CODE_LOOKUP_MESSAGE,
+  CLASS_CODE_NOT_FOUND_MESSAGE,
+  DATABASE_RETRY_MESSAGE,
+  INVALID_STUDENT_ID_MESSAGE,
+  SESSION_RETRY_MESSAGE,
+} from "@/lib/errors/user-facing-errors";
 import { createStudentSupabaseSession } from "@/lib/auth/student-supabase-auth";
 import { validateStudentCode, validateStudentID } from "@/lib/auth/validate-student-signup";
 
@@ -31,14 +39,14 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
     .maybeSingle();
 
   if (classError) {
-    return { ok: false, field: "form", message: "Could not verify that classroom." };
+    return { ok: false, field: "code", message: CLASS_CODE_LOOKUP_MESSAGE };
   }
 
   if (!classRow) {
     return {
       ok: false,
       field: "code",
-      message: "That classroom code was not found or is inactive.",
+      message: CLASS_CODE_NOT_FOUND_MESSAGE,
     };
   }
 
@@ -50,20 +58,25 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
     .maybeSingle();
 
   if (studentError) {
-    return { ok: false, field: "form", message: "Could not verify that student account." };
+    return { ok: false, field: "form", message: DATABASE_RETRY_MESSAGE };
   }
 
   if (!student) {
     return {
       ok: false,
       field: "studentID",
-      message: "That Student ID was not found in this classroom.",
+      message: INVALID_STUDENT_ID_MESSAGE,
     };
   }
 
-  const sessionError = await createStudentSupabaseSession(supabase, student);
-  if (sessionError) {
-    return { ok: false, field: "form", message: sessionError };
+  try {
+    await createStudentSession(student.id, classRow.id);
+  } catch {
+    return {
+      ok: false,
+      field: "form",
+      message: SESSION_RETRY_MESSAGE,
+    };
   }
 
   return { ok: true };
