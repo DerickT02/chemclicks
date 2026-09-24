@@ -38,7 +38,7 @@ const SALT_DEFINITIONS: readonly SaltDefinition[] = [
 
 const OCTET = 8;
 const SUPERSCRIPT_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸⁹";
-const SUBSCRIPT_DIGITS = "₀₁₂₃₄₅₆₇₈₉";
+export const SUBSCRIPT_DIGITS = "₀₁₂₃₄₅₆₇₈₉";
 const MINUS_SIGN = "−";
 
 function getElement(symbol: string): Element {
