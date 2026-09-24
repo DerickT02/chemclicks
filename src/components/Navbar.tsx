@@ -12,7 +12,7 @@ const LINKS = {
     { label: "How it works", href: "#how-it-works" },
   ],
   student: [
-    { label: "Home", href: "#" },
+    { label: "Assignments", href: "/student" },
     { label: "Labs", href: "#" },
     { label: "Models", href: "#" },
   ],
@@ -109,7 +109,7 @@ export default function Navbar() {
   const showPublicAuthCta = role === "public" && !hasAuthenticatedSession;
 
   const logoHref =
-    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "#";
+    role === "public" ? "/" : role === "teacher" ? "/teacher/dashboard" : "/student";
   const navbarCtaClassName =
     "text-sm font-semibold px-4 py-1.5 rounded-lg bg-accent text-accent-foreground transition-opacity hover:opacity-90 whitespace-nowrap";
 

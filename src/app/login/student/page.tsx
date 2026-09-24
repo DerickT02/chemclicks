@@ -57,7 +57,7 @@ export default function StudentLoginPage() {
     setCode(normalizedCode);
     setIsSubmitting(false);
     setIsLoggedIn(true);
-    window.location.href = "/";
+    window.location.href = "/student";
   }
 
   return (
