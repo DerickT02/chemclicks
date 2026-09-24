@@ -10,6 +10,7 @@ vi.mock("@/components/assignments/AssignmentAccess", () => ({ default: ({ childr
 vi.mock("@/components/measurement/GraduatedCylinder", () => ({ default: () => <p>Cylinder exercise</p> }));
 vi.mock("@/components/measurement/PrecisionRuler", () => ({ default: () => <p>Ruler exercise</p> }));
 vi.mock("@/components/lewis/LewisDotExplorer", () => ({ default: () => <p>Lewis exercise</p> }));
+vi.mock("@/components/lewis/IonicCompoundExplorer", () => ({ default: () => <p>Ionic exercise</p> }));
 import AssignmentPage from "@/app/(student)/student/assignments/[assignmentId]/page";
 import StudentPage from "@/app/(student)/student/page";
 
@@ -36,6 +37,16 @@ describe("student assignment pages", () => {
     expect(html).toContain("Cylinder exercise");
     expect(html).not.toContain("Ruler exercise");
     expect(html).not.toContain("Lewis exercise");
+    expect(html).not.toContain("Ionic exercise");
+  });
+  it("renders the ionic compound explorer for ionic assignments", async () => {
+    const ionic = { ...assignment, id: "ionic", activity: { ...assignment.activity, type: "lewis_structures_ionic" } };
+    reader.mockResolvedValue({ status: "ok", assignments: [ionic] });
+    const html = renderToStaticMarkup(await page("ionic"));
+    expect(html).toContain("Ionic exercise");
+    expect(html).not.toContain("Lewis exercise");
+    expect(html).not.toContain("not available yet");
+    expect(renderToStaticMarkup(await StudentPage())).toContain("/student/assignments/ionic");
   });
   it("shows an empty state and handles query failures separately", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [] });
