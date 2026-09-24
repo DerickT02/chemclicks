@@ -218,6 +218,12 @@ export default async function AdminPage({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {(selectedClass.students?.length ?? 0).toString()} students enrolled
                 </p>
+                <Link
+                  href={`/admin/classes/${selectedClass.id}/attempts`}
+                  className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                >
+                  Activity attempts
+                </Link>
                 <div className="mt-7">
                   <h3 className="text-lg font-semibold text-foreground">Active students</h3>
                   {/* Live DB-backed list: once student signup writes records, students appear automatically here. */}
