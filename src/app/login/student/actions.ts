@@ -1,7 +1,6 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createStudentSession } from "@/lib/auth/student-session";
 import {
   CLASS_CODE_LOOKUP_MESSAGE,
   CLASS_CODE_NOT_FOUND_MESSAGE,
@@ -70,7 +69,7 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
   }
 
   try {
-    await createStudentSession(student.id, classRow.id);
+    await createStudentSupabaseSession(supabase, student);
   } catch {
     return {
       ok: false,
