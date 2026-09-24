@@ -1,8 +1,5 @@
 import type { QuizQuestion } from "@/components/quiz/types";
 
-/** How many questions each student attempt draws from the pool. */
-export const BOHR_QUESTIONS_PER_ATTEMPT = 12;
-
 /** Fisher–Yates shuffle of array items (mutates `items`). */
 function shuffleInPlace<T>(items: T[]): T[] {
   for (let i = items.length - 1; i > 0; i -= 1) {
