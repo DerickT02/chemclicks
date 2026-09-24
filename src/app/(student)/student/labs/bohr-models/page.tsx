@@ -19,15 +19,14 @@ export default function BohrModelsPage() {
             <span className="text-4xl" aria-hidden="true">⚛️</span>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Bohr Models</h1>
-              <p className="text-muted-foreground text-sm">Introduction to Electron Shells</p>
             </div>
           </div>
           <p className="max-w-2xl text-sm text-muted-foreground leading-relaxed">
             In the Bohr model, electrons orbit the nucleus in concentric shells labeled{" "}
             <strong className="text-foreground">K, L, M,</strong> and <strong className="text-foreground">N</strong>.
-            Each shell has a maximum capacity (2, 8, 8, 2 for the first 20 elements).
-            Select any element below to see its model animate — then click a shell ring or configuration
-            chip to explore that shell in detail.
+            For the first 20 elements, electrons fill these shells in a 2, 8, 8, 2 pattern.
+            Select any element below to see its model animate — then click a shell ring or shell reference
+            card to explore that shell in detail.
           </p>
         </header>
 

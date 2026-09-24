@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Dropdown from "@/components/ui/Dropdown";
+import { calculateIonicCharge, describeIonicCharge, evaluateNobleGasRule } from "@/lib/chemistry/bohr-explorer";
+import { BOHR_ION_INFO } from "@/lib/chemistry/bohr-ions";
 import { ELEMENTS } from "@/lib/chemistry/elements";
 import { getElectronShells } from "@/lib/chemistry/lewis";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SHELL_LABELS     = ["K", "L", "M", "N"] as const;
-const SHELL_CAPACITIES = [2, 8, 8, 2] as const;
+// Actual shell capacities; the first 20 elements occupy at most 2, 8, 8, 2 electrons in these shells.
+const SHELL_CAPACITIES = [2, 8, 18, 32] as const;
 
 // SVG dimensions — same proportional approach as LewisDotExplorer's BohrModel
 const BOHR_SIZE   = 500;
@@ -27,24 +31,30 @@ function BohrModelDiagram({
   shells,
   symbol,
   atomicNumber,
+  electronCount,
+  chargeDescription,
+  stabilitySummary,
   activeShell,
   onShellClick,
 }: {
   shells: readonly number[];
   symbol: string;
   atomicNumber: number;
+  electronCount: number;
+  chargeDescription: string;
+  stabilitySummary: string;
   activeShell: number | null;
   onShellClick: (idx: number) => void;
 }) {
   return (
-    <div className="relative w-full aspect-square select-none">
+    <div className="relative my-auto aspect-square w-full shrink-0 select-none">
       {/* Single keyframe shared by all orbiting groups */}
       <style>{`@keyframes bohr-orbit { to { transform: rotate(360deg); } }`}</style>
       <svg
         viewBox={`0 0 ${BOHR_SIZE} ${BOHR_SIZE}`}
         className="w-full h-full"
         role="img"
-        aria-label={`Bohr model for ${symbol} (atomic number ${atomicNumber})`}
+        aria-label={`Bohr model for ${symbol} (atomic number ${atomicNumber}): ${atomicNumber} ${atomicNumber === 1 ? "proton" : "protons"}, ${electronCount} ${electronCount === 1 ? "electron" : "electrons"}, ionic charge ${chargeDescription}; ${stabilitySummary}`}
       >
         {/* ── Orbit rings — same style as LewisDotExplorer ── */}
         {shells.map((_, shellIdx) => {
@@ -148,16 +158,68 @@ function BohrModelDiagram({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+type ParticleControlProps = {
+  label: string;
+  particle: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+};
+
+function ParticleControl({ label, particle, value, min, max, onChange }: ParticleControlProps) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/50 px-4 py-3">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-label={`Remove ${particle}`}
+          disabled={value <= min}
+          onClick={() => onChange(value - 1)}
+          className="h-9 w-9 rounded-lg border border-border bg-card text-foreground hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          −
+        </button>
+        <output className="min-w-6 text-center font-semibold text-foreground" aria-label={`${label}: ${value}`}>
+          {value}
+        </output>
+        <button
+          type="button"
+          aria-label={`Add ${particle}`}
+          disabled={value >= max}
+          onClick={() => onChange(value + 1)}
+          className="h-9 w-9 rounded-lg border border-border bg-card text-foreground hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const SHELL_CAPACITIES_MAP = SHELL_CAPACITIES;
 
 export default function BohrModelViewer() {
   const [element, setElement] = useState(ELEMENTS[0]);
+  const [electronCount, setElectronCount] = useState(ELEMENTS[0].atomicNumber);
   const [activeShell, setActiveShell] = useState<number | null>(null);
 
-  const shells = getElectronShells(element.atomicNumber);
+  const shells = getElectronShells(electronCount);
+  const ionInfo = BOHR_ION_INFO[element.atomicNumber];
+  const selectedIon = ionInfo.ions.find((ion) => element.atomicNumber - ion.charge === electronCount);
 
   const handleElementSelect = (el: typeof ELEMENTS[number]) => {
     setElement(el);
+    setElectronCount(el.atomicNumber);
+    setActiveShell(null);
+  };
+
+  const handleElectronChange = (count: number) => {
+    if (count !== element.atomicNumber && !ionInfo.ions.some((ion) => element.atomicNumber - ion.charge === count)) {
+      return;
+    }
+    setElectronCount(count);
     setActiveShell(null);
   };
 
@@ -165,11 +227,16 @@ export default function BohrModelViewer() {
     setActiveShell((prev) => (prev === idx ? null : idx));
   };
 
-  const valenceCount      = shells[shells.length - 1];
+  const valenceCount      = shells[shells.length - 1] ?? 0;
   const totalElectrons    = shells.reduce((a, b) => a + b, 0);
-  const outerCapacity     = SHELL_CAPACITIES[shells.length - 1];
-  const isStable          = valenceCount === outerCapacity;
-  const electronsNeeded   = outerCapacity - valenceCount;
+  const charge            = calculateIonicCharge(element.atomicNumber, electronCount);
+  const chargeDescription = charge === null ? "unavailable" : describeIonicCharge(charge);
+  const shellRule         = evaluateNobleGasRule(electronCount);
+  const stabilitySummary  = !shellRule
+    ? "Shell status unavailable"
+    : shellRule.meetsRule
+      ? charge === 0 ? "Noble-gas stable (neutral atom)" : `${shellRule.rule} rule met (ion)`
+      : `${shellRule.rule} rule not met`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -179,10 +246,10 @@ export default function BohrModelViewer() {
         <h2 className="text-sm font-semibold text-foreground mb-4">Key Concepts</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { icon: "🔵", title: "Electron (e⁻)",    body: "Negatively charged particles that orbit the nucleus in fixed shells. Each element has as many electrons as protons." },
+            { icon: "🔵", title: "Electron (e⁻)",    body: "Negatively charged particles that orbit the nucleus in fixed shells. Neutral atoms have as many electrons as protons; changing electrons creates an ion." },
             { icon: "⚡", title: "Valence Electrons", body: "Electrons in the outermost shell. They determine how an element bonds and reacts with other elements." },
-            { icon: "🏠", title: "Shell Capacity",    body: "The K shell holds up to 2 electrons. The L and M shells hold up to 8. The N shell holds 2 for elements 1–20." },
-            { icon: "🛡️", title: "Stability",         body: "Noble gases (He, Ne, Ar) have completely full outer shells — they are the most chemically stable elements." },
+            { icon: "🏠", title: "Shell Capacity",    body: "K, L, M, and N can hold up to 2, 8, 18, and 32 electrons. For the first 20 elements, their electron counts go up to 2, 8, 8, and 2." },
+            { icon: "🛡️", title: "Ions and Stability",  body: "Common ions occur in compounds, but a full electron shell alone cannot tell us whether an isolated ion is stable." },
           ].map((c) => (
             <div key={c.title} className="flex gap-3 rounded-xl bg-muted/40 border border-border p-4">
               <span className="text-xl shrink-0">{c.icon}</span>
@@ -223,10 +290,10 @@ export default function BohrModelViewer() {
       </div>
 
       {/* ── Bohr Diagram + Info ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
 
         {/* Diagram */}
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-col rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-sm font-semibold text-foreground">Bohr Diagram</h2>
             <span className="text-xs text-muted-foreground">click a shell ring to highlight</span>
@@ -235,10 +302,13 @@ export default function BohrModelViewer() {
             shells={shells}
             symbol={element.symbol}
             atomicNumber={element.atomicNumber}
+            electronCount={electronCount}
+            chargeDescription={chargeDescription}
+            stabilitySummary={stabilitySummary}
             activeShell={activeShell}
             onShellClick={handleShellToggle}
           />
-          <div className="flex items-center gap-4 mt-2 justify-center">
+          <div className="mt-auto flex items-center justify-center gap-4 pt-2">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-[#60a5fa]" />
               <span className="text-xs text-muted-foreground">Electron (e⁻)</span>
@@ -252,7 +322,7 @@ export default function BohrModelViewer() {
 
         {/* Info panel */}
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="grow rounded-2xl border border-border bg-card p-5">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold text-foreground">{element.symbol}</span>
@@ -260,42 +330,6 @@ export default function BohrModelViewer() {
                   <p className="text-lg font-semibold text-foreground leading-tight">{element.name}</p>
                   <p className="text-xs text-muted-foreground">Atomic number: {element.atomicNumber}</p>
                 </div>
-              </div>
-              {isStable ? (
-                <span className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-accent/15 text-accent border border-accent/30">
-                  ✓ Stable
-                </span>
-              ) : (
-                <span className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-muted-foreground border border-border">
-                  Unstable
-                </span>
-              )}
-            </div>
-
-            {/* Config chips */}
-            <div className="mb-4">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Electron configuration</p>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {shells.map((count, idx) => {
-                  const isActive = activeShell === idx;
-                  const isFull   = count === SHELL_CAPACITIES_MAP[idx];
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleShellToggle(idx)}
-                      className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-sm font-mono transition-all duration-150 ${
-                        isActive
-                          ? "border-accent bg-accent/10 text-accent"
-                          : "border-border bg-muted text-foreground hover:border-accent/40"
-                      }`}
-                    >
-                      <span className="font-bold">{SHELL_LABELS[idx]}:</span>
-                      <span>{count}</span>
-                      {isFull && <span className="text-accent text-xs ml-0.5">✓</span>}
-                    </button>
-                  );
-                })}
               </div>
             </div>
 
@@ -314,16 +348,60 @@ export default function BohrModelViewer() {
                 <span className="font-semibold text-foreground">{shells.length}</span>
               </div>
               <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Stability</span>
-                {isStable ? (
-                  <span className="font-semibold text-accent">Stable — outer shell full</span>
-                ) : (
-                  <span className="font-semibold text-foreground">
-                    Needs {electronsNeeded} more e⁻
-                  </span>
-                )}
+                <span className="text-muted-foreground">Ionic charge</span>
+                <output aria-label={`Ionic charge: ${chargeDescription}`} aria-live="polite" className="font-semibold text-foreground">
+                  {chargeDescription}
+                </output>
               </div>
             </div>
+            <div className="mt-3 rounded-xl border border-border bg-muted/50 p-4" aria-live="polite" aria-atomic="true">
+              <p className={`text-sm font-semibold ${shellRule?.meetsRule ? "text-accent" : "text-foreground"}`}>
+                Outer-shell stability: {stabilitySummary}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {shellRule?.explanation ?? "Counts are outside the supported range."}
+                {shellRule?.meetsRule && charge !== 0 && " This electron arrangement does not prove the ion is stable on its own."}
+              </p>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
+              {selectedIon ? `${selectedIon.name}: ${selectedIon.note}` : ionInfo.neutralNote}
+            </p>
+          </div>
+
+          <div className="grow rounded-2xl border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold text-foreground mb-4">Build an atom</h2>
+            <div className="flex flex-col gap-3">
+              <ParticleControl
+                label="Protons"
+                particle="a proton"
+                value={element.atomicNumber}
+                min={1}
+                max={ELEMENTS.length}
+                onChange={(count) => handleElementSelect(ELEMENTS[count - 1])}
+              />
+              <div className="rounded-xl border border-border bg-muted/50 px-4 py-3">
+                <Dropdown
+                  label="Electrons"
+                  value={String(electronCount)}
+                  disabled={ionInfo.ions.length === 0}
+                  onChange={(value) => handleElectronChange(Number(value))}
+                  options={[
+                    {
+                      value: String(element.atomicNumber),
+                      label: "Neutral atom",
+                      description: `${element.atomicNumber} ${element.atomicNumber === 1 ? "electron" : "electrons"}`,
+                    },
+                    ...ionInfo.ions.map((ion) => {
+                      const count = element.atomicNumber - ion.charge;
+                      return { value: String(count), label: ion.name, description: `${count} ${count === 1 ? "electron" : "electrons"}` };
+                    }),
+                  ]}
+                />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Options show ions documented in compounds, not a guarantee of stability as free ions.
+            </p>
           </div>
         </div>
       </div>
@@ -332,7 +410,9 @@ export default function BohrModelViewer() {
       <section className="rounded-2xl border border-border bg-card p-6">
         <h2 className="text-sm font-semibold text-foreground mb-1">Electron Shell Reference</h2>
         <p className="text-xs text-muted-foreground mb-5">
-          Click a card or a shell ring in the diagram to highlight that shell.
+          Click a card or a shell ring in the diagram to highlight that shell. Capacities shown are the
+          full shell limits. Argon has a filled outer 3s/3p configuration, even though M can hold more
+          electrons in higher-energy orbitals.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {SHELL_LABELS.map((label, idx) => {
@@ -366,7 +446,7 @@ export default function BohrModelViewer() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mb-2">Shell {idx + 1} · max {capacity}e⁻</p>
+                <p className="text-xs text-muted-foreground mb-2">Shell {idx + 1} · capacity {capacity}e⁻</p>
                 {inUse ? (
                   <>
                     <p className="text-sm font-semibold text-foreground">{count} / {capacity}</p>
