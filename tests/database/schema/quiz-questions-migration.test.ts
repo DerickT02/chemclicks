@@ -12,7 +12,6 @@ function readMigration(name: string): string {
 const tableMigration = readMigration("20260924150000_quiz_questions.sql")
   .replace(/\s+/g, " ")
   .toLowerCase();
-const seedMigration = readMigration("20260924150100_seed_bohr_quiz_questions.sql");
 
 describe("quiz_questions table migration", () => {
   it("creates the table with integrity constraints", () => {
@@ -45,21 +44,67 @@ describe("quiz_questions table migration", () => {
   });
 });
 
-describe("Bohr quiz seed migration", () => {
-  const rows = [
-    ...seedMigration.matchAll(
-      /^\s*\('bohr_models', '((?:[^']|'')+)', '((?:[^']|'')+)', '(\[.*\])'::jsonb, (\d+), (\d+)\),?$/gm,
-    ),
-  ].map(([, key, question, options, correctIndex, order]) => ({
-    key,
-    question: question.replaceAll("''", "'"),
-    options: JSON.parse(options.replaceAll("''", "'")) as string[],
-    correctIndex: Number(correctIndex),
-    order: Number(order),
-  }));
+type SeedRow = {
+  key: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  order: number;
+};
 
-  it("moves all 36 questions from the old config file", () => {
-    expect(rows).toHaveLength(36);
+function parseSeed(file: string, quizKey: string): { sql: string; rows: SeedRow[] } {
+  const sql = readMigration(file);
+  const rowPattern = new RegExp(
+    `^\\s*\\('${quizKey}', '((?:[^']|'')+)', '((?:[^']|'')+)', '(\\[.*\\])'::jsonb, (\\d+), (\\d+)\\),?$`,
+    "gm",
+  );
+  const rows = [...sql.matchAll(rowPattern)].map(
+    ([, key, question, options, correctIndex, order]) => ({
+      key,
+      question: question.replaceAll("''", "'"),
+      options: JSON.parse(options.replaceAll("''", "'")) as string[],
+      correctIndex: Number(correctIndex),
+      order: Number(order),
+    }),
+  );
+  return { sql, rows };
+}
+
+const QUESTIONS_PER_ATTEMPT = 12;
+
+const SEEDS = [
+  {
+    name: "Bohr Models",
+    file: "20260924150100_seed_bohr_quiz_questions.sql",
+    quizKey: "bohr_models",
+    expectedCount: 36,
+    knownAnswers: [
+      ["bohr-beryllium-shells", "2, 2"],
+      ["bohr-identify-silicon", "Silicon"],
+      ["bohr-calcium-shells", "2, 8, 8, 2"],
+      ["bohr-which-fills-first", "The shell closest to the nucleus"],
+    ],
+  },
+  {
+    name: "Lewis Structures & Bonding",
+    file: "20260924150200_seed_lewis_quiz_questions.sql",
+    quizKey: "lewis_bonding",
+    expectedCount: 38,
+    knownAnswers: [
+      ["lewis-valence-nitrogen", "5"],
+      ["lewis-n2-bond", "Triple bond"],
+      ["lewis-water-lone-pairs", "2"],
+      ["lewis-formula-caf2", "CaF₂"],
+      ["lewis-formula-al2o3", "Al₂O₃"],
+    ],
+  },
+] as const;
+
+describe.each(SEEDS)("$name quiz seed migration", (seed) => {
+  const { sql, rows } = parseSeed(seed.file, seed.quizKey);
+
+  it(`moves all ${seed.expectedCount} questions from the old config file`, () => {
+    expect(rows).toHaveLength(seed.expectedCount);
   });
 
   it("keeps every question well formed and in the original order", () => {
@@ -67,25 +112,27 @@ describe("Bohr quiz seed migration", () => {
     expect(rows.map((row) => row.order)).toEqual(rows.map((_, index) => index + 1));
     for (const row of rows) {
       expect(row.options.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(row.options).size).toBe(row.options.length);
       expect(row.correctIndex).toBeGreaterThanOrEqual(0);
       expect(row.correctIndex).toBeLessThan(row.options.length);
     }
   });
 
-  it("preserves the correct answers of known questions", () => {
-    const byKey = new Map(rows.map((row) => [row.key, row]));
-    const answer = (key: string) => {
-      const row = byKey.get(key);
-      return row?.options[row.correctIndex];
-    };
-
-    expect(answer("bohr-beryllium-shells")).toBe("2, 2");
-    expect(answer("bohr-identify-silicon")).toBe("Silicon");
-    expect(answer("bohr-calcium-shells")).toBe("2, 8, 8, 2");
-    expect(answer("bohr-which-fills-first")).toBe("The shell closest to the nucleus");
+  it("has more questions than one attempt draws", () => {
+    expect(rows.length).toBeGreaterThan(QUESTIONS_PER_ATTEMPT);
   });
 
-  it("is safe to re-run", () => {
-    expect(seedMigration).toContain("on conflict (quiz_key, question_key) do nothing");
+  it("preserves the correct answers of known questions", () => {
+    const byKey = new Map(rows.map((row) => [row.key, row]));
+    for (const [key, expected] of seed.knownAnswers) {
+      const row = byKey.get(key);
+      expect(row?.options[row.correctIndex]).toBe(expected);
+    }
+  });
+
+  it("only touches its own quiz and is safe to re-run", () => {
+    const keys = [...sql.matchAll(/^\s*\('([a-z0-9_]+)', /gm)].map((match) => match[1]);
+    expect(new Set(keys)).toEqual(new Set([seed.quizKey]));
+    expect(sql).toContain("on conflict (quiz_key, question_key) do nothing");
   });
 });
