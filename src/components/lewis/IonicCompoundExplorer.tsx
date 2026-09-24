@@ -46,7 +46,7 @@ function LewisTile({
   ).map((position, index) => ({ position, gained: index >= keptElectrons }));
 
   return (
-    <div className="grid aspect-square w-28 grid-cols-3 grid-rows-3">
+    <div className="grid aspect-square w-28 shrink-0 grid-cols-3 grid-rows-3">
       {SIDES.map((side) => (
         <div key={side} className={SIDE_CLASS_NAMES[side]}>
           {dotsForSide(dots, side).map((dot) => (
@@ -96,7 +96,7 @@ function IonColumn({ ion, role }: { ion: Ion; role: "cation" | "anion" }) {
           →
         </span>
 
-        <div className="relative rounded-sm border-x-2 border-muted-foreground/60 px-1">
+        <div className="relative shrink-0 rounded-sm border-x-2 border-muted-foreground/60 px-1">
           <LewisTile
             symbol={ion.symbol}
             keptElectrons={isCation ? 0 : ion.valenceElectrons}
@@ -198,12 +198,12 @@ export default function IonicCompoundExplorer() {
       <section className="flex min-h-[22rem] flex-col rounded-xl border border-border bg-card p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-muted-foreground">How the Ions Form</h2>
 
-        <figure className="flex flex-1 flex-col items-center justify-center gap-6 pt-5">
+        <figure className="@container flex flex-1 flex-col items-center justify-center gap-6 pt-5">
           <div
             role="img"
             aria-label={`Diagram of ${compound.name.toLowerCase()}: ${transferred} ${transferred === 1 ? "electron moves" : "electrons move"} from ${cation.elementName.toLowerCase()} to ${anion.elementName.toLowerCase()}. Result: ${describeIon(cation)}; ${describeIon(anion)}.`}
             aria-describedby={descriptionId}
-            className="grid w-full grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-4"
+            className="grid w-full grid-cols-1 gap-8 @2xl:grid-cols-2 @2xl:gap-4"
           >
             <IonColumn ion={cation} role="cation" />
             <IonColumn ion={anion} role="anion" />
