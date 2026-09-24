@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/server/database";
+import { requireTeacherId } from "@/lib/server/teacher";
 import { insertClass } from "@/lib/db/classes";
 
 type CreateClassInput = {
@@ -29,14 +30,16 @@ export async function createClass(input: CreateClassInput): Promise<
   const class_code = rawCode.toUpperCase();
   const section = input.section.trim();
 
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
-    return { ok: false, message: "You must be logged in to create a class." };
+  let teacherId: string;
+  try {
+    teacherId = await requireTeacherId();
+  } catch {
+    return { ok: false, message: "An approved, verified teacher session is required." };
   }
+  const supabase = createServiceClient();
 
   const { data, error } = await insertClass(supabase, {
-    teacher_id: userData.user.id,
+    teacher_id: teacherId,
     name,
     section,
     class_code,

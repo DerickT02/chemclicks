@@ -53,7 +53,9 @@ export async function getStudentSession(): Promise<StudentSession | null> {
   const value = (await cookies()).get(STUDENT_SESSION_COOKIE)?.value;
   if (!value) return null;
 
-  const [payload, signature] = value.split(".");
+  const parts = value.split(".");
+  if (parts.length !== 2) return null;
+  const [payload, signature] = parts;
   if (!payload || !signature) return null;
 
   const expectedSignature = sign(payload);
@@ -67,11 +69,18 @@ export async function getStudentSession(): Promise<StudentSession | null> {
   }
 
   try {
-    const session = JSON.parse(decode(payload)) as StudentSession;
-    if (!session.studentId || !session.classId || session.expiresAt <= Date.now()) {
+    const session: unknown = JSON.parse(decode(payload));
+    const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+    if (
+      !session || typeof session !== "object" ||
+      !("studentId" in session) || typeof session.studentId !== "string" || !uuid.test(session.studentId) ||
+      !("classId" in session) || typeof session.classId !== "string" || !uuid.test(session.classId) ||
+      !("expiresAt" in session) || typeof session.expiresAt !== "number" ||
+      !Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()
+    ) {
       return null;
     }
-    return session;
+    return { studentId: session.studentId, classId: session.classId, expiresAt: session.expiresAt };
   } catch {
     return null;
   }

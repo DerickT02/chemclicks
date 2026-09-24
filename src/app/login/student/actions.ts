@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/server/database";
 import { createStudentSession } from "@/lib/auth/student-session";
 
 export async function loginStudent(studentID: string, classroomCode: string): Promise<
@@ -9,7 +9,7 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
 > {
   const normalizedStudentID = studentID.trim();
   const normalizedCode = classroomCode.trim().toUpperCase();
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: classRow, error: classError } = await supabase
     .from("classes")
@@ -35,6 +35,7 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
     .select("id")
     .eq("class_id", classRow.id)
     .eq("student_id", normalizedStudentID)
+    .eq("verified", true)
     .maybeSingle();
 
   if (studentError) {

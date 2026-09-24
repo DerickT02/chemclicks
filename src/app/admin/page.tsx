@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { deleteClass } from "@/lib/db/classes";
+import { deleteOwnedClass } from "@/lib/server/classes";
 
 type ProgressStatus = "not_started" | "in_progress" | "completed";
 
@@ -61,6 +61,7 @@ export default async function AdminPage({
   const { data: classesData } = await supabase
     .from("classes")
     .select("id, name, section, class_code")
+    .eq("teacher_id", userData.user.id)
     .order("created_at", { ascending: false });
 
   const baseClasses: ClassWithStudents[] = ((classesData ?? []) as Omit<ClassWithStudents, "students">[])
@@ -120,10 +121,7 @@ export default async function AdminPage({
     "use server";
     const id = formData.get("classId") as string;
     if (!id) return;
-    const supabase = await createClient();
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
-    await deleteClass(supabase, id);
+    await deleteOwnedClass(id);
     redirect("/admin");
   }
 
