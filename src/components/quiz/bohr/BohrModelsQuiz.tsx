@@ -3,24 +3,22 @@
 import { useEffect, useState } from "react";
 import QuizShell from "@/components/quiz/QuizShell";
 import type { QuizCompleteResult, QuizQuestion } from "@/components/quiz/types";
-import {
-  BOHR_MODEL_QUESTIONS,
-  BOHR_QUESTIONS_PER_ATTEMPT,
-  pickRandomQuestions,
-} from "./questions";
+import { BOHR_QUESTIONS_PER_ATTEMPT, pickRandomQuestions } from "./attempt";
 
 type BohrModelsQuizProps = {
+  /** The full question pool, loaded from the database by the page. */
+  questions: QuizQuestion[];
   onComplete?: (result: QuizCompleteResult) => void;
 };
 
-function createAttemptQuestions(): QuizQuestion[] {
-  return pickRandomQuestions(
-    BOHR_MODEL_QUESTIONS,
-    BOHR_QUESTIONS_PER_ATTEMPT,
-  );
+function createAttemptQuestions(pool: QuizQuestion[]): QuizQuestion[] {
+  return pickRandomQuestions(pool, BOHR_QUESTIONS_PER_ATTEMPT);
 }
 
-export default function BohrModelsQuiz({ onComplete }: BohrModelsQuizProps) {
+export default function BohrModelsQuiz({
+  questions,
+  onComplete,
+}: BohrModelsQuizProps) {
   // Start empty so server and first client render match (no Math.random during SSR).
   const [attemptQuestions, setAttemptQuestions] = useState<QuizQuestion[]>(
     [],
@@ -30,10 +28,10 @@ export default function BohrModelsQuiz({ onComplete }: BohrModelsQuizProps) {
     // Defer so this is not a synchronous setState-in-effect lint violation,
     // and so hydration completes before the random attempt is drawn.
     const timeoutId = window.setTimeout(() => {
-      setAttemptQuestions(createAttemptQuestions());
+      setAttemptQuestions(createAttemptQuestions(questions));
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [questions]);
 
   if (attemptQuestions.length === 0) {
     return (
@@ -54,7 +52,7 @@ export default function BohrModelsQuiz({ onComplete }: BohrModelsQuizProps) {
       questions={attemptQuestions}
       passingThresholdPercent={80}
       onComplete={onComplete}
-      onRetry={() => setAttemptQuestions(createAttemptQuestions())}
+      onRetry={() => setAttemptQuestions(createAttemptQuestions(questions))}
     />
   );
 }
