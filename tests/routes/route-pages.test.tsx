@@ -38,9 +38,20 @@ describe("route page behavior", () => {
     expect(html).not.toContain("Something went wrong");
   });
 
-  it("redirects legacy lab URLs through the assignment list", () => {
-    expect(() => MeasurementLabPage()).toThrow("REDIRECT:/student");
-    expect(() => LewisLabPage()).toThrow("REDIRECT:/student");
+  it("renders lab pages instead of redirecting to the assignment list", () => {
+    expect(() => MeasurementLabPage()).not.toThrow();
+    expect(() => LewisLabPage()).not.toThrow();
+  });
+
+  it("renders every Lewis explorer on the Lewis lab and links to its quiz", () => {
+    const html = renderToStaticMarkup(<LewisLabPage />);
+
+    expect(html).toContain("Lewis Diagrams");
+    expect(html).toContain("Ionic Bonds");
+    expect(html).toContain("Covalent Bonds");
+    expect(html).toContain("Example Salts");
+    expect(html).toContain("Example Molecules");
+    expect(html).toContain('href="/student/quizzes/lewis"');
   });
 
   it("links the measurement lab to its practice questions", () => {
