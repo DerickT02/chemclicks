@@ -16,6 +16,7 @@
   --destructive: #dc2626;
   --destructive-foreground: #fafafa;
   --electron: #2563eb;
+  --electron-partner: #d97706;
 }
 
 html {
@@ -37,6 +38,7 @@ html {
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-electron: var(--electron);
+  --color-electron-partner: var(--electron-partner);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -57,6 +59,7 @@ html {
     --destructive: #f87171;
     --destructive-foreground: #18181b;
     --electron: #60a5fa;
+    --electron-partner: #fbbf24;
   }
 }
 

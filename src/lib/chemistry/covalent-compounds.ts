@@ -159,6 +159,8 @@ const BOND_TYPES: Record<BondOrder, BondType> = { 1: "single", 2: "double", 3: "
 
 const BOND_ORDERS: readonly BondOrder[] = [1, 2, 3];
 
+const SIDES: readonly Side[] = ["top", "right", "bottom", "left"];
+
 function getElement(symbol: string): Element {
   const element = ELEMENTS.find((item) => item.symbol === symbol);
   if (!element) {
@@ -173,6 +175,11 @@ function capitalize(text: string): string {
 
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+/** "Each" when a sentence covers several atoms of one element, "The" for a single atom. */
+function groupArticle(count: number): string {
+  return count > 1 ? "Each" : "The";
 }
 
 function toSubscriptFormula(plainFormula: string): string {
@@ -277,6 +284,147 @@ export function getAtomElectronCount(compound: CovalentCompound, atomId: string)
   return 2 * (atom.lonePairSides.length + getAtomSharedPairCount(compound, atomId));
 }
 
+/** Electrons an atom needs for a full outer shell: a duet for hydrogen, an octet otherwise. */
+export function getFullShellSize(atom: CovalentAtom): number {
+  return atom.symbol === "H" ? 2 : 8;
+}
+
+export type UnpairedElectron = {
+  /** The bond this electron helps form. */
+  bondId: string;
+  /** Which shared pair of that bond it joins (0 for a single bond, up to 2 for a triple). */
+  pair: number;
+  /** Where it sits in the atom's own Lewis diagram before bonding. */
+  side: Side;
+};
+
+/**
+ * An atom's unpaired electrons as they sit in its Lewis diagram before bonding. Each one
+ * later pairs with an electron from the bonded neighbour to make a shared pair. The first
+ * electron for each bond faces that neighbour; any extra (double or triple bonds) fill the
+ * remaining sides, so no side ever holds more than one unpaired electron.
+ */
+export function getUnpairedElectrons(compound: CovalentCompound, atomId: string): UnpairedElectron[] {
+  const atom = getAtom(compound, atomId);
+  const bonds = compound.bonds.filter((bond) => bond.from === atomId || bond.to === atomId);
+  const freeSides = SIDES.filter((side) => !atom.lonePairSides.includes(side));
+
+  const takeSide = (preferred?: Side): Side => {
+    const index = preferred ? freeSides.indexOf(preferred) : 0;
+    if (index < 0 || freeSides.length === 0) {
+      throw new Error(`No free side for an unpaired electron on ${atomId} in ${compound.plainFormula}`);
+    }
+    return freeSides.splice(index, 1)[0];
+  };
+
+  const facing = bonds.map((bond) => {
+    const neighbor = getAtom(compound, bond.from === atomId ? bond.to : bond.from);
+    return { bondId: bond.id, pair: 0, side: takeSide(getBondSide(atom, neighbor)) };
+  });
+  const extra = bonds.flatMap((bond) =>
+    Array.from({ length: bond.order - 1 }, (_, index) => ({
+      bondId: bond.id,
+      pair: index + 1,
+      side: takeSide(),
+    })),
+  );
+  return [...facing, ...extra];
+}
+
+/**
+ * Splits the atoms into two groups so every bond joins one atom from each, starting from the
+ * most-bonded atom. Colouring the groups differently shows that each shared pair holds one
+ * electron from each atom.
+ */
+export function getAlternatingAtomGroups(compound: CovalentCompound): Record<string, 0 | 1> {
+  const bondCount = (atomId: string) =>
+    compound.bonds.filter((bond) => bond.from === atomId || bond.to === atomId).length;
+  const start = compound.atoms.reduce((best, atom) => (bondCount(atom.id) > bondCount(best.id) ? atom : best));
+
+  const groups: Record<string, 0 | 1> = { [start.id]: 0 };
+  const queue = [start.id];
+  while (queue.length > 0) {
+    const atomId = queue.shift() as string;
+    for (const bond of compound.bonds) {
+      if (bond.from !== atomId && bond.to !== atomId) continue;
+      const neighborId = bond.from === atomId ? bond.to : bond.from;
+      if (neighborId in groups) continue;
+      groups[neighborId] = groups[atomId] === 0 ? 1 : 0;
+      queue.push(neighborId);
+    }
+  }
+  return groups;
+}
+
+/**
+ * Legend label for one colour group from `getAlternatingAtomGroups`, e.g. "From the oxygen",
+ * "From the hydrogens", or "From the left nitrogen" when both atoms are the same element.
+ */
+export function describeElectronSource(compound: CovalentCompound, group: 0 | 1): string {
+  const groups = getAlternatingAtomGroups(compound);
+  const atoms = compound.atoms.filter((atom) => groups[atom.id] === group);
+  const others = compound.atoms.filter((atom) => groups[atom.id] !== group);
+  const [atom] = atoms;
+
+  if (atoms.length === 1 && others.length === 1 && others[0].symbol === atom.symbol) {
+    const [other] = others;
+    const position =
+      atom.x !== other.x ? (atom.x < other.x ? "left" : "right") : atom.y < other.y ? "top" : "bottom";
+    return `From the ${position} ${atom.elementName.toLowerCase()}`;
+  }
+
+  const names = countAtomsBySymbol(atoms).map(({ atom: item, count }) => {
+    const element = item.elementName.toLowerCase();
+    return count > 1 ? `${element}s` : element;
+  });
+  return `From the ${names.join(" and ")}`;
+}
+
+/** Step 1 caption: what each atom brings before any electrons are shared. */
+export function describeValenceBeforeBonding(compound: CovalentCompound): string {
+  const atomSentences = countAtomsBySymbol(compound.atoms).map(({ atom, count }) => {
+    const lonePairs = atom.lonePairSides.length;
+    const unpaired = atom.valenceElectrons - 2 * lonePairs;
+    const kept = lonePairs > 0 ? ` and ${plural(lonePairs, "pair")} it keeps` : "";
+    return `${groupArticle(count)} ${atom.elementName.toLowerCase()} brings ${plural(atom.valenceElectrons, "valence electron")}: ${plural(unpaired, "unpaired electron")}${kept}.`;
+  });
+
+  return [
+    ...atomSentences,
+    "The unpaired electrons are the ones that get shared.",
+  ].join(" ");
+}
+
+/** Step 2 caption: shared pairs sit where outer shells overlap, so both atoms count them. */
+export function describeShellOverlap(compound: CovalentCompound): string {
+  const shared = getSharedPairCount(compound);
+  return [
+    "The atoms move close enough for their outer shells to overlap.",
+    "Each unpaired electron teams up with one from the neighbouring atom, and the pair sits in the overlap, so both atoms count it.",
+    `${compound.name} has ${plural(shared, "shared pair")} in all.`,
+  ].join(" ");
+}
+
+/** e.g. "This oxygen counts 4 in lone pairs + 4 shared = 8 electrons, a full outer shell (an octet)." */
+export function describeAtomElectronCount(compound: CovalentCompound, atomId: string): string {
+  const atom = getAtom(compound, atomId);
+  const lone = 2 * atom.lonePairSides.length;
+  const shared = 2 * getAtomSharedPairCount(compound, atomId);
+  const total = lone + shared;
+  const full = getFullShellSize(atom);
+  const parts = [...(lone > 0 ? [`${lone} in lone pairs`] : []), `${shared} shared`];
+
+  let verdict: string;
+  if (total !== full) {
+    verdict = `${full - total} short of a full outer shell`;
+  } else if (full === 2) {
+    verdict = "a full outer shell for hydrogen";
+  } else {
+    verdict = "a full outer shell (an octet)";
+  }
+  return `This ${atom.elementName.toLowerCase()} counts ${parts.join(" + ")} = ${total} electrons, ${verdict}.`;
+}
+
 /** e.g. "Double bond — 2 shared pairs (4 electrons)". */
 export function describeBondOrder(order: BondOrder): string {
   return `${capitalize(BOND_TYPES[order])} bond — ${plural(order, "shared pair")} (${order * 2} electrons)`;
@@ -331,7 +479,6 @@ export function describeDiagram(compound: CovalentCompound): string {
 export function describeSharing(compound: CovalentCompound): string {
   const shared = getSharedPairCount(compound);
   const groups = countAtomsBySymbol(compound.atoms);
-  const article = (count: number) => (count > 1 ? "Each" : "The");
 
   const bondSentences = BOND_ORDERS.filter((order) =>
     compound.bonds.some((bond) => bond.order === order),
@@ -341,13 +488,13 @@ export function describeSharing(compound: CovalentCompound): string {
     .filter(({ atom }) => atom.lonePairSides.length > 0)
     .map(
       ({ atom, count }) =>
-        `${article(count)} ${atom.elementName.toLowerCase()} also keeps ${plural(atom.lonePairSides.length, "lone pair")} that ${atom.lonePairSides.length === 1 ? "is" : "are"} not shared.`,
+        `${groupArticle(count)} ${atom.elementName.toLowerCase()} also keeps ${plural(atom.lonePairSides.length, "lone pair")} that ${atom.lonePairSides.length === 1 ? "is" : "are"} not shared.`,
     );
 
   const fullShells = groups
     .map(({ atom, count }) => {
       const electrons = getAtomElectronCount(compound, atom.id);
-      return `${article(count).toLowerCase()} ${atom.elementName.toLowerCase()} has ${electrons}`;
+      return `${groupArticle(count).toLowerCase()} ${atom.elementName.toLowerCase()} has ${electrons}`;
     })
     .join(" and ");
 
