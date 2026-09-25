@@ -1,13 +1,29 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import LewisBondingQuiz from "@/components/quiz/lewis/LewisBondingQuiz";
+import { LEWIS_QUIZ_KEY, listQuizQuestions } from "@/lib/db/quiz-questions";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Lewis Structures & Bonding Quiz | ChemClicks",
   description:
     "Check your understanding of valence electrons, Lewis dot diagrams, covalent bonds, and ionic bonding.",
 };
+export const dynamic = "force-dynamic";
 
-export default function LewisBondingQuizPage() {
+const LOAD_ERROR_MESSAGE =
+  "We couldn't load the quiz questions. Please try again.";
+
+export default async function LewisBondingQuizPage() {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) redirect("/login/student");
+
+  const { data: questions, error } = await listQuizQuestions(
+    supabase,
+    LEWIS_QUIZ_KEY,
+  );
+
   return (
     <div className="min-h-screen-below-nav bg-background px-4 py-10 md:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
@@ -20,7 +36,17 @@ export default function LewisBondingQuizPage() {
           </p>
         </header>
 
-        <LewisBondingQuiz />
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {LOAD_ERROR_MESSAGE}
+          </p>
+        ) : !questions || questions.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border p-6 text-muted-foreground">
+            No quiz questions are available right now.
+          </p>
+        ) : (
+          <LewisBondingQuiz questions={questions} />
+        )}
       </div>
     </div>
   );
