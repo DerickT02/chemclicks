@@ -5,6 +5,7 @@ import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
 import PrecisionRuler from "@/components/measurement/PrecisionRuler";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
+import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function AssignmentPage({ params }: {
         <AssignmentAccess key={`${assignment.id}:${assignment.closes_at}`} closesAt={assignment.closes_at}>
           <section className="rounded-xl border border-border bg-card p-6">
             {type === "lewis_diagram" && <LewisDotExplorer />}
+            {type === "lewis_structures_ionic" && <IonicCompoundExplorer />}
             {type === "measurement_graduated_cylinder" && <GraduatedCylinder />}
             {(type === "measurement_ruler_tenths" || type === "measurement_ruler_hundredths") && <PrecisionRuler />}
             {!hasActivityContent(type) && (

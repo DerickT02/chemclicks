@@ -21,6 +21,11 @@ const FORBIDDEN_PASSWORD_CHARS_RE = /["'\\/`;$]/;
  * Allowed: ! # % & ( ) * + , - . : < = > ? @ [ ] ^ _ { | } ~
  */
 const ALLOWED_PASSWORD_SPECIAL_RE = /[!#%&()*+,\-.:<=>?@[\]^_{|}~]/;
+export function validateTeacherDisplayName(displayName: string): string | undefined {
+  const normalized = displayName.trim();
+  if (!normalized) return "Display name is required.";
+  return undefined;
+}
 
 export function validateTeacherEmail(email: string): string | undefined {
   const normalized = email.trim();
@@ -68,16 +73,21 @@ export type TeacherSignupResult =
   | { valid: true }
   | {
       valid: false;
+      displayNameError?: string;
       emailError?: string;
       passwordError?: string;
       confirmError?: string;
     };
 
 export function validateTeacherSignup(
+  displayName: string,
   email: string,
   password: string,
   confirmPassword: string,
 ): TeacherSignupResult {
+  // Validate display name
+  const displayNameError = validateTeacherDisplayName(displayName);
+
   // Validate email
   const emailError = validateTeacherEmail(email);
 
@@ -93,8 +103,8 @@ export function validateTeacherSignup(
   }
 
   // Final check
-  if (emailError || passwordError || confirmError) {
-    return { valid: false, emailError, passwordError, confirmError };
+  if (displayNameError || emailError || passwordError || confirmError) {
+    return { valid: false, displayNameError, emailError, passwordError, confirmError };
   }
 
   return { valid: true };
