@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 const reader = vi.hoisted(() => vi.fn());
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignments: reader }));
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); },
@@ -63,5 +64,24 @@ describe("student assignment pages", () => {
     expect(html).toContain(`/student/assignments/${assignment.id}`);
     expect(html).not.toContain("/student/assignments/bohr");
     expect(html).toContain("Exercise not available yet");
+  });
+  it.each([
+    ["lewis_structures_covalent", "/student/quizzes/covalent"],
+    ["lewis_structures_ionic", "/student/quizzes/ionic"],
+  ])("shows a Take quiz link on %s assignments", async (type, path) => {
+    reader.mockResolvedValue({ status: "ok", assignments: [{
+      ...assignment, id: "lesson", activity: { ...assignment.activity, type },
+    }] });
+    const html = renderToStaticMarkup(await StudentPage());
+    expect(html).toContain("Take quiz");
+    expect(html).toContain(`href="${path}"`);
+  });
+  it("shows no Take quiz link on other activities", async () => {
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment, {
+      ...assignment, id: "diagram", activity: { ...assignment.activity, type: "lewis_diagram" },
+    }] });
+    const html = renderToStaticMarkup(await StudentPage());
+    expect(html).not.toContain("Take quiz");
+    expect(html).not.toContain("/student/quizzes/");
   });
 });

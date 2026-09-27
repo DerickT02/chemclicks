@@ -98,6 +98,32 @@ const SEEDS = [
       ["lewis-formula-al2o3", "Al₂O₃"],
     ],
   },
+  {
+    name: "Lewis Structures Covalent",
+    file: "20260924160110_seed_lewis_covalent_quiz_questions.sql",
+    quizKey: "lewis_covalent",
+    expectedCount: 28,
+    knownAnswers: [
+      ["lewis-valence-nitrogen", "5"],
+      ["lewis-n2-bond", "Triple bond"],
+      ["lewis-triple-bond-electrons", "6"],
+      ["lewis-o2-bond", "Double bond"],
+      ["lewis-hcl-lone-pairs", "3"],
+    ],
+  },
+  {
+    name: "Lewis Structures Ionic",
+    file: "20260924160120_seed_lewis_ionic_quiz_questions.sql",
+    quizKey: "lewis_ionic",
+    expectedCount: 29,
+    knownAnswers: [
+      ["lewis-valence-magnesium", "2"],
+      ["lewis-formula-caf2", "CaF₂"],
+      ["lewis-formula-na2o", "Na₂O"],
+      ["lewis-aluminum-ion", "Al³⁺"],
+      ["lewis-chloride-dots-nacl", "8"],
+    ],
+  },
 ] as const;
 
 describe.each(SEEDS)("$name quiz seed migration", (seed) => {
@@ -134,5 +160,23 @@ describe.each(SEEDS)("$name quiz seed migration", (seed) => {
     const keys = [...sql.matchAll(/^\s*\('([a-z0-9_]+)', /gm)].map((match) => match[1]);
     expect(new Set(keys)).toEqual(new Set([seed.quizKey]));
     expect(sql).toContain("on conflict (quiz_key, question_key) do nothing");
+  });
+});
+
+describe("Lewis quiz question restriction migration", () => {
+  const sql = readMigration("20260924160200_restrict_lewis_quiz_questions.sql")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+  it("hides every Lewis quiz pool from client sessions", () => {
+    expect(sql).toContain(
+      "using (is_active and quiz_key not in ('lewis_bonding', 'lewis_covalent', 'lewis_ionic'))",
+    );
+  });
+
+  it("retires the combined lewis_bonding pool", () => {
+    expect(sql).toContain(
+      "update public.quiz_questions set is_active = false where quiz_key = 'lewis_bonding'",
+    );
   });
 });

@@ -118,15 +118,18 @@ describe("quiz_questions RLS", () => {
     expect(result.data).toHaveLength(36);
   });
 
-  it("has the moved Lewis questions available to a signed-in user", async () => {
-    const result = await signedIn
-      .from("quiz_questions")
-      .select("question_key")
-      .eq("quiz_key", "lewis_bonding");
+  it.each(["lewis_bonding", "lewis_covalent", "lewis_ionic"])(
+    "hides the assignment-gated %s questions from a signed-in user",
+    async (quizKey) => {
+      const result = await signedIn
+        .from("quiz_questions")
+        .select("question_key")
+        .eq("quiz_key", quizKey);
 
-    expect(result.error).toBeNull();
-    expect(result.data).toHaveLength(38);
-  });
+      expect(result.error).toBeNull();
+      expect(result.data).toHaveLength(0);
+    },
+  );
 
   it("denies question mutations from a signed-in user", async () => {
     const inserted = await signedIn.from("quiz_questions").insert({
