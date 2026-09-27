@@ -23,15 +23,20 @@ function detailRow(label: string) {
   return screen.getByText(label, { selector: "dt" }).parentElement as HTMLElement;
 }
 
+function stepButton(label: string) {
+  return screen.getByRole("button", { name: label });
+}
+
 describe("CovalentBondExplorer", () => {
   it("groups all eight molecules by bond type, with hydrogen selected", () => {
     render(<CovalentBondExplorer />);
 
-    for (const group of GROUPS) {
-      const region = within(screen.getByRole("group", { name: group.name }));
-      expect(region.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(group.buttons);
-    }
-    expect(screen.getAllByRole("button")).toHaveLength(8);
+    const moleculeButtons = GROUPS.flatMap((group) => {
+      const buttons = within(screen.getByRole("group", { name: group.name })).getAllByRole("button");
+      expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual(group.buttons);
+      return buttons;
+    });
+    expect(moleculeButtons).toHaveLength(8);
     expect(screen.getAllByRole("button", { pressed: true })).toEqual([
       screen.getByRole("button", { name: "Hydrogen gas, H2" }),
     ]);
@@ -40,13 +45,19 @@ describe("CovalentBondExplorer", () => {
     );
   });
 
-  it("describes hydrogen by default", () => {
+  it("describes hydrogen by default, starting with the atoms apart", async () => {
+    const user = userEvent.setup();
     render(<CovalentBondExplorer />);
 
     expect(detailRow("Formula")).toHaveTextContent("H₂");
     expect(detailRow("Atoms")).toHaveTextContent("2 hydrogen");
     expect(detailRow("Total shared pairs")).toHaveTextContent("1(2 electrons)");
     expect(detailRow("Lone pairs")).toHaveTextContent("None");
+    expect(screen.getByRole("img")).toHaveAccessibleName(
+      "Hydrogen gas before bonding: the atoms sit apart, each shown with its own valence electrons.",
+    );
+
+    await user.click(stepButton("3. Lewis structure"));
     expect(screen.getByRole("img")).toHaveAccessibleName(
       "Diagram of hydrogen gas: 1 single bond between the two hydrogen atoms (1 shared pair); no lone pairs.",
     );
@@ -57,6 +68,7 @@ describe("CovalentBondExplorer", () => {
     render(<CovalentBondExplorer />);
 
     await user.click(screen.getByRole("button", { name: molecule.button }));
+    await user.click(stepButton("3. Lewis structure"));
 
     expect(screen.getByRole("button", { name: molecule.button })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(1);
@@ -70,24 +82,90 @@ describe("CovalentBondExplorer", () => {
     expect(screen.getByRole("figure")).toHaveTextContent(`${molecule.name} (`);
   });
 
-  it("draws one dot per electron: two per shared pair and two per lone pair", async () => {
+  it("draws one outer shell per atom and one dot per valence electron", async () => {
     const user = userEvent.setup();
     const { container } = render(<CovalentBondExplorer />);
+    const circles = () => container.querySelectorAll("svg circle");
 
-    expect(container.querySelectorAll("svg circle")).toHaveLength(2);
+    // 2 hydrogen shells + 1 electron from each hydrogen.
+    expect(circles()).toHaveLength(2 + 2);
     await user.click(screen.getByRole("button", { name: "Carbon dioxide, CO2" }));
-    // 4 valence electrons from carbon + 6 from each oxygen.
-    expect(container.querySelectorAll("svg circle")).toHaveLength(16);
+    // 3 shells + 4 valence electrons from carbon + 6 from each oxygen.
+    expect(circles()).toHaveLength(3 + 16);
     await user.click(screen.getByRole("button", { name: "Nitrogen gas, N2" }));
-    expect(container.querySelectorAll("svg circle")).toHaveLength(10);
+    // 2 shells + 5 valence electrons from each nitrogen.
+    expect(circles()).toHaveLength(2 + 10);
+    // Electrons move between steps but are never added or removed.
+    await user.click(stepButton("3. Lewis structure"));
+    expect(circles()).toHaveLength(2 + 10);
   });
 
-  it("explains the diagram colors in text, not color alone", () => {
+  it("explains the diagram colors in text, not color alone", async () => {
+    const user = userEvent.setup();
     render(<CovalentBondExplorer />);
 
     const figure = within(screen.getByRole("figure"));
+    expect(figure.getByText("From the left hydrogen")).toBeInTheDocument();
+    expect(figure.getByText("From the right hydrogen")).toBeInTheDocument();
+    expect(figure.getByText("Outer shell")).toBeInTheDocument();
+
+    await user.click(stepButton("3. Lewis structure"));
     expect(figure.getByText("Shared pair (bonding electrons)")).toBeInTheDocument();
     expect(figure.getByText("Lone pair (non-bonding electrons)")).toBeInTheDocument();
+    expect(figure.queryByText("Outer shell")).not.toBeInTheDocument();
+  });
+
+  it("walks through the three bonding steps with the step list or the next button", async () => {
+    const user = userEvent.setup();
+    render(<CovalentBondExplorer />);
+
+    const steps = within(screen.getByRole("list", { name: "Steps" })).getAllByRole("button");
+    expect(steps.map((button) => button.textContent)).toEqual([
+      "1. Atoms apart",
+      "2. Sharing",
+      "3. Lewis structure",
+    ]);
+    expect(stepButton("1. Atoms apart")).toHaveAttribute("aria-current", "step");
+
+    await user.click(stepButton("Next: share electrons"));
+    expect(stepButton("2. Sharing")).toHaveAttribute("aria-current", "step");
+    expect(stepButton("1. Atoms apart")).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("img")).toHaveAccessibleName(/^Hydrogen gas bonding: the atoms' outer shells overlap/);
+
+    await user.click(stepButton("Next: Lewis structure"));
+    expect(stepButton("3. Lewis structure")).toHaveAttribute("aria-current", "step");
+
+    await user.click(stepButton("Start over"));
+    expect(stepButton("1. Atoms apart")).toHaveAttribute("aria-current", "step");
+  });
+
+  it("counts one atom's outer-shell electrons during the sharing step", async () => {
+    const user = userEvent.setup();
+    render(<CovalentBondExplorer />);
+
+    expect(screen.queryByRole("group", { name: /Select an atom/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Water, H2O" }));
+    await user.click(stepButton("2. Sharing"));
+
+    const atoms = within(screen.getByRole("group", { name: /Select an atom/ }));
+    expect(atoms.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Hydrogen 1: 2 of 2 electrons",
+      "Hydrogen 2: 2 of 2 electrons",
+      "Oxygen: 8 of 8 electrons",
+    ]);
+
+    await user.click(atoms.getByRole("button", { name: "Oxygen: 8 of 8 electrons" }));
+    expect(atoms.getByRole("button", { name: "Oxygen: 8 of 8 electrons" })).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByText("This oxygen counts 4 in lone pairs + 4 shared = 8 electrons, a full outer shell (an octet)."),
+    ).toBeInTheDocument();
+
+    // Switching molecules clears the selected atom.
+    await user.click(screen.getByRole("button", { name: "Ammonia, NH3" }));
+    expect(screen.queryByText(/^This oxygen counts/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { pressed: true })).toEqual([
+      screen.getByRole("button", { name: "Ammonia, NH3" }),
+    ]);
   });
 
   it("does not call elements like H₂ compounds, and notes the diagram is not the 3D shape", () => {
