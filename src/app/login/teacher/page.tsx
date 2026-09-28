@@ -13,6 +13,7 @@ import {
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
+import { INVALID_CREDENTIALS_MESSAGE } from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TeacherLoginPage() {
@@ -57,6 +58,7 @@ function TeacherLoginForm() {
     const nextEmailError = validateTeacherEmail(email);
     if (nextEmailError) {
       setEmailError(nextEmailError);
+      setPassword("");
       return;
     }
 
@@ -76,7 +78,8 @@ function TeacherLoginForm() {
     });
 
     if (signInError) {
-      setFormError("Invalid email or password.");
+      setFormError(INVALID_CREDENTIALS_MESSAGE);
+      setPassword("");
       setIsSubmitting(false);
       return;
     }
@@ -91,6 +94,7 @@ function TeacherLoginForm() {
     if (teacherError || !teacher) {
       await supabase.auth.signOut();
       setFormError("This account is not approved as a teacher. Please contact your administrator.");
+      setPassword("");
       setIsSubmitting(false);
       return;
     }

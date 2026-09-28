@@ -1,94 +1,36 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
-const STUDENT_SESSION_COOKIE = "chemclicks_student_session";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
+type StudentSession = { studentId: string; classId: string };
 
-type StudentSession = {
-  studentId: string;
-  classId: string;
-  expiresAt: number;
-};
-
-function getSessionSecret(): string {
-  const secret = process.env.STUDENT_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("STUDENT_SESSION_SECRET is not configured.");
-  }
-  return secret;
-}
-
-function encode(value: string): string {
-  return Buffer.from(value).toString("base64url");
-}
-
-function decode(value: string): string {
-  return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function sign(payload: string): string {
-  return createHmac("sha256", getSessionSecret()).update(payload).digest("base64url");
-}
-
-export async function createStudentSession(studentId: string, classId: string) {
-  const session: StudentSession = {
-    studentId,
-    classId,
-    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
-  };
-  const payload = encode(JSON.stringify(session));
-  const value = `${payload}.${sign(payload)}`;
-  const cookieStore = await cookies();
-
-  cookieStore.set(STUDENT_SESSION_COOKIE, value, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  });
-}
-
+/** Verify the Supabase cookie, then resolve its user to an existing student. */
 export async function getStudentSession(): Promise<StudentSession | null> {
-  const value = (await cookies()).get(STUDENT_SESSION_COOKIE)?.value;
-  if (!value) return null;
-
-  const parts = value.split(".");
-  if (parts.length !== 2) return null;
-  const [payload, signature] = parts;
-  if (!payload || !signature) return null;
-
-  const expectedSignature = sign(payload);
-  const providedBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expectedSignature);
-  if (
-    providedBuffer.length !== expectedBuffer.length ||
-    !timingSafeEqual(providedBuffer, expectedBuffer)
-  ) {
-    return null;
-  }
-
   try {
-    const session: unknown = JSON.parse(decode(payload));
-    if (
-      !session || typeof session !== "object"
-      || !("studentId" in session) || typeof session.studentId !== "string"
-      || !("classId" in session) || typeof session.classId !== "string"
-      || !("expiresAt" in session) || typeof session.expiresAt !== "number"
-      || !Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()
-      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session.studentId)
-      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session.classId)
-    ) {
-      return null;
-    }
-    return { studentId: session.studentId, classId: session.classId, expiresAt: session.expiresAt };
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getClaims();
+    const authUserId = data?.claims?.sub;
+    if (error || !authUserId) return null;
+
+    // Student table RLS is still teacher-only; continue to authorize all
+    // student data on the server, exactly as before this session migration.
+    const admin = createAdminClient();
+    const { data: student, error: studentError } = await admin.from("students")
+      .select("id, class_id")
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
+    if (studentError || !student) return null;
+
+    const { data: classroom, error: classError } = await admin.from("classes")
+      .select("id")
+      .eq("id", student.class_id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (classError || !classroom) return null;
+
+    return { studentId: student.id, classId: classroom.id };
   } catch {
     return null;
   }
-}
-
-export async function clearStudentSession() {
-  (await cookies()).delete(STUDENT_SESSION_COOKIE);
 }

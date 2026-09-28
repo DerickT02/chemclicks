@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { hasActivityContent } from "@/lib/assignments/activity-content";
+import { LEWIS_QUIZZES, lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getStudentAssignments } from "@/lib/db/student-assignments";
@@ -26,7 +27,9 @@ export default async function StudentAssignmentsPage() {
           </p>
         ) : (
           <ul className="space-y-4">
-            {result.assignments.map((assignment) => (
+            {result.assignments.map((assignment) => {
+              const quizKind = lewisQuizForLesson(assignment.activity.type);
+              return (
               <li key={assignment.id} className="space-y-3 rounded-xl border border-border bg-card p-5">
                 <h2 className="text-lg font-semibold">{assignment.activity.title}</h2>
                 <p className="text-sm text-muted-foreground">
@@ -42,8 +45,15 @@ export default async function StudentAssignmentsPage() {
                 ) : (
                   <p className="text-sm text-muted-foreground">Exercise not available yet.</p>
                 )}
+                {quizKind && (
+                  <Link href={LEWIS_QUIZZES[quizKind].path} prefetch={false}
+                    className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground">
+                    Take quiz
+                  </Link>
+                )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
-  getUser: vi.fn(), query: vi.fn(), insert: vi.fn(), update: vi.fn(), refresh: vi.fn(), create: vi.fn(),
+  teacher: vi.fn(), writer: {}, getUser: vi.fn(), query: vi.fn(), insert: vi.fn(), update: vi.fn(), refresh: vi.fn(), create: vi.fn(),
 }));
+vi.mock('@/lib/server/teacher', () => ({ requireTeacherId: mocks.teacher }));
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => mocks.writer }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.refresh }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.create }));
 vi.mock("@/lib/db/class_activities", () => ({ insertClassActivity: mocks.insert, updateClassActivity: mocks.update }));
@@ -18,6 +20,7 @@ function form(values: Record<string, string | undefined> = {}): FormData {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.teacher.mockResolvedValue("teacher");
   const builder = { select: () => builder, eq: () => builder, maybeSingle: mocks.query };
   mocks.create.mockResolvedValue({ auth: { getUser: mocks.getUser }, from: () => builder });
   mocks.getUser.mockResolvedValue({ data: { user: { id: "teacher" } }, error: null });
@@ -70,4 +73,11 @@ describe("teacher assignment action", () => {
     expect(result.message).toContain("already assigned");
     expect(mocks.refresh).not.toHaveBeenCalled();
   });
+});
+
+it('does not perform privileged writes when teacher approval fails', async () => {
+  mocks.teacher.mockRejectedValue(new Error('Unauthorized'));
+  expect((await saveAssignment(initial, form())).status).toBe('error');
+  expect(mocks.insert).not.toHaveBeenCalled();
+  expect(mocks.update).not.toHaveBeenCalled();
 });

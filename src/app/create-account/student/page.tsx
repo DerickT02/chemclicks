@@ -11,8 +11,7 @@ import {
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
-import { insertStudent } from "@/lib/db/students";
-import { createClient } from "@/lib/supabase/client";
+import { signupStudent } from "@/app/create-account/student/actions";
 
 export default function StudentCreateAccountPage() {
   const router = useRouter();
@@ -51,42 +50,19 @@ export default function StudentCreateAccountPage() {
 
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const { data: classRow, error: classError } = await supabase
-      .from("classes")
-      .select("id, is_active")
-      .eq("class_code", normalizedCode)
-      .maybeSingle();
-
-    if (classError) {
-      setFormError(classError.message);
-      setIsSubmitting(false);
+    try {
+      const response = await signupStudent({ firstName: normalizedFirstName, lastName: normalizedLastName, studentID: normalizedStudentID, code: normalizedCode });
+      if (!response.ok) {
+        if (response.field === 'studentID') setStudentIDError(response.message);
+        else if (response.field === 'code') setCodeError(response.message);
+        else setFormError(response.message);
+        return;
+      }
+    } catch {
+      setFormError("Unable to create your account. Please try again.");
       return;
-    }
-
-    if (!classRow) {
-      setCodeError("That classroom code was not found.");
+    } finally {
       setIsSubmitting(false);
-      return;
-    }
-
-    if (!classRow.is_active) {
-      setCodeError("That classroom is inactive.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    const { error: studentError } = await insertStudent(supabase, {
-      class_id: classRow.id,
-      first_name: normalizedFirstName,
-      last_name: normalizedLastName,
-      student_id: normalizedStudentID,
-    });
-
-    if (studentError) {
-      setFormError(studentError.message);
-      setIsSubmitting(false);
-      return;
     }
 
     setFirstName(normalizedFirstName);
@@ -163,7 +139,11 @@ export default function StudentCreateAccountPage() {
             }}
             error={codeError}
           />
-          {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+          {formError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {formError}
+            </p>
+          ) : null}
           <AuthPrimaryButton type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating account..." : "Create account"}
           </AuthPrimaryButton>

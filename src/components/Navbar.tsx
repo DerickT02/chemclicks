@@ -101,11 +101,10 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isStudentAuthenticated, setIsStudentAuthenticated] = useState(false);
 
   const role = navRoleFromPathname(pathname);
   const links = LINKS[role];
-  const hasAuthenticatedSession = isAuthenticated || isStudentAuthenticated;
+  const hasAuthenticatedSession = isAuthenticated;
   const showPublicAuthCta = role === "public" && !hasAuthenticatedSession;
 
   const logoHref =
@@ -133,11 +132,6 @@ export default function Navbar() {
       setIsAuthenticated(Boolean(data.session));
     });
 
-    void fetch("/api/student/session")
-      .then((response) => response.json() as Promise<{ authenticated: boolean }>)
-      .then(({ authenticated }) => setIsStudentAuthenticated(authenticated))
-      .catch(() => setIsStudentAuthenticated(false));
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -154,15 +148,6 @@ export default function Navbar() {
 
     setIsSigningOut(true);
     try {
-      if (isStudentAuthenticated) {
-        const response = await fetch("/api/student/session", { method: "DELETE" });
-        if (!response.ok) {
-          console.error("Student sign out failed:", response.statusText);
-          return;
-        }
-        setIsStudentAuthenticated(false);
-      }
-
       const supabase = createClient();
       const { error } = await supabase.auth.signOut();
       if (error) {

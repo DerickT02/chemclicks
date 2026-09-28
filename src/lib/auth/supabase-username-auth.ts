@@ -1,4 +1,5 @@
 import type { AuthError } from "@supabase/supabase-js";
+import { GENERIC_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 /**
  * User-facing copy when the server rejects the username (unknown user, invalid credentials, etc.).
@@ -34,5 +35,5 @@ export function messageForSupabaseUsernameAuthError(
     return AUTH_USERNAME_NOT_FOUND_MESSAGE;
   }
 
-  return error.message?.trim() || "Something went wrong. Please try again.";
+  return GENERIC_RETRY_MESSAGE;
 }

@@ -1,7 +1,10 @@
 'use server';
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireTeacherId } from "@/lib/server/teacher";
 import { findClassByCode, insertClass, isDuplicateClassCodeError } from "@/lib/db/classes";
+import { DATABASE_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 type CreateClassInput = {
   className: string;
@@ -43,13 +46,16 @@ export async function createClass(input: CreateClassInput): Promise<
   // can't be bypassed by a concurrent submission slipping past this check.
   const { exists, error: lookupError } = await findClassByCode(supabase, class_code);
   if (lookupError) {
-    return { ok: false, message: lookupError.message };
+    return { ok: false, message: DATABASE_RETRY_MESSAGE };
   }
   if (exists) {
     return { ok: false, field: "classCode", message: DUPLICATE_CODE_MESSAGE };
   }
 
-  const { data, error } = await insertClass(supabase, {
+  try { await requireTeacherId(); } catch {
+    return { ok: false, message: "An approved, verified teacher session is required." };
+  }
+  const { data, error } = await insertClass(createAdminClient(), {
     teacher_id: userData.user.id,
     name,
     section,
@@ -60,7 +66,7 @@ export async function createClass(input: CreateClassInput): Promise<
     if (error && isDuplicateClassCodeError(error)) {
       return { ok: false, field: "classCode", message: DUPLICATE_CODE_MESSAGE };
     }
-    return { ok: false, message: error?.message ?? "Failed to create class." };
+    return { ok: false, message: DATABASE_RETRY_MESSAGE };
   }
 
   return { ok: true, classId: data.id };

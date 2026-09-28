@@ -3,7 +3,6 @@
 import { AuthCard, AuthFooter, AuthPageLayout } from "@/components/auth/AuthPageLayout";
 
 export default function AdminError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -21,7 +20,7 @@ export default function AdminError({
       >
         <div className="flex flex-col gap-4">
           <p className="mb-4 text-center text-sm text-muted-foreground">
-            {error.message || "Something went wrong while loading your classrooms."}
+            Something went wrong while loading your classrooms. Please try again.
           </p>
           <button
             type="button"
