@@ -17,7 +17,6 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
           {summary.students.map(student => (
             <li key={student.studentId} className="py-4">
               <h3 className="font-semibold">{student.firstName} {student.lastName}</h3>
-              {!student.verified && <p className="text-sm text-muted-foreground">Awaiting verification</p>}
               <p className="mt-1">{student.attemptCount} {student.attemptCount === 1 ? 'attempt' : 'attempts'} · {student.completedCount} completed · {student.inProgressCount} in progress</p>
               {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">No attempts yet.</p> : (
                 <details className="mt-3">

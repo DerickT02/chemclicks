@@ -1,5 +1,7 @@
 # Step 3: persisted exploration lifecycle
 
+> Updated integration behavior and validation: see [dev integration](student-attempts-dev-integration.md). Earlier session, activity-support and build notes below are historical.
+
 The `student_attempt_lifecycle` migration is applied to Chemclicks. RLS remains disabled on classes/teachers and enabled on attempts, as in Step 2.
 
 ## Behavior

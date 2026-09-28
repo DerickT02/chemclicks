@@ -1,7 +1,12 @@
 import Link from "next/link";
+import { deleteOwnedClass } from "@/lib/server/classes";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { deleteOwnedClass } from "@/lib/server/classes";
+import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
+import { listActivityCatalog } from "@/lib/db/activities";
+import { getClassActivities } from "@/lib/db/class_activities";
+import { listActiveClassesForTeacher } from "@/lib/db/classes";
+
 
 type ProgressStatus = "not_started" | "in_progress" | "completed";
 
@@ -38,6 +43,14 @@ function statusText(status: ProgressStatus | null): string {
   return "Not started";
 }
 
+function formatAssignmentTimestamp(value: string): string {
+  return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
+function scheduleTimestamp(value: string | null, whenEmpty: string): string {
+  return value ? formatAssignmentTimestamp(value) : whenEmpty;
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -58,11 +71,14 @@ export default async function AdminPage({
     );
   }
 
-  const { data: classesData } = await supabase
-    .from("classes")
-    .select("id, name, section, class_code")
-    .eq("teacher_id", userData.user.id)
-    .order("created_at", { ascending: false });
+  const { data: classesData, error: classesError } = await listActiveClassesForTeacher(
+    supabase,
+    userData.user.id,
+  );
+
+  if (classesError) {
+    throw new Error("We couldn't load your classes. Please try again.");
+  }
 
   const baseClasses: ClassWithStudents[] = ((classesData ?? []) as Omit<ClassWithStudents, "students">[])
     .map((classItem) => ({ ...classItem, students: [] }));
@@ -117,6 +133,22 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
+  const [catalogResult, assignmentsResult] = await Promise.all([
+    listActivityCatalog(supabase),
+    selectedClass
+      ? getClassActivities(supabase, selectedClass.id)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const activities = catalogResult.data ?? [];
+  const assignments = assignmentsResult.data ?? [];
+  const assignedActivityIds = assignments.map(
+    (assignment) => assignment.activity_id,
+  );
+  const catalogLoadFailed = Boolean(catalogResult.error);
+  const assignmentsLoadFailed = Boolean(assignmentsResult.error);
+
+
   async function removeSelectedClass(formData: FormData) {
     "use server";
     const id = formData.get("classId") as string;
@@ -145,9 +177,15 @@ export default async function AdminPage({
 
             <div className="space-y-2">
               {classes.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                  No classes yet. Create your first class below.
-                </p>
+                <div className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                  <p>No classes yet.</p>
+                  <Link
+                    href="/admin/create-class"
+                    className="mt-2 inline-flex text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Create your first class
+                  </Link>
+                </div>
               ) : (
                 classes.map((classItem) => {
                   const isSelected = selectedClass?.id === classItem.id;
@@ -156,15 +194,20 @@ export default async function AdminPage({
                     <Link
                       key={classItem.id}
                       href={`/admin?classId=${classItem.id}`}
-                      className={`block rounded-lg border px-3 py-2.5 transition ${
+                      aria-current={isSelected ? "true" : undefined}
+                      className={`block rounded-lg border px-3 py-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                         isSelected
                           ? "border-accent bg-muted"
                           : "border-border bg-background/40 hover:border-ring"
                       }`}
                     >
                       <p className="truncate text-sm font-medium text-foreground">{classItem.name}</p>
+                      {classItem.section ? (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{classItem.section}</p>
+                      ) : null}
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {studentCount} students · Code {classItem.class_code}
+                        {studentCount} {studentCount === 1 ? "student" : "students"} · Code{" "}
+                        {classItem.class_code}
                       </p>
                     </Link>
                   );
@@ -179,7 +222,7 @@ export default async function AdminPage({
               </p>
               <Link
                 href="/admin/create-class"
-                className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90"
+                className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 Create class
               </Link>
@@ -206,7 +249,7 @@ export default async function AdminPage({
                     <input type="hidden" name="classId" value={selectedClass.id} />
                     <button
                       type="submit"
-                      className="rounded-md border border-destructive px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                      className="rounded-md border border-destructive px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       Remove class
                     </button>
@@ -218,10 +261,99 @@ export default async function AdminPage({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {(selectedClass.students?.length ?? 0).toString()} students enrolled
                 </p>
-                <Link
-                  href={`/admin/classes/${selectedClass.id}/attempts`}
-                  className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-                >
+                <section className="mt-7 space-y-6">
+                  <h3 className="text-lg font-semibold">Class activities</h3>
+
+                  {catalogLoadFailed ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      The activity catalog could not be loaded. Please refresh the page.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="space-y-4 rounded-lg border border-border p-4">
+                        <h4 className="font-medium">Assign an activity</h4>
+                        <AssignmentForm
+                          key={selectedClass.id}
+                          classId={selectedClass.id}
+                          activities={activities}
+                          assignedActivityIds={assignedActivityIds}
+                        />
+                      </div>
+
+                      {assignmentsLoadFailed ? (
+                        <p role="alert" className="text-sm text-destructive">
+                          Assigned activities could not be loaded. Please refresh the page.
+                        </p>
+                      ) : assignments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          This class has no assigned activities.
+                        </p>
+                      ) : (
+                        assignments.map((assignment) => {
+                          const activity = activities.find(
+                            (item) => item.id === assignment.activity_id,
+                          );
+
+                          return (
+                            <div
+                              key={assignment.id}
+                              className="flex items-start justify-between gap-4 rounded-lg border border-border p-4"
+                            >
+                              <div>
+                                <h4 className="font-medium">
+                                  {activity?.title ?? "Assigned activity"}
+                                </h4>
+                                {activity ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {activity.description}
+                                  </p>
+                                ) : null}
+                                <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Assigned
+                                    </dt>
+                                    <dd>
+                                      {formatAssignmentTimestamp(
+                                        assignment.created_at,
+                                      )}
+                                    </dd>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Opens
+                                    </dt>
+                                    <dd>
+                                      {scheduleTimestamp(
+                                        assignment.opens_at,
+                                        "Available immediately",
+                                      )}
+                                    </dd>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2">
+                                    <dt className="font-medium text-foreground/80">
+                                      Closes
+                                    </dt>
+                                    <dd>
+                                      {scheduleTimestamp(
+                                        assignment.closes_at,
+                                        "No deadline",
+                                      )}
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </div>
+                              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                Assigned
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </>
+                  )}
+                </section>
+                <Link href={`/admin/classes/${selectedClass.id}/attempts`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
                   Activity attempts
                 </Link>
                 <div className="mt-7">

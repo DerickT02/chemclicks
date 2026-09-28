@@ -1,5 +1,7 @@
 # Step 2: attempt access controls (SCRUM-175)
 
+> Updated integration behavior and validation: see [dev integration](student-attempts-dev-integration.md). Earlier session, activity-support and build notes below are historical.
+
 ## Implemented and applied
 
 Migration `student_attempts_access` is applied to Chemclicks (`cprrlddivmtrlkubluyt`). The local SQL is in `src/lib/supabase/migration/20260924053830_student_attempts_access.sql`.

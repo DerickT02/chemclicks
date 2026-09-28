@@ -51,14 +51,11 @@ export default function StudentCreateAccountPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await signupStudent({
-        firstName: normalizedFirstName,
-        lastName: normalizedLastName,
-        studentID: normalizedStudentID,
-        code: normalizedCode,
-      });
+      const response = await signupStudent({ firstName: normalizedFirstName, lastName: normalizedLastName, studentID: normalizedStudentID, code: normalizedCode });
       if (!response.ok) {
-        setFormError(response.message);
+        if (response.field === 'studentID') setStudentIDError(response.message);
+        else if (response.field === 'code') setCodeError(response.message);
+        else setFormError(response.message);
         return;
       }
     } catch {
@@ -142,7 +139,11 @@ export default function StudentCreateAccountPage() {
             }}
             error={codeError}
           />
-          {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+          {formError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {formError}
+            </p>
+          ) : null}
           <AuthPrimaryButton type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating account..." : "Create account"}
           </AuthPrimaryButton>

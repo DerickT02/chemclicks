@@ -1,15 +1,10 @@
 "use client";
 
-import {
-  useId,
-  useState,
-  type KeyboardEvent,
-  type PointerEvent,
-} from "react";
+import { useId, useState, type PointerEvent } from "react";
+import { CYLINDER_SPEC, quantizeReading } from "@/lib/measurement/instruments";
 
-const CAPACITY_ML = 50;
-const STEP_ML = 0.1;
-const DEFAULT_ML = 32;
+const CAPACITY_ML = CYLINDER_SPEC.max;
+const DEFAULT_ML = CYLINDER_SPEC.defaultReading;
 const SCALE_TOP_Y = 46;
 const SCALE_BOTTOM_Y = 390;
 const SCALE_HEIGHT = SCALE_BOTTOM_Y - SCALE_TOP_Y;
@@ -18,17 +13,23 @@ const GRADUATIONS_ML = Array.from({ length: CAPACITY_ML + 1 }, (_, index) => ind
 const CYLINDER_PATH =
   "M 105 30 L 105 390 Q 105 400 115 400 L 195 400 Q 205 400 205 390 L 205 30";
 
-function quantizeMl(ml: number): number {
-  const clamped = Math.min(CAPACITY_ML, Math.max(0, ml));
-  return Number((Math.round(clamped / STEP_ML) * STEP_ML).toFixed(1));
-}
-
 function volumeToY(ml: number): number {
   return SCALE_BOTTOM_Y - (ml / CAPACITY_ML) * SCALE_HEIGHT;
 }
 
-export default function GraduatedCylinder() {
-  const [volumeMl, setVolumeMl] = useState(DEFAULT_ML);
+type Props = {
+  /**
+   * Pin the water at this volume, in milliliters, for a question. The student
+   * can't move it, and neither the readout nor assistive tech reveals the value.
+   */
+  lockedValue?: number;
+};
+
+export default function GraduatedCylinder({ lockedValue }: Props) {
+  const [movableMl, setVolumeMl] = useState(DEFAULT_ML);
+  const isLocked = lockedValue !== undefined;
+  const volumeMl = lockedValue ?? movableMl;
+
   const idPrefix = useId().replaceAll(":", "");
   const glassGradientId = `${idPrefix}-glass`;
   const waterGradientId = `${idPrefix}-water`;
@@ -40,7 +41,7 @@ export default function GraduatedCylinder() {
     if (rect.height === 0) return;
 
     const position = 1 - (event.clientY - rect.top) / rect.height;
-    setVolumeMl(quantizeMl(position * CAPACITY_ML));
+    setVolumeMl(quantizeReading(position * CAPACITY_ML, CYLINDER_SPEC));
   }
 
   function handlePointerDown(event: PointerEvent<SVGRectElement>) {
@@ -73,8 +74,13 @@ export default function GraduatedCylinder() {
       <svg
         viewBox="0 0 330 460"
         className="h-auto w-full max-w-[20rem] overflow-visible select-none"
+        role={isLocked ? "img" : undefined}
       >
-        <title>Graduated cylinder with adjustable water volume</title>
+        <title>
+          {isLocked
+            ? "Graduated cylinder holding water"
+            : "Graduated cylinder with adjustable water volume"}
+        </title>
         <defs>
           <linearGradient id={glassGradientId} x1="0" x2="1">
             <stop offset="0" stopColor="#cbd5e1" stopOpacity="0.28" />
@@ -211,49 +217,54 @@ export default function GraduatedCylinder() {
           strokeWidth="1"
         />
 
-        <g transform={`translate(218 ${labelY})`} aria-hidden="true">
-          <rect
-            width="100"
-            height="28"
-            rx="14"
-            fill="var(--card)"
-            stroke="var(--accent)"
-            strokeOpacity="0.55"
-          />
-          <text
-            x="50"
-            y="18.5"
-            textAnchor="middle"
-            fill="var(--accent)"
-            className="font-mono text-[13px] font-semibold"
-          >
-            {formattedVolume} mL
-          </text>
-        </g>
+        {/* A locked cylinder is a question, so neither the badge nor a slider may give away the volume. */}
+        {!isLocked && (
+          <>
+            <g transform={`translate(218 ${labelY})`} aria-hidden="true">
+              <rect
+                width="100"
+                height="28"
+                rx="14"
+                fill="var(--card)"
+                stroke="var(--accent)"
+                strokeOpacity="0.55"
+              />
+              <text
+                x="50"
+                y="18.5"
+                textAnchor="middle"
+                fill="var(--accent)"
+                className="font-mono text-[13px] font-semibold"
+              >
+                {formattedVolume} mL
+              </text>
+            </g>
 
-        <rect
-          x="96"
-          y={SCALE_TOP_Y}
-          width="118"
-          height={SCALE_HEIGHT}
-          rx="8"
-          fill="transparent"
-          stroke="transparent"
-          strokeWidth="3"
-          className="cursor-ns-resize touch-none outline-none focus:stroke-[var(--ring)]"
-          role="slider"
-          tabIndex={0}
-          aria-label="Water volume"
-          aria-valuemin={0}
-          aria-valuemax={CAPACITY_ML}
-          aria-valuenow={volumeMl}
-          aria-valuetext={`${formattedVolume} milliliters`}
-          aria-orientation="vertical"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={stopDragging}
-          onPointerCancel={stopDragging}
-        />
+            <rect
+              x="96"
+              y={SCALE_TOP_Y}
+              width="118"
+              height={SCALE_HEIGHT}
+              rx="8"
+              fill="transparent"
+              stroke="transparent"
+              strokeWidth="3"
+              className="cursor-ns-resize touch-none outline-none focus:stroke-[var(--ring)]"
+              role="slider"
+              tabIndex={0}
+              aria-label="Water volume"
+              aria-valuemin={0}
+              aria-valuemax={CAPACITY_ML}
+              aria-valuenow={volumeMl}
+              aria-valuetext={`${formattedVolume} milliliters`}
+              aria-orientation="vertical"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={stopDragging}
+              onPointerCancel={stopDragging}
+            />
+          </>
+        )}
       </svg>
     </div>
   );

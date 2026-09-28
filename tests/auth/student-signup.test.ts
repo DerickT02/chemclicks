@@ -27,7 +27,7 @@ it.each([null, { id: 'class', is_active: false }])('rejects missing or inactive 
 })
 it('handles duplicate IDs without altering an existing student', async () => {
   mock.insert.mockResolvedValue({ error: { code: '23505' } })
-  expect(await signupStudent(input)).toEqual({ ok: false, message: expect.stringContaining('already registered') })
+  expect(await signupStudent(input)).toEqual({ ok: false, field: 'studentID', message: expect.stringContaining('already registered') })
 })
 it('does not expose database errors', async () => {
   mock.maybeSingle.mockResolvedValue({ data: null, error: { message: 'private database details' } })

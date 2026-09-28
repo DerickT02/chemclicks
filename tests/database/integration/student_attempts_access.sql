@@ -37,7 +37,8 @@ BEGIN
 
   UPDATE public.students SET verified=false WHERE id=sa;
   SET LOCAL ROLE service_role;
-  BEGIN PERFORM public.student_attempt_access(sa,ca,pa,true); RAISE EXCEPTION 'Unverified student allowed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  -- dev resolves enrollment from the authenticated Supabase session, not verified.
+  PERFORM public.student_attempt_access(sa,ca,pa,false);
   RESET ROLE;
   UPDATE public.students SET verified=true WHERE id=sa;
   UPDATE public.classes SET is_active=false WHERE id=ca;

@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { beforeAll, afterAll, describe, it, expect } from 'vitest'
+import { listActiveClassesForTeacher } from '@/lib/db/classes'
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 // RLS policies on the classes table:
@@ -52,10 +53,16 @@ async function insertTeacher(id: string, email: string, displayName: string): Pr
   if (error) throw new Error(`insertTeacher failed: ${error.message}`)
 }
 
-async function insertClass(teacherId: string, name: string): Promise<string> {
+async function insertClass(teacherId: string, name: string, isActive = true): Promise<string> {
   const { data, error } = await admin
     .from('classes')
-    .insert({ teacher_id: teacherId, name, section: generateClassCode(), class_code: generateClassCode() })
+    .insert({
+      teacher_id: teacherId,
+      name,
+      section: generateClassCode(),
+      class_code: generateClassCode(),
+      is_active: isActive,
+    })
     .select('id')
     .single()
   if (error) throw new Error(`insertClass failed: ${error.message}`)
@@ -231,6 +238,42 @@ describe('classes table RLS', () => {
 
       const { data } = await admin.from('classes').select('id').eq('id', classBId).single()
       expect(data!.id).toBe(classBId)
+    })
+  })
+
+  describe('listActiveClassesForTeacher (classroom list view)', () => {
+    it("returns the teacher's own active classes and excludes another teacher's", async () => {
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
+      const { data, error } = await listActiveClassesForTeacher(client, teacherAId)
+
+      expect(error).toBeNull()
+      const ids = data!.map(c => c.id)
+      expect(ids).toContain(classAId)
+      expect(ids).not.toContain(classBId)
+    })
+
+    it('excludes a class the teacher has deactivated', async () => {
+      const inactiveId = await insertClass(teacherAId, 'Deactivated Class', false)
+
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
+      const { data, error } = await listActiveClassesForTeacher(client, teacherAId)
+
+      expect(error).toBeNull()
+      const ids = data!.map(c => c.id)
+      expect(ids).toContain(classAId)
+      expect(ids).not.toContain(inactiveId)
+
+      await admin.from('classes').delete().eq('id', inactiveId)
+    })
+
+    it("RLS still blocks another teacher's classes even if their id is passed in", async () => {
+      // Teacher A signed in, but querying as if for teacher B — RLS (auth.uid())
+      // takes precedence over the teacherId argument, so this must come back empty.
+      const client = await signInAsTeacher(TEACHER_A_EMAIL, PASSWORD)
+      const { data, error } = await listActiveClassesForTeacher(client, teacherBId)
+
+      expect(error).toBeNull()
+      expect(data).toHaveLength(0)
     })
   })
 

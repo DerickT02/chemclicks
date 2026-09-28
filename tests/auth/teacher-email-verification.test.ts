@@ -10,7 +10,7 @@ describe("teacher email verification flow helpers", () => {
     const result = buildTeacherEmailRedirectTo("https://app.example.com");
 
     expect(result).toBe(
-      "https://app.example.com/auth/callback?redirect_to=%2Fteacher%2Fdashboard",
+      "https://app.example.com/auth/callback?redirect_to=%2Fadmin",
     );
     expect(result).toContain(encodeURIComponent(TEACHER_POST_VERIFY_PATH));
   });

@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
+import {
+  RULER_SPEC,
+  formatReading,
+  quantizeReading,
+} from "@/lib/measurement/instruments";
 
-export const RULER_MIN_CM = 0;
-export const RULER_MAX_CM = 15;
-export const STEP_CM = 0.01;
-export const DEFAULT_CM = 7.5;
+export const RULER_MIN_CM = RULER_SPEC.min;
+export const RULER_MAX_CM = RULER_SPEC.max;
+export const STEP_CM = RULER_SPEC.step;
+export const DEFAULT_CM = RULER_SPEC.defaultReading;
 
 const SPAN_CM = RULER_MAX_CM - RULER_MIN_CM;
 const SCALE_LEFT_X = 40;
@@ -31,20 +36,29 @@ const KEY_DELTAS_CM: Record<string, number> = {
 };
 
 export function quantizeCm(cm: number): number {
-  const clamped = Math.min(RULER_MAX_CM, Math.max(RULER_MIN_CM, cm));
-  return Number((Math.round(clamped / STEP_CM) * STEP_CM).toFixed(2));
+  return quantizeReading(cm, RULER_SPEC);
 }
 
 export function formatCm(cm: number): string {
-  return quantizeCm(cm).toFixed(2);
+  return formatReading(cm, RULER_SPEC);
 }
 
 function cmToX(cm: number): number {
   return SCALE_LEFT_X + ((cm - RULER_MIN_CM) / SPAN_CM) * SCALE_WIDTH;
 }
 
-export default function PrecisionRuler() {
-  const [valueCm, setValueCm] = useState(DEFAULT_CM);
+type Props = {
+  /**
+   * Pin the cursor at this reading, in centimeters, for a question. The student
+   * can't move it, and neither the readout nor assistive tech reveals the value.
+   */
+  lockedValue?: number;
+};
+
+export default function PrecisionRuler({ lockedValue }: Props) {
+  const [movableCm, setValueCm] = useState(DEFAULT_CM);
+  const isLocked = lockedValue !== undefined;
+  const valueCm = lockedValue ?? movableCm;
 
   function setFromPointer(event: PointerEvent<SVGRectElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -92,8 +106,11 @@ export default function PrecisionRuler() {
       <svg
         viewBox="0 0 600 150"
         className="h-auto w-full max-w-3xl overflow-visible select-none"
+        role={isLocked ? "img" : undefined}
       >
-        <title>Ruler with adjustable measurement cursor</title>
+        <title>
+          {isLocked ? "Ruler with measurement cursor" : "Ruler with adjustable measurement cursor"}
+        </title>
 
         <rect
           x={SCALE_LEFT_X}
@@ -164,51 +181,56 @@ export default function PrecisionRuler() {
             fill="var(--accent)"
           />
 
-          <g transform={`translate(${labelX - LABEL_WIDTH / 2} ${BASELINE_Y - 46})`}>
-            <rect
-              width={LABEL_WIDTH}
-              height="28"
-              rx="14"
-              fill="var(--card)"
-              stroke="var(--accent)"
-              strokeOpacity="0.55"
-            />
-            <text
-              x={LABEL_WIDTH / 2}
-              y="18.5"
-              textAnchor="middle"
-              fill="var(--accent)"
-              className="font-mono text-[13px] font-semibold"
-            >
-              {formattedValue} cm
-            </text>
-          </g>
+          {!isLocked && (
+            <g transform={`translate(${labelX - LABEL_WIDTH / 2} ${BASELINE_Y - 46})`}>
+              <rect
+                width={LABEL_WIDTH}
+                height="28"
+                rx="14"
+                fill="var(--card)"
+                stroke="var(--accent)"
+                strokeOpacity="0.55"
+              />
+              <text
+                x={LABEL_WIDTH / 2}
+                y="18.5"
+                textAnchor="middle"
+                fill="var(--accent)"
+                className="font-mono text-[13px] font-semibold"
+              >
+                {formattedValue} cm
+              </text>
+            </g>
+          )}
         </g>
 
-        <rect
-          x={SCALE_LEFT_X}
-          y={BASELINE_Y - 20}
-          width={SCALE_WIDTH}
-          height={BAR_HEIGHT + 20}
-          rx="8"
-          fill="transparent"
-          stroke="transparent"
-          strokeWidth="3"
-          className="cursor-ew-resize touch-none outline-none focus:stroke-[var(--ring)]"
-          role="slider"
-          tabIndex={0}
-          aria-label="Measured length"
-          aria-valuemin={RULER_MIN_CM}
-          aria-valuemax={RULER_MAX_CM}
-          aria-valuenow={valueCm}
-          aria-valuetext={`${formattedValue} centimeters`}
-          aria-orientation="horizontal"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={stopDragging}
-          onPointerCancel={stopDragging}
-          onKeyDown={handleKeyDown}
-        />
+        {/* A locked ruler is a question, so it has no slider to announce the reading. */}
+        {!isLocked && (
+          <rect
+            x={SCALE_LEFT_X}
+            y={BASELINE_Y - 20}
+            width={SCALE_WIDTH}
+            height={BAR_HEIGHT + 20}
+            rx="8"
+            fill="transparent"
+            stroke="transparent"
+            strokeWidth="3"
+            className="cursor-ew-resize touch-none outline-none focus:stroke-[var(--ring)]"
+            role="slider"
+            tabIndex={0}
+            aria-label="Measured length"
+            aria-valuemin={RULER_MIN_CM}
+            aria-valuemax={RULER_MAX_CM}
+            aria-valuenow={valueCm}
+            aria-valuetext={`${formattedValue} centimeters`}
+            aria-orientation="horizontal"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
+            onKeyDown={handleKeyDown}
+          />
+        )}
       </svg>
     </div>
   );

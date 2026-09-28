@@ -12,5 +12,9 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     env: loadEnv(mode, process.cwd(), ''),
     hookTimeout: 30000,
+    environmentMatchGlobs: [
+      ['**/tests/quiz/**', 'jsdom'],
+      ['**/*.test.tsx', 'jsdom'],
+    ],
   },
 }))

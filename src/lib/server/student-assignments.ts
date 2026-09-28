@@ -1,36 +1,14 @@
 import 'server-only'
 import { getStudentSession } from '@/lib/auth/student-session'
 import { createServiceClient } from '@/lib/server/database'
-import type { Activity } from '@/lib/db/activities'
+import { getStudentAssignments } from '@/lib/db/student-assignments'
 import type { StudentAttempt } from '@/lib/db/student_attempts'
-
-export type StudentAssignment = {
-  id: string
-  opens_at: string | null
-  closes_at: string | null
-  activities: Pick<Activity, 'title' | 'type'>
-}
-
-export async function getStudentAssignments(): Promise<StudentAssignment[]> {
-  const session = await getStudentSession()
-  if (!session) throw new Error('Please sign in as a student.')
-  const client = createServiceClient()
-  const { data: student, error } = await client.from('students')
-    .select('id, classes!inner(is_active)').eq('id', session.studentId)
-    .eq('class_id', session.classId).eq('verified', true).eq('classes.is_active', true).maybeSingle()
-  if (error || !student) throw new Error('Your classroom is unavailable. Please contact your teacher.')
-  const { data, error: assignmentError } = await client.from('class_activities')
-    .select('id, opens_at, closes_at, activities!inner(title, type)').eq('class_id', session.classId)
-    .order('created_at')
-  if (assignmentError) throw new Error('Assignments could not be loaded. Please try again.')
-  return data as unknown as StudentAssignment[]
-}
 
 export async function getAssignmentAttempts(assignmentId: string): Promise<StudentAttempt[]> {
   const session = await getStudentSession()
   if (!session) throw new Error('Please sign in as a student.')
   const assignments = await getStudentAssignments()
-  if (!assignments.some(a => a.id === assignmentId)) throw new Error('Assignment unavailable.')
+  if (assignments.status !== 'ok' || !assignments.assignments.some(a => a.id === assignmentId)) throw new Error('Assignment unavailable.')
   const client = createServiceClient()
   const { data: progress, error } = await client.from('student_progress').select('id')
     .eq('student_id', session.studentId).eq('class_activity_id', assignmentId).maybeSingle()

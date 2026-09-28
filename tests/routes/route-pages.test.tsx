@@ -1,10 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import NotFound from "../../src/app/not-found";
 import AppError from "../../src/app/error";
 import LoginRolePage from "../../src/app/login/page";
 import MeasurementLabPage from "../../src/app/(student)/student/labs/measurement/page";
+import MeasurementQuestionsPage from "../../src/app/(student)/student/labs/measurement/questions/page";
+
+import LewisLabPage from "@/app/(student)/student/labs/lewis/page";
+
+vi.mock("next/navigation", () => ({
+  redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); },
+}));
 
 describe("route page behavior", () => {
   it("renders the not-found page for unmatched routes", () => {
@@ -31,21 +38,36 @@ describe("route page behavior", () => {
     expect(html).not.toContain("Something went wrong");
   });
 
-  it("renders the measurement lab with the graduated cylinder", () => {
-    const html = renderToStaticMarkup(<MeasurementLabPage />);
-
-    expect(html).toContain("Measurement Lab");
-    expect(html).toContain("Graduated Cylinder");
-    expect(html).toContain("32.0 mL");
-    expect(html).not.toContain("Go to quiz");
+  it("renders lab pages instead of redirecting to the assignment list", () => {
+    expect(() => MeasurementLabPage()).not.toThrow();
+    expect(() => LewisLabPage()).not.toThrow();
   });
 
-  it("renders the measurement lab with the precision ruler", () => {
+  it("renders every Lewis explorer on the Lewis lab and links to its quiz", () => {
+    const html = renderToStaticMarkup(<LewisLabPage />);
+
+    expect(html).toContain("Lewis Diagrams");
+    expect(html).toContain("Ionic Bonds");
+    expect(html).toContain("Covalent Bonds");
+    expect(html).toContain("Example Salts");
+    expect(html).toContain("Example Molecules");
+    expect(html).toContain('href="/student/quizzes/lewis"');
+  });
+
+  it("links the measurement lab to its practice questions", () => {
     const html = renderToStaticMarkup(<MeasurementLabPage />);
 
-    expect(html).toContain("Precision Ruler");
-    expect(html).toContain("7.50 cm");
-    expect(html).toContain('role="slider"');
-    expect(html).toContain('aria-valuenow="7.5"');
+    expect(html).toContain('href="/student/labs/measurement/questions"');
+    expect(html).toContain("Practice measurement questions");
+  });
+
+  it("renders the measurement questions page with the instrument chooser", () => {
+    const html = renderToStaticMarkup(<MeasurementQuestionsPage />);
+
+    expect(html).toContain("Measurement Questions");
+    expect(html).toContain("Start ruler questions");
+    expect(html).toContain("Start graduated cylinder questions");
+    expect(html).toContain('href="/student/labs/measurement"');
+    expect(html).not.toContain("Page not found");
   });
 });

@@ -3,7 +3,7 @@
 import { createServiceClient } from "@/lib/server/database";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
 
-type SignupResult = { ok: true } | { ok: false; message: string };
+type SignupResult = { ok: true } | { ok: false; message: string; field?: "studentID" | "code" };
 
 export async function signupStudent(input: unknown): Promise<SignupResult> {
   if (!input || typeof input !== "object") return { ok: false, message: "Invalid signup details." };
@@ -23,7 +23,7 @@ export async function signupStudent(input: unknown): Promise<SignupResult> {
       .select("id, is_active").eq("class_code", code.trim().toUpperCase()).maybeSingle();
     if (error) return { ok: false, message: "Unable to create your account. Please try again." };
     if (!classroom || !classroom.is_active) {
-      return { ok: false, message: "That classroom code was not found or is inactive." };
+      return { ok: false, field: "code", message: "That classroom code was not found or is inactive." };
     }
     // Only these fields may be supplied. Signup never approves a student or creates a session.
     const { error: insertError } = await client.from("students").insert({
@@ -33,7 +33,7 @@ export async function signupStudent(input: unknown): Promise<SignupResult> {
       student_id: studentID.trim(),
       verified: false,
     });
-    if (insertError) return { ok: false, message: insertError.code === "23505"
+    if (insertError) return { ok: false, field: insertError.code === "23505" ? "studentID" : undefined, message: insertError.code === "23505"
       ? "That Student ID is already registered. Please sign in or contact your teacher."
       : "Unable to create your account. Please try again." };
     return { ok: true };

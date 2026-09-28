@@ -1,8 +1,10 @@
-export default function StudentGroupLayout({
-  children,
-}: Readonly<{
+import { redirect } from "next/navigation";
+import { getStudentSession } from "@/lib/auth/student-session";
+
+export default async function StudentGroupLayout({ children }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // TODO: verify session and student role; redirect if unauthorized
+  if (!(await getStudentSession())) redirect("/login/student");
+  // Each data reader also verifies current membership and availability.
   return <div className="min-h-screen bg-background">{children}</div>;
 }

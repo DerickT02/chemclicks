@@ -1,5 +1,7 @@
 # Step 6: student activity attempt acceptance checks
 
+> Updated integration behavior and validation: see [dev integration](student-attempts-dev-integration.md). Earlier session, activity-support and build notes below are historical.
+
 The teacher report is available from **Classrooms → Activity attempts** at
 `/admin/classes/[classId]/attempts`. Select an assigned activity and choose **View
 attempts**. Expand a student's history to see attempt numbers, status, start time,
