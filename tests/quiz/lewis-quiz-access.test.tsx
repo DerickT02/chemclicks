@@ -1,3 +1,5 @@
+vi.mock('@/lib/server/student-assignments', () => ({ getAssignmentAttempts: async () => [] }));
+vi.mock('@/app/(student)/student/assignments/[assignmentId]/AttemptControls', () => ({ default: () => <button>Start exploration</button> }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 

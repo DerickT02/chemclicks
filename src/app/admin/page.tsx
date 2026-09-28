@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { deleteOwnedClass } from "@/lib/server/classes";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
-import { deleteClass, listActiveClassesForTeacher } from "@/lib/db/classes";
+import { listActiveClassesForTeacher } from "@/lib/db/classes";
 
 
 type ProgressStatus = "not_started" | "in_progress" | "completed";
@@ -152,10 +153,7 @@ export default async function AdminPage({
     "use server";
     const id = formData.get("classId") as string;
     if (!id) return;
-    const supabase = await createClient();
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
-    await deleteClass(supabase, id);
+    await deleteOwnedClass(id);
     redirect("/admin");
   }
 
@@ -355,6 +353,9 @@ export default async function AdminPage({
                     </>
                   )}
                 </section>
+                <Link href={`/admin/classes/${selectedClass.id}/attempts`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+                  Activity attempts
+                </Link>
                 <div className="mt-7">
                   <h3 className="text-lg font-semibold text-foreground">Active students</h3>
                   {/* Live DB-backed list: once student signup writes records, students appear automatically here. */}

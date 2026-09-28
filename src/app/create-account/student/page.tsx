@@ -11,15 +11,7 @@ import {
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
-import {
-  insertStudent,
-  isDuplicateStudentUsernameError,
-} from "@/lib/db/students";
-import {
-  CLASS_CODE_LOOKUP_MESSAGE,
-  DATABASE_RETRY_MESSAGE,
-} from "@/lib/errors/user-facing-errors";
-import { createClient } from "@/lib/supabase/client";
+import { signupStudent } from "@/app/create-account/student/actions";
 
 export default function StudentCreateAccountPage() {
   const router = useRouter();
@@ -58,50 +50,19 @@ export default function StudentCreateAccountPage() {
 
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const { data: classRow, error: classError } = await supabase
-      .from("classes")
-      .select("id, is_active")
-      .eq("class_code", normalizedCode)
-      .maybeSingle();
-
-    if (classError) {
-      setCodeError(CLASS_CODE_LOOKUP_MESSAGE);
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!classRow) {
-      setCodeError("That classroom code was not found.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!classRow.is_active) {
-      setCodeError("That classroom is inactive.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    const { error: studentError } = await insertStudent(supabase, {
-      class_id: classRow.id,
-      first_name: normalizedFirstName,
-      last_name: normalizedLastName,
-      student_id: normalizedStudentID,
-    });
-
-    if (studentError) {
-      if (isDuplicateStudentUsernameError(studentError)) {
-        setStudentIDError(
-          `Student ID "${normalizedStudentID}" is already taken. Please choose a different Student ID.`,
-        );
-        setIsSubmitting(false);
+    try {
+      const response = await signupStudent({ firstName: normalizedFirstName, lastName: normalizedLastName, studentID: normalizedStudentID, code: normalizedCode });
+      if (!response.ok) {
+        if (response.field === 'studentID') setStudentIDError(response.message);
+        else if (response.field === 'code') setCodeError(response.message);
+        else setFormError(response.message);
         return;
       }
-
-      setFormError(DATABASE_RETRY_MESSAGE);
-      setIsSubmitting(false);
+    } catch {
+      setFormError("Unable to create your account. Please try again.");
       return;
+    } finally {
+      setIsSubmitting(false);
     }
 
     setFirstName(normalizedFirstName);

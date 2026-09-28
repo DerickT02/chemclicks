@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireTeacherId } from "@/lib/server/teacher";
 import { insertClassActivity, updateClassActivity } from "@/lib/db/class_activities";
 
 export type AssignmentFormState = { status: "idle" | "success" | "error"; message: string; };
@@ -117,12 +119,14 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
        }
      }
 
+     await requireTeacherId();
+     const writer = createAdminClient();
      const result = assignmentId
-           ? await updateClassActivity(supabase, assignmentId, {
+           ? await updateClassActivity(writer, assignmentId, {
                opens_at: opensAt,
                closes_at: closesAt,
              })
-           : await insertClassActivity(supabase, {
+           : await insertClassActivity(writer, {
                class_id: classId,
                activity_id: activityId,
                opens_at: opensAt,

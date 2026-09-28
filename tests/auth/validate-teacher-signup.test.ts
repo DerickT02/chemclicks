@@ -4,6 +4,7 @@ import {
   TEACHER_PASSWORD_FORBIDDEN_CHARS,
   TEACHER_PASSWORD_MIN_LENGTH,
   validateTeacherEmail,
+  validateTeacherDisplayName,
   validateTeacherPassword,
   validateTeacherSignup,
 } from "../../src/lib/auth/validate-teacher-signup";
@@ -162,6 +163,7 @@ describe("validateTeacherPassword allowed specials & ordering", () => {
 describe("validateTeacherSignup", () => {
   it("returns valid: true when all fields pass", () => {
     const result = validateTeacherSignup(
+      "Ms. Smith",
       "teacher@example.com",
       "CorrectHorse!1",
       "CorrectHorse!1",
@@ -175,8 +177,8 @@ describe("validateTeacherSignup", () => {
     const result = validateTeacherSignup(
       "",
       "teacher@example.com",
-      "TeacherPass1",
-      "TeacherPass1",
+      "TeacherPass!1",
+      "TeacherPass!1",
     );
     expect(result).toEqual({
       valid: false,
@@ -212,7 +214,7 @@ describe("validateTeacherSignup", () => {
 
       "Ms. Smith",
       "teacher@example.com",
-      "TeacherPass1",
+      "TeacherPass!1",
       "DifferentPass1",
     );
     expect(result).toEqual({
@@ -227,6 +229,7 @@ describe("validateTeacherSignup", () => {
 
   it("blocks submission when password contains a forbidden special", () => {
     const result = validateTeacherSignup(
+      "Ms. Smith",
       "teacher@example.com",
       "TeacherPass;1",
       "TeacherPass;1",
@@ -241,6 +244,7 @@ describe("validateTeacherSignup", () => {
 
   it("blocks submission when password contains spaces", () => {
     const result = validateTeacherSignup(
+      "Ms. Smith",
       "teacher@example.com",
       "Teacher Pass!1",
       "Teacher Pass!1",

@@ -1,6 +1,8 @@
 'use server';
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireTeacherId } from "@/lib/server/teacher";
 import { findClassByCode, insertClass, isDuplicateClassCodeError } from "@/lib/db/classes";
 import { DATABASE_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
@@ -50,7 +52,10 @@ export async function createClass(input: CreateClassInput): Promise<
     return { ok: false, field: "classCode", message: DUPLICATE_CODE_MESSAGE };
   }
 
-  const { data, error } = await insertClass(supabase, {
+  try { await requireTeacherId(); } catch {
+    return { ok: false, message: "An approved, verified teacher session is required." };
+  }
+  const { data, error } = await insertClass(createAdminClient(), {
     teacher_id: userData.user.id,
     name,
     section,
