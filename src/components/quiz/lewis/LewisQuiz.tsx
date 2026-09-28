@@ -6,19 +6,21 @@ import type { QuizCompleteResult, QuizQuestion } from "@/components/quiz/types";
 /** How many questions each student attempt draws from the pool. */
 const LEWIS_QUESTIONS_PER_ATTEMPT = 12;
 
-type LewisBondingQuizProps = {
+type LewisQuizProps = {
+  title: string;
   /** The full question pool, loaded from the database by the page. */
   questions: QuizQuestion[];
   onComplete?: (result: QuizCompleteResult) => void;
 };
 
-export default function LewisBondingQuiz({
+export default function LewisQuiz({
+  title,
   questions,
   onComplete,
-}: LewisBondingQuizProps) {
+}: LewisQuizProps) {
   return (
     <RandomizedQuiz
-      title="Lewis Structures & Bonding Quiz"
+      title={title}
       pool={questions}
       questionsPerAttempt={LEWIS_QUESTIONS_PER_ATTEMPT}
       passingThresholdPercent={80}

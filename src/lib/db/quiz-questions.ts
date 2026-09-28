@@ -4,7 +4,8 @@ import type { QuizQuestion } from "@/components/quiz/types";
 // Logic and types regarding the QUIZ_QUESTIONS table.
 
 export const BOHR_QUIZ_KEY = "bohr_models";
-export const LEWIS_QUIZ_KEY = "lewis_bonding";
+export const LEWIS_COVALENT_QUIZ_KEY = "lewis_covalent";
+export const LEWIS_IONIC_QUIZ_KEY = "lewis_ionic";
 
 type QuizQuestionRow = {
   question_key: string;

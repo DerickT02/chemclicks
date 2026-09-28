@@ -7,7 +7,10 @@ import PrecisionRuler from "@/components/measurement/PrecisionRuler";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
+import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
+
 import { hasActivityContent } from "@/lib/assignments/activity-content";
+import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,7 @@ export default async function AssignmentPage({ params }: {
   if (!assignment) notFound();
 
   const type = assignment.activity.type;
+  const quizKind = lewisQuizForLesson(type);
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -40,6 +44,7 @@ export default async function AssignmentPage({ params }: {
             )}
           </section>
         </AssignmentAccess>
+        {quizKind && <LewisQuizCard kind={quizKind} assignments={result.assignments} />}
       </div>
     </main>
   );

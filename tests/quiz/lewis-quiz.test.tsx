@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import LewisBondingQuiz from "@/components/quiz/lewis/LewisBondingQuiz";
+import LewisQuiz from "@/components/quiz/lewis/LewisQuiz";
 import type { QuizQuestion } from "@/components/quiz/types";
 
 afterEach(cleanup);
@@ -18,23 +18,30 @@ function makePool(size: number): QuizQuestion[] {
   }));
 }
 
-describe("LewisBondingQuiz", () => {
+describe("LewisQuiz", () => {
+  it("shows the title it is given", async () => {
+    render(<LewisQuiz title="Ionic Compounds Quiz" questions={makePool(4)} />);
+
+    await screen.findByText("Question 1 of 4");
+    expect(screen.getByText("Ionic Compounds Quiz")).toBeInTheDocument();
+  });
+
   it("draws a 12-question attempt from the pool it is given", async () => {
-    render(<LewisBondingQuiz questions={makePool(20)} />);
+    render(<LewisQuiz title="Covalent Compounds Quiz" questions={makePool(20)} />);
 
     expect(await screen.findByText("Question 1 of 12")).toBeInTheDocument();
     expect(screen.getByText(/^Database question \d+\?$/)).toBeInTheDocument();
   });
 
   it("uses every question when the pool is smaller than an attempt", async () => {
-    render(<LewisBondingQuiz questions={makePool(4)} />);
+    render(<LewisQuiz title="Covalent Compounds Quiz" questions={makePool(4)} />);
 
     expect(await screen.findByText("Question 1 of 4")).toBeInTheDocument();
   });
 
   it("scores answers against the correct index from the database", async () => {
     const user = userEvent.setup();
-    render(<LewisBondingQuiz questions={makePool(3)} />);
+    render(<LewisQuiz title="Ionic Compounds Quiz" questions={makePool(3)} />);
 
     await screen.findByText("Question 1 of 3");
     for (let n = 1; n <= 3; n += 1) {
