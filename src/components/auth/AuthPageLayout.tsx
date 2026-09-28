@@ -58,12 +58,18 @@ export function AuthField({
   label,
   id,
   error,
+  hint,
   ...inputProps
 }: {
   label: string;
   id: string;
   error?: string;
+  hint?: ReactNode;
 } & Omit<ComponentProps<"input">, "id" | "className">) {
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
+
   return (
     <div className="flex flex-col gap-1.5">
       <label
@@ -76,12 +82,17 @@ export function AuthField({
         id={id}
         className={`${authInputClassName} ${error ? authInputErrorClassName : ""}`}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={describedBy}
         {...inputProps}
       />
+      {hint ? (
+        <p id={hintId} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
       {error ? (
         <p
-          id={`${id}-error`}
+          id={errorId}
           className="text-sm text-destructive"
           role="alert"
         >

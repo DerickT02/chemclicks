@@ -6,7 +6,9 @@ import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
 import PrecisionRuler from "@/components/measurement/PrecisionRuler";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
+import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
 import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
+
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 
@@ -34,6 +36,7 @@ export default async function AssignmentPage({ params }: {
           <section className="rounded-xl border border-border bg-card p-6">
             {type === "lewis_diagram" && <LewisDotExplorer />}
             {type === "lewis_structures_ionic" && <IonicCompoundExplorer />}
+            {type === "lewis_structures_covalent" && <CovalentBondExplorer />}
             {type === "measurement_graduated_cylinder" && <GraduatedCylinder />}
             {(type === "measurement_ruler_tenths" || type === "measurement_ruler_hundredths") && <PrecisionRuler />}
             {!hasActivityContent(type) && (
