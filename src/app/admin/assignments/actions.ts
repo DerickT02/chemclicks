@@ -24,6 +24,11 @@ function parseUtcInput(value: string): string | null {
     throw new Error("Invalid date.");
   }
 
+  const year = Number(value.slice(0, 4));
+  if (year < 2000 || year > 2099) {
+    throw new Error("Invalid date.");
+  }
+
   const normalized = value.length === 16 ? `${value}:00` : value;
   const date = new Date(`${normalized}Z`);
 

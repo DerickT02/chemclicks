@@ -29,6 +29,9 @@ describe("AssignmentScheduleForm", () => {
     expect(screen.getByLabelText("Opens at — optional")).toHaveValue(
       "2026-09-12T08:00",
     );
+    expect(
+      screen.getByRole("button", { name: "Clear opening time" }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Closes at — optional")).toHaveValue("");
     expect(
       screen.getByRole("button", { name: "Save schedule" }),

@@ -318,6 +318,7 @@ export default async function AdminPage({
                                 </span>
                               </div>
                               <AssignmentScheduleForm
+                                key={`${assignment.id}:${assignment.opens_at ?? ""}:${assignment.closes_at ?? ""}`}
                                 classId={selectedClass.id}
                                 assignmentId={assignment.id}
                                 activityId={assignment.activity_id}

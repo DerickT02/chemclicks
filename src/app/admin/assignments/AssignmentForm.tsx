@@ -6,6 +6,7 @@ import {
   type AssignmentFormState,
 } from "@/app/admin/assignments/actions";
 import ActivityCatalog from "@/app/admin/assignments/ActivityCatalog";
+import UtcScheduleInputs from "@/app/admin/assignments/UtcScheduleInputs";
 import type { ActivityCatalogEntry } from "@/lib/db/activities";
 
 type Props = {
@@ -18,9 +19,6 @@ const initialState: AssignmentFormState = {
   status: "idle",
   message: "",
 };
-
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-foreground";
 
 export default function AssignmentForm({
   classId,
@@ -52,31 +50,12 @@ export default function AssignmentForm({
         Enter optional schedule times in UTC.
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block space-y-1 text-sm">
-          <span>Opens at — optional</span>
-          <input
-            type="datetime-local"
-            name="opens_at"
-            step="1"
-            value={opensAt}
-            onChange={(event) => setOpensAt(event.target.value)}
-            className={inputClass}
-          />
-        </label>
-
-        <label className="block space-y-1 text-sm">
-          <span>Closes at — optional</span>
-          <input
-            type="datetime-local"
-            name="closes_at"
-            step="1"
-            value={closesAt}
-            onChange={(event) => setClosesAt(event.target.value)}
-            className={inputClass}
-          />
-        </label>
-      </div>
+      <UtcScheduleInputs
+        opensAt={opensAt}
+        closesAt={closesAt}
+        onOpensAtChange={setOpensAt}
+        onClosesAtChange={setClosesAt}
+      />
 
       <p className="text-xs text-muted-foreground">
         Leave opening blank for immediate availability. Leave closing blank

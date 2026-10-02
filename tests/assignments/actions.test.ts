@@ -34,6 +34,7 @@ describe("teacher assignment action", () => {
     { class_id: "" },
     { activity_id: "" },
     { opens_at: "2026-02-30T12:00" },
+    { opens_at: "30000-01-01T12:00" },
     { opens_at: "2026-09-12T12:00", closes_at: "2026-09-12T12:00" },
     { opens_at: "2026-09-13T12:00", closes_at: "2026-09-12T12:00" },
   ])("rejects invalid form input before database access: %j", async (values) => {

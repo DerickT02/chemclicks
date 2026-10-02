@@ -5,6 +5,9 @@ import {
   saveAssignment,
   type AssignmentFormState,
 } from "@/app/admin/assignments/actions";
+import UtcScheduleInputs, {
+  isoToUtcDatetimeLocal,
+} from "@/app/admin/assignments/UtcScheduleInputs";
 
 type Props = {
   classId: string;
@@ -18,16 +21,6 @@ const initialState: AssignmentFormState = {
   status: "idle",
   message: "",
 };
-
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-foreground";
-
-function isoToUtcDatetimeLocal(iso: string | null): string {
-  if (!iso) return "";
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return "";
-  return new Date(ms).toISOString().slice(0, 19);
-}
 
 export default function AssignmentScheduleForm({
   classId,
@@ -55,35 +48,17 @@ export default function AssignmentScheduleForm({
 
       <p className="text-xs font-medium text-foreground">Adjust schedule (UTC)</p>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block space-y-1 text-sm">
-          <span>Opens at — optional</span>
-          <input
-            type="datetime-local"
-            name="opens_at"
-            step="1"
-            value={opensAt}
-            onChange={(event) => setOpensAt(event.target.value)}
-            className={inputClass}
-          />
-        </label>
-
-        <label className="block space-y-1 text-sm">
-          <span>Closes at — optional</span>
-          <input
-            type="datetime-local"
-            name="closes_at"
-            step="1"
-            value={closesAt}
-            onChange={(event) => setClosesAt(event.target.value)}
-            className={inputClass}
-          />
-        </label>
-      </div>
+      <UtcScheduleInputs
+        opensAt={opensAt}
+        closesAt={closesAt}
+        onOpensAtChange={setOpensAt}
+        onClosesAtChange={setClosesAt}
+      />
 
       <p className="text-xs text-muted-foreground">
         Leave opening blank for immediate availability. Leave closing blank for
-        no deadline.
+        no deadline. Use the clear links if the date picker will not empty the
+        field.
       </p>
 
       <button
