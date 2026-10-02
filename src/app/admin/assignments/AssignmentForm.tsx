@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import {
   saveAssignment,
   type AssignmentFormState,
 } from "@/app/admin/assignments/actions";
 import ActivityCatalog from "@/app/admin/assignments/ActivityCatalog";
+import UtcScheduleInputs from "@/app/admin/assignments/UtcScheduleInputs";
 import type { ActivityCatalogEntry } from "@/lib/db/activities";
 
 type Props = {
@@ -18,9 +19,6 @@ const initialState: AssignmentFormState = {
   status: "idle",
   message: "",
 };
-
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-foreground";
 
 export default function AssignmentForm({
   classId,
@@ -35,16 +33,29 @@ export default function AssignmentForm({
   const [activityId, setActivityId] = useState("");
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
-  const noActivities = activities.length === 0;
+  const assignedIds = useMemo(
+    () => new Set(assignedActivityIds),
+    [assignedActivityIds],
+  );
+  const availableActivities = useMemo(
+    () => activities.filter((activity) => !assignedIds.has(activity.id)),
+    [activities, assignedIds],
+  );
+  const selectedActivityId = availableActivities.some(
+    (activity) => activity.id === activityId,
+  )
+    ? activityId
+    : "";
+  const canAssign = availableActivities.length > 0;
 
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="class_id" value={classId} />
       <input type="hidden" name="assignment_id" value="" />
       <ActivityCatalog
-        activities={activities}
-        assignedActivityIds={assignedActivityIds}
-        selectedActivityId={activityId}
+        activities={availableActivities}
+        totalCatalogCount={activities.length}
+        selectedActivityId={selectedActivityId}
         onSelect={setActivityId}
       />
 
@@ -52,31 +63,12 @@ export default function AssignmentForm({
         Enter optional schedule times in UTC.
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block space-y-1 text-sm">
-          <span>Opens at — optional</span>
-          <input
-            type="datetime-local"
-            name="opens_at"
-            step="1"
-            value={opensAt}
-            onChange={(event) => setOpensAt(event.target.value)}
-            className={inputClass}
-          />
-        </label>
-
-        <label className="block space-y-1 text-sm">
-          <span>Closes at — optional</span>
-          <input
-            type="datetime-local"
-            name="closes_at"
-            step="1"
-            value={closesAt}
-            onChange={(event) => setClosesAt(event.target.value)}
-            className={inputClass}
-          />
-        </label>
-      </div>
+      <UtcScheduleInputs
+        opensAt={opensAt}
+        closesAt={closesAt}
+        onOpensAtChange={setOpensAt}
+        onClosesAtChange={setClosesAt}
+      />
 
       <p className="text-xs text-muted-foreground">
         Leave opening blank for immediate availability. Leave closing blank
@@ -85,7 +77,7 @@ export default function AssignmentForm({
 
       <button
         type="submit"
-        disabled={pending || noActivities || !activityId}
+        disabled={pending || !canAssign || !selectedActivityId}
         className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground disabled:opacity-50"
       >
         {pending ? "Saving…" : "Assign activity"}

@@ -11,7 +11,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
       const builder: Record<string, (...args: unknown[]) => unknown> = {};
-      for (const method of ["select", "eq", "or", "order", "range"]) {
+      for (const method of ["select", "eq", "is", "or", "order", "range"]) {
         builder[method] = (...args: unknown[]) => {
           mocks.calls.push({ table, method, args });
           return builder;
@@ -58,6 +58,9 @@ describe("getStudentAssignments", () => {
     ]));
     expect(callsTo("class_activities", "eq")).toEqual([
       expect.objectContaining({ args: ["class_id", classId] }),
+    ]);
+    expect(callsTo("class_activities", "is")).toEqual([
+      expect.objectContaining({ args: ["archived_at", null] }),
     ]);
     const windowFilters = callsTo("class_activities", "or").map((call) => call.args[0]);
     expect(windowFilters).toEqual([
