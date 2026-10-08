@@ -128,6 +128,16 @@ export function formatIonSymbol(ion: Ion): string {
   return `${ion.symbol}${formatCharge(ion.charge)}`;
 }
 
+/**
+ * Charge written beside an ion's brackets, magnitude before sign with a 1 left
+ * out, e.g. "+", "3+", "−", "2−". Full-size characters stay legible where
+ * superscript glyphs would shrink to a speck.
+ */
+export function formatChargeLabel(charge: number): string {
+  const magnitude = Math.abs(charge);
+  return `${magnitude > 1 ? magnitude : ""}${charge > 0 ? "+" : MINUS_SIGN}`;
+}
+
 /** Explicit signed charge text, e.g. "+1" or "−2". */
 export function formatChargeValue(charge: number): string {
   return `${charge > 0 ? "+" : MINUS_SIGN}${Math.abs(charge)}`;
@@ -142,6 +152,31 @@ export function describeIon(ion: Ion): string {
 /** Cation-to-anion count ratio, e.g. "2:3". */
 export function getAtomRatio(compound: IonicCompound): string {
   return `${compound.cation.count}:${compound.anion.count}`;
+}
+
+export type IonRole = "cation" | "anion";
+
+/** One ion within a formula unit, with an id that is stable across renders. */
+export type FormulaUnitIon = { id: string; role: IonRole; ion: Ion };
+
+/**
+ * Every ion in one formula unit, alternating so the more numerous ion surrounds
+ * the other, e.g. NaCl → Na Cl, CaF₂ → F Ca F, Al₂O₃ → O Al O Al O.
+ */
+export function getFormulaUnitIons(compound: IonicCompound): readonly FormulaUnitIon[] {
+  const expand = (role: IonRole, ion: Ion): FormulaUnitIon[] =>
+    Array.from({ length: ion.count }, (_, index) => ({ id: `${role}-${index + 1}`, role, ion }));
+
+  const cations = expand("cation", compound.cation);
+  const anions = expand("anion", compound.anion);
+  const [first, second] = anions.length > cations.length ? [anions, cations] : [cations, anions];
+
+  const ordered: FormulaUnitIon[] = [];
+  for (let index = 0; index < first.length; index += 1) {
+    ordered.push(first[index]);
+    if (index < second.length) ordered.push(second[index]);
+  }
+  return ordered;
 }
 
 export function getNetCharge(compound: IonicCompound): number {
@@ -176,5 +211,6 @@ export function describeFormation(compound: IonicCompound): string {
     `Each ${cation.elementName.toLowerCase()} atom gives up ${cationLoss} ${electronWord(cationLoss)} and becomes ${formatIonSymbol(cation)}.`,
     `Each ${anion.elementName.toLowerCase()} atom gains ${anionGain} ${electronWord(anionGain)} and becomes ${formatIonSymbol(anion)}.`,
     `${total} ${electronWord(total)} ${total === 1 ? "moves" : "move"} in total, so ${cation.count} ${formatIonSymbol(cation)} and ${anion.count} ${formatIonSymbol(anion)} combine to give a net charge of 0.`,
+    "The attraction between these oppositely charged ions is the ionic bond.",
   ].join(" ");
 }
