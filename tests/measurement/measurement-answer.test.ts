@@ -46,7 +46,7 @@ describe("evaluateAnswer with the ruler", () => {
 
   it("accepts readings at the ends of the scale", () => {
     expect(evaluateAnswer("0.00", 0, RULER_SPEC).status).toBe("correct");
-    expect(evaluateAnswer("15.00", 15, RULER_SPEC).status).toBe("correct");
+    expect(evaluateAnswer("10.00", 10, RULER_SPEC).status).toBe("correct");
   });
 });
 
@@ -84,7 +84,7 @@ describe("evaluateAnswer with the graduated cylinder", () => {
 describe("evaluateAnswer against the current instrument position", () => {
   it("grades the same answer differently when the reading changes", () => {
     expect(evaluateAnswer("4.37", 4.37, RULER_SPEC).status).toBe("correct");
-    expect(evaluateAnswer("4.37", 11.62, RULER_SPEC).status).toBe("incorrect");
+    expect(evaluateAnswer("4.37", 6.62, RULER_SPEC).status).toBe("incorrect");
     expect(evaluateAnswer("41.7", 41.7, CYLINDER_SPEC).status).toBe("correct");
     expect(evaluateAnswer("41.7", 23.4, CYLINDER_SPEC).status).toBe("incorrect");
   });
@@ -121,13 +121,13 @@ describe("evaluateAnswer input validation", () => {
   });
 
   it("rejects numbers outside the instrument's scale", () => {
-    expect(grade("15.01")).toMatchObject({ status: "invalid", code: "out-of-range" });
+    expect(grade("10.01")).toMatchObject({ status: "invalid", code: "out-of-range" });
     expect(grade("-0.50")).toMatchObject({ status: "invalid", code: "out-of-range" });
     expect(evaluateAnswer("50.1", 23.4, CYLINDER_SPEC)).toMatchObject({
       status: "invalid",
       code: "out-of-range",
     });
-    expect(grade("15.01").message).toContain("from 0 to 15 cm");
+    expect(grade("10.01").message).toContain("from 0 to 10 cm");
   });
 
   it("uses an example with the instrument's precision", () => {

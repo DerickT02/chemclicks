@@ -55,7 +55,9 @@ export default async function AssignmentPage({ params }: {
             {type === "lewis_structures_ionic" && <IonicCompoundExplorer />}
             {type === "lewis_structures_covalent" && <CovalentBondExplorer />}
             {type === "measurement_graduated_cylinder" && <GraduatedCylinder />}
-            {(type === "measurement_ruler_tenths" || type === "measurement_ruler_hundredths") && <PrecisionRuler />}
+            {(type === "measurement_ruler_tenths" || type === "measurement_ruler_hundredths") && (
+              <PrecisionRuler precision={type === "measurement_ruler_tenths" ? "tenths" : "hundredths"} />
+            )}
             {!hasActivityContent(type) && (
               <p className="text-muted-foreground">This activity’s exercise is not available yet.</p>
             )}

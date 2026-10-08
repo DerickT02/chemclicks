@@ -10,6 +10,25 @@ import {
 } from "../../src/components/measurement/PrecisionRuler";
 
 describe("precision ruler measurement helpers", () => {
+  it("spans exactly 0–10 centimeters", () => {
+    expect(RULER_MIN_CM).toBe(0);
+    expect(RULER_MAX_CM).toBe(10);
+  });
+
+  it("rounds tenths mode to 0.1 cm, including exact half steps", () => {
+    expect(quantizeCm(3.44, "tenths")).toBe(3.4);
+    expect(quantizeCm(3.46, "tenths")).toBe(3.5);
+    for (let tenth = 0; tenth < 100; tenth++) {
+      expect(quantizeCm((tenth + 0.5) / 10, "tenths")).toBe((tenth + 1) / 10);
+    }
+  });
+
+  it("formats tenths with one decimal place and clamps both endpoints", () => {
+    expect(formatCm(-5, "tenths")).toBe("0.0");
+    expect(formatCm(3.44, "tenths")).toBe("3.4");
+    expect(formatCm(9.99, "tenths")).toBe("10.0");
+    expect(formatCm(20, "tenths")).toBe("10.0");
+  });
   it("starts at a reading inside the ruler's range", () => {
     expect(DEFAULT_CM).toBeGreaterThanOrEqual(RULER_MIN_CM);
     expect(DEFAULT_CM).toBeLessThanOrEqual(RULER_MAX_CM);
@@ -31,13 +50,13 @@ describe("precision ruler measurement helpers", () => {
     expect(formatCm(0)).toBe("0.00");
     expect(formatCm(3.4)).toBe("3.40");
     expect(formatCm(3.456)).toBe("3.46");
-    expect(formatCm(RULER_MAX_CM)).toBe("15.00");
+    expect(formatCm(RULER_MAX_CM)).toBe("10.00");
   });
 
   it("keeps the cursor position and the readout in sync", () => {
     // The cursor is drawn from the quantized value and the badge from the
     // formatted one, so re-quantizing has to be a no-op or the two can drift.
-    for (const sample of [-1, 0, 0.004, 2.225, 7.5, 14.999, 20]) {
+    for (const sample of [-1, 0, 0.004, 2.225, 7.5, 9.999, 20]) {
       const quantized = quantizeCm(sample);
 
       expect(formatCm(sample)).toBe(quantized.toFixed(2));
