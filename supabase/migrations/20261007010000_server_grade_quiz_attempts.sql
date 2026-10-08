@@ -15,7 +15,7 @@ DECLARE
   assignment_type text;
   expected_questions integer;
   answer jsonb;
-  question_key text;
+  submitted_question_key text;
   selected_index integer;
   correct_index integer;
   option_count integer;
@@ -103,8 +103,8 @@ BEGIN
 
   FOR answer IN SELECT value FROM jsonb_array_elements(p_answers)
   LOOP
-    question_key := answer->>'questionId';
-    IF question_key IS NULL OR question_key = ''
+    submitted_question_key := answer->>'questionId';
+    IF submitted_question_key IS NULL OR submitted_question_key = ''
        OR (answer->>'selectedIndex') IS NULL
        OR (answer->>'selectedIndex') !~ '^[0-9]+$' THEN
       RAISE EXCEPTION 'Invalid quiz answer' USING ERRCODE = '22023';
@@ -116,7 +116,7 @@ BEGIN
       INTO correct_index, option_count
       FROM public.quiz_questions qq
       WHERE qq.quiz_key = p_quiz_key
-        AND qq.question_key = question_key
+        AND qq.question_key = submitted_question_key
         AND qq.is_active;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Quiz question is unavailable' USING ERRCODE = '22023';
