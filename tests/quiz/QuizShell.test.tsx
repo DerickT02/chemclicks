@@ -113,4 +113,17 @@ describe("QuizShell", () => {
       screen.queryByRole("link", { name: "Continue to next section" }),
     ).not.toBeInTheDocument();
   });
+
+  it("shows a retry action when saving the final result fails", async () => {
+    const { user } = renderQuiz({
+      onSubmit: vi.fn().mockRejectedValue(new Error("Save failed")),
+    });
+
+    await answerQuestion(user, "Nucleus");
+    await user.click(screen.getByRole("button", { name: "Next question" }));
+    await answerQuestion(user, "2");
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Save failed");
+    expect(screen.getByRole("button", { name: "Retry save" })).toBeEnabled();
+  });
 });
