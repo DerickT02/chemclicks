@@ -16,6 +16,7 @@ export function shuffleQuestionOptions(question: QuizQuestion): QuizQuestion {
   const entries = question.options.map((option, index) => ({
     option,
     isCorrect: index === question.correctIndex,
+    originalIndex: index,
   }));
   shuffleInPlace(entries);
 
@@ -23,6 +24,7 @@ export function shuffleQuestionOptions(question: QuizQuestion): QuizQuestion {
     ...question,
     options: entries.map((entry) => entry.option),
     correctIndex: entries.findIndex((entry) => entry.isCorrect),
+    answerOrder: entries.map((entry) => entry.originalIndex),
   };
 }
 

@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const getUser = vi.hoisted(() => vi.fn());
+const getAccess = vi.hoisted(() => vi.fn());
 const listQuestions = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
     throw new Error(`REDIRECT:${path}`);
   },
 }));
+vi.mock("@/lib/assignments/bohr-quiz-access", () => ({
+  getBohrQuizAccess: getAccess,
+}));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: { getUser } }),
+  createClient: async () => ({}),
 }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_QUIZ_KEY: "bohr_models",
@@ -30,14 +33,17 @@ const question = {
 };
 
 beforeEach(() => {
-  getUser.mockReset();
+  getAccess.mockReset();
   listQuestions.mockReset();
-  getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+  getAccess.mockResolvedValue({
+    status: "available",
+    assignment: { id: "assignment-1", opens_at: null, closes_at: null },
+  });
 });
 
 describe("Bohr quiz page", () => {
   it("sends signed-out visitors to the student login without reading questions", async () => {
-    getUser.mockResolvedValue({ data: { user: null } });
+    getAccess.mockResolvedValue({ status: "unauthenticated" });
 
     await expect(BohrModelQuizPage()).rejects.toThrow("REDIRECT:/login/student");
     expect(listQuestions).not.toHaveBeenCalled();
