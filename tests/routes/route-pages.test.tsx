@@ -61,6 +61,15 @@ describe("route page behavior", () => {
     expect(html).toContain("Practice measurement questions");
   });
 
+  it("offers only the tenths ruler in the measurement lab", () => {
+    const html = renderToStaticMarkup(<MeasurementLabPage />);
+
+    expect(html).toContain("Ruler — Tenths");
+    expect(html).toContain("nearest tenth of a centimeter");
+    expect(html).toContain('aria-valuetext="5.0 centimeters"');
+    expect(html.toLowerCase()).not.toContain("hundredth");
+  });
+
   it("renders the measurement questions page with the instrument chooser", () => {
     const html = renderToStaticMarkup(<MeasurementQuestionsPage />);
 

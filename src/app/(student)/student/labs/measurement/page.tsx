@@ -5,7 +5,7 @@ import PrecisionRuler from "@/components/measurement/PrecisionRuler";
 
 export const metadata: Metadata = {
   title: "Measurement Lab | ChemClicks",
-  description: "Practice reading a graduated cylinder at the bottom of the meniscus.",
+  description: "Practice reading a ruler to tenths and a graduated cylinder at the bottom of the meniscus.",
 };
 
 // Activities must be opened through a class assignment with server access checks.
@@ -35,12 +35,12 @@ export default function MeasurementLabPage() {
         </article>
 
         <article className="rounded-xl border border-border bg-card p-6">
-          <h2 className="font-semibold text-foreground">Precision Ruler</h2>
+          <h2 className="font-semibold text-foreground">Ruler — Tenths</h2>
           <p className="mt-2 mb-6 text-sm text-muted-foreground">
-            Drag the cursor, or focus it and use the arrow keys, to read the ruler to the
-            hundredth of a centimeter.
+            Drag the cursor, or focus it and use the arrow keys, to read the 0–10 cm ruler
+            to the nearest tenth of a centimeter.
           </p>
-          <PrecisionRuler />
+          <PrecisionRuler precision="tenths" />
         </article>
       </div>
     </div>
