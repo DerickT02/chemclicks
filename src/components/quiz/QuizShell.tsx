@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import Link from "next/link";
 import type { QuizShellProps } from "./types";
 
 const primaryButtonClassName =
@@ -106,6 +107,9 @@ export default function QuizShell({
             ? `Passed — you needed ${passingThresholdPercent}% or higher.`
             : `Not passed — you need at least ${passingThresholdPercent}% to pass.`}
         </p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Quiz results are not saved or visible to your teacher.
+        </p>
         <div className="mt-8 flex flex-wrap gap-4">
           <button
             type="button"
@@ -114,11 +118,9 @@ export default function QuizShell({
           >
             Try again
           </button>
-          {passed && (
-            <button type="button" className={primaryButtonClassName}>
-              Continue to next section
-            </button>
-          )}
+          <Link href="/student" className={passed ? primaryButtonClassName : secondaryButtonClassName}>
+            Back to assignments
+          </Link>
         </div>
       </article>
     );

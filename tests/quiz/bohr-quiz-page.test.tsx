@@ -50,6 +50,9 @@ describe("Bohr quiz page", () => {
 
     expect(listQuestions).toHaveBeenCalledWith(expect.anything(), "bohr_models");
     expect(html).toContain("Quiz with 2 questions");
+    expect(html).toContain("Quiz results are not saved or visible to your teacher.");
+    expect(html).toContain('href="/student/labs/bohr-models"');
+    expect(html).not.toContain("before moving on");
     expect(html).not.toContain('role="alert"');
   });
 

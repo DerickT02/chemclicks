@@ -204,9 +204,11 @@ describe("QuizShell", () => {
         name: "Continue to next section",
       }),
     ).not.toBeInTheDocument();
+    expect(within(results!).getByRole("link", { name: "Back to assignments" })).toHaveAttribute("href", "/student");
+    expect(within(results!).getByText("Quiz results are not saved or visible to your teacher.")).toBeInTheDocument();
   });
 
-  it("shows completion state with pass messaging and continue button", async () => {
+  it("shows completion state with pass messaging and a real return link", async () => {
     const { user } = renderQuiz();
 
     await answerCurrent(user, "Nucleus");
@@ -226,9 +228,8 @@ describe("QuizShell", () => {
       within(results!).getByRole("status"),
     ).toHaveTextContent("Passed — you needed 80% or higher.");
     expect(
-      within(results!).getByRole("button", {
-        name: "Continue to next section",
-      }),
-    ).toBeInTheDocument();
+      within(results!).getByRole("link", { name: "Back to assignments" }),
+    ).toHaveAttribute("href", "/student");
+    expect(within(results!).getByText("Quiz results are not saved or visible to your teacher.")).toBeInTheDocument();
   });
 });

@@ -3,11 +3,13 @@ import Link from "next/link";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
+import { getLewisQuizAccess } from "@/lib/assignments/lewis-quiz-access";
+import { LEWIS_QUIZZES, type LewisQuizKind } from "@/lib/assignments/lewis-quizzes";
 
 export const metadata: Metadata = {
   title: "Lewis Structures — ChemClicks",
   description:
-    "Draw Lewis diagrams for elements 1–20, then explore how atoms form ionic and covalent bonds.",
+    "Explore Lewis diagrams for elements 1–20, then see how atoms form ionic and covalent bonds.",
 };
 
 const SECTIONS = [
@@ -31,13 +33,25 @@ const SECTIONS = [
   },
 ];
 
-export default function LewisDotDiagramsPage() {
+export default async function LewisDotDiagramsPage() {
+  const kinds: LewisQuizKind[] = ["covalent", "ionic"];
+  const quizzes = await Promise.all(kinds.map(async (kind) => ({
+    ...LEWIS_QUIZZES[kind],
+    access: await getLewisQuizAccess(kind),
+  })));
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
 
         {/* Page header */}
         <header className="mb-10">
+          <Link href="/student/labs" className="mb-4 inline-block text-sm text-foreground underline">
+            Back to practice labs
+          </Link>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Untracked practice — exploring here does not record assignment completion.
+          </p>
           <div className="flex items-center gap-3 mb-3">
             <span className="text-4xl" aria-hidden="true">🧪</span>
             <div>
@@ -65,15 +79,35 @@ export default function LewisDotDiagramsPage() {
           ))}
         </div>
 
-        {/* Quiz CTA */}
-        <div className="mt-10 flex justify-center">
-          <Link
-            href="/student/quizzes/lewis"
-            className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90"
-          >
-            Go to quiz →
+        <section className="mt-10" aria-labelledby="lewis-quizzes">
+          <h2 id="lewis-quizzes" className="text-xl font-semibold text-foreground">Check your understanding</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Quizzes are available while the matching class lesson is open. Quiz results are not saved or visible to your teacher.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {quizzes.map(({ title, path, access }) => (
+              <article key={path} className="rounded-xl border border-border bg-card p-6">
+                <h3 className="font-semibold text-foreground">{title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {access.status === "available" ? "Available now."
+                    : access.status === "scheduled" ? "Your lesson is scheduled but not open yet."
+                    : access.status === "closed" ? "Your lesson is closed; this quiz is unavailable."
+                    : access.status === "error" ? access.message
+                    : access.status === "unauthenticated" ? "Sign in to check your class assignments."
+                    : "The matching lesson has not been assigned to your class."}
+                </p>
+                {access.status === "available" ? (
+                  <Link href={path} className="mt-4 inline-flex rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
+                    Start quiz
+                  </Link>
+                ) : null}
+              </article>
+            ))}
+          </div>
+          <Link href="/student" className="mt-4 inline-block text-sm text-foreground underline">
+            Back to assignments
           </Link>
-        </div>
+        </section>
 
       </div>
     </div>
