@@ -1,4 +1,4 @@
--- SCRUM: persist quiz-specific metadata on the existing student_attempts table.
+-- SCRUM 135: persist quiz-specific metadata on the existing student_attempts table.
 -- Exploration attempts continue to use NULL quiz_key. Quiz attempts are scoped
 -- by quiz identity so they can coexist with exploration attempts for the same
 -- assigned activity.
