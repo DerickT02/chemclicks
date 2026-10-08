@@ -66,7 +66,7 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
   const meniscusEdgeY = meniscusY - 5;
   const meniscusPath = `M 106 ${meniscusEdgeY} Q 155 ${meniscusY + 5} 204 ${meniscusEdgeY}`;
   const waterPath = `${meniscusPath} L 204 400 L 106 400 Z`;
-  const labelY = Math.min(397, Math.max(38, meniscusY - 14));
+  const labelY = meniscusY - 14;
   const formattedVolume = volumeMl.toFixed(1);
 
   return (
@@ -81,6 +81,9 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
             ? "Graduated cylinder holding water"
             : "Graduated cylinder with adjustable water volume"}
         </title>
+        <desc>
+          Read the volume at the bottom of the meniscus, indicated by the arrow and horizontal guide line.
+        </desc>
         <defs>
           <linearGradient id={glassGradientId} x1="0" x2="1">
             <stop offset="0" stopColor="#cbd5e1" stopOpacity="0.28" />
@@ -217,12 +220,30 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
           strokeWidth="1"
         />
 
+        {/* The curve's center is its lowest point and the level used to read the scale. */}
+        {volumeMl > 0 && (
+          <g aria-hidden="true" pointerEvents="none">
+            <line
+              x1="106"
+              x2="218"
+              y1={meniscusY}
+              y2={meniscusY}
+              stroke="var(--accent)"
+              strokeWidth="2"
+            />
+            <path
+              d={`M 218 ${meniscusY - 7} L 218 ${meniscusY + 7} L 206 ${meniscusY} Z`}
+              fill="var(--accent)"
+            />
+          </g>
+        )}
+
         {/* A locked cylinder is a question, so neither the badge nor a slider may give away the volume. */}
         {!isLocked && (
           <>
-            <g transform={`translate(218 ${labelY})`} aria-hidden="true">
+            <g transform={`translate(234 ${labelY})`} aria-hidden="true">
               <rect
-                width="100"
+                width="84"
                 height="28"
                 rx="14"
                 fill="var(--card)"
@@ -230,11 +251,11 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
                 strokeOpacity="0.55"
               />
               <text
-                x="50"
+                x="42"
                 y="18.5"
                 textAnchor="middle"
                 fill="var(--accent)"
-                className="font-mono text-[13px] font-semibold"
+                className="font-mono text-[16px] font-semibold"
               >
                 {formattedVolume} mL
               </text>
