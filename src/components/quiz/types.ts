@@ -20,6 +20,7 @@ export type QuizCompleteResult = {
   passed: boolean;
   attemptId?: string;
   attemptNumber?: number;
+  nextDestination?: string | null;
 };
 
 export type QuizShellProps = {

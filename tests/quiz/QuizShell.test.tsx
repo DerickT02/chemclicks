@@ -231,4 +231,29 @@ describe("QuizShell", () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it("renders the server-authorized next destination for a saved pass", async () => {
+    const { user } = renderQuiz({
+      onSubmit: vi.fn().mockResolvedValue({
+        score: 5,
+        total: 5,
+        percent: 100,
+        passed: true,
+        attemptId: "attempt-1",
+        nextDestination: "/student/assignments/next",
+      }),
+    });
+
+    await answerCurrent(user, "Nucleus");
+    await answerCurrent(user, "2");
+    await answerCurrent(user, "8");
+    await answerCurrent(user, "Neon");
+    await selectOption(user, "Closest to the nucleus");
+    await submitAnswer(user);
+    await goNext(user);
+
+    expect(
+      screen.getByRole("link", { name: "Continue to next section" }),
+    ).toHaveAttribute("href", "/student/assignments/next");
+  });
 });

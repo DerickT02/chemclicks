@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useState } from "react";
 import type {
   QuizAnswer,
@@ -158,14 +159,22 @@ export default function QuizShell({
           <button
             type="button"
             onClick={resetQuiz}
-            className={passed ? secondaryButtonClassName : primaryButtonClassName}
+            className={result.passed ? secondaryButtonClassName : primaryButtonClassName}
           >
             Try again
           </button>
-          {result.passed && result.attemptId && (
+          {result.passed && result.nextDestination && (
+            <Link
+              href={result.nextDestination}
+              className={primaryButtonClassName}
+            >
+              Continue to next section
+            </Link>
+          )}
+          {result.passed && result.attemptId && !result.nextDestination && (
             <p className="text-sm text-muted-foreground">
-              Your passing result is saved. The next-section destination will
-              be enabled by the prerequisite access check.
+              Your passing result is saved. No next assigned section is
+              currently available.
             </p>
           )}
           {result.passed && !onSubmit && (
