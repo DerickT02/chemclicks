@@ -73,7 +73,21 @@ describe.each([
 
     expect(listQuestions).toHaveBeenCalledWith(expect.anything(), quizKey);
     expect(html).toContain(`${title} with 3 questions`);
+    expect(html).toContain("Quiz results are not saved or visible to your teacher.");
+    expect(html).toContain('href="/student"');
+    expect(html).not.toContain("before moving on");
     expect(html).not.toContain('role="alert"');
+  });
+
+  it.each([
+    ["scheduled", "This quiz is not open yet."],
+    ["closed", "This quiz is closed."],
+    ["locked", "This quiz is locked."],
+  ])("explains %s access without reading quiz content", async (status, message) => {
+    getAccess.mockResolvedValue({ status, assignment: { id: "assignment-1" } });
+    const html = await render();
+    expect(html).toContain(message);
+    expect(listQuestions).not.toHaveBeenCalled();
   });
 
   it("shows a failure state instead of an empty or successful-looking quiz", async () => {

@@ -28,9 +28,10 @@ export default async function LewisQuizPage({ kind }: Props) {
     <div className="min-h-screen-below-nav bg-background px-4 py-10 md:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-2">
+          <Link href="/student" className="text-sm text-foreground underline">Back to assignments</Link>
           <h1 className="text-3xl font-semibold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground">
-            Complete this quiz before moving on to the next section.
+            Check your understanding. Quiz results are not saved or visible to your teacher.
           </p>
         </header>
 
@@ -38,15 +39,22 @@ export default async function LewisQuizPage({ kind }: Props) {
           <p role="alert" className="text-sm text-destructive">
             {access.message}
           </p>
-        ) : access.status === "locked" ? (
+        ) : access.status !== "available" ? (
           <div
             role="status"
             className="space-y-3 rounded-lg border border-dashed border-border p-6"
           >
-            <p className="font-semibold text-foreground">This quiz is locked.</p>
+            <p className="font-semibold text-foreground">
+              {access.status === "scheduled" ? "This quiz is not open yet."
+                : access.status === "closed" ? "This quiz is closed."
+                : "This quiz is locked."}
+            </p>
             <p className="text-muted-foreground">
-              Your teacher must assign the {lessonTitle} lesson to your class
-              before you can take this quiz.
+              {access.status === "scheduled"
+                ? `Your ${lessonTitle} lesson is scheduled. Return when the assignment opens.`
+                : access.status === "closed"
+                ? `Your ${lessonTitle} lesson is no longer open. Further quiz answers are unavailable; quiz results are not saved.`
+                : `Your teacher must assign the ${lessonTitle} lesson to your class before you can take this quiz.`}
             </p>
             <Link href="/student" className="text-accent underline">
               Back to assignments
