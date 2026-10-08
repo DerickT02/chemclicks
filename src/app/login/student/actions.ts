@@ -28,6 +28,17 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
 
   // Student ID and classroom code remain the student-facing credentials. The
   // successful lookup is exchanged for a standard Supabase Auth session.
+  try {
+    return await establishStudentSession(normalizedStudentID, normalizedCode);
+  } catch {
+    return { ok: false, field: "form", message: SESSION_RETRY_MESSAGE };
+  }
+}
+
+async function establishStudentSession(
+  normalizedStudentID: string,
+  normalizedCode: string,
+): ReturnType<typeof loginStudent> {
   const supabase = createAdminClient();
 
   const { data: classRow, error: classError } = await supabase
@@ -68,14 +79,9 @@ export async function loginStudent(studentID: string, classroomCode: string): Pr
     };
   }
 
-  try {
-    await createStudentSupabaseSession(supabase, student);
-  } catch {
-    return {
-      ok: false,
-      field: "form",
-      message: SESSION_RETRY_MESSAGE,
-    };
+  const sessionError = await createStudentSupabaseSession(supabase, student);
+  if (sessionError !== null) {
+    return { ok: false, field: "form", message: SESSION_RETRY_MESSAGE };
   }
 
   return { ok: true };

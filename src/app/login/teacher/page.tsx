@@ -13,7 +13,7 @@ import {
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
-import { INVALID_CREDENTIALS_MESSAGE } from "@/lib/errors/user-facing-errors";
+import { DATABASE_RETRY_MESSAGE, INVALID_CREDENTIALS_MESSAGE } from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TeacherLoginPage() {
@@ -45,10 +45,6 @@ function TeacherLoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const verificationRequired = searchParams.get("verification") === "required";
 
-  async function handleForgottenPassword() {
-    // TODO. Blank for SCRUM-184.
-  }
-
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setEmailError(undefined);
@@ -58,7 +54,6 @@ function TeacherLoginForm() {
     const nextEmailError = validateTeacherEmail(email);
     if (nextEmailError) {
       setEmailError(nextEmailError);
-      setPassword("");
       return;
     }
 
@@ -69,37 +64,43 @@ function TeacherLoginForm() {
 
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const normalizedEmail = email.trim();
+    try {
+      const supabase = createClient();
+      const normalizedEmail = email.trim();
 
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
 
-    if (signInError) {
-      setFormError(INVALID_CREDENTIALS_MESSAGE);
-      setPassword("");
+      if (signInError) {
+        setFormError(INVALID_CREDENTIALS_MESSAGE);
+        setPassword("");
+        return;
+      }
+
+      // Teacher membership is separate from student access; no administrator approval is required.
+      const { data: teacher, error: teacherError } = await supabase
+        .from("teachers")
+        .select("id")
+        .eq("id", signInData.user.id)
+        .maybeSingle();
+
+      if (teacherError || !teacher) {
+        setFormError(teacherError
+          ? DATABASE_RETRY_MESSAGE
+          : "This account does not have a teacher profile. Sign in with a teacher account.");
+        setPassword("");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      router.push("/admin");
+    } catch {
+      setFormError(DATABASE_RETRY_MESSAGE);
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    // Confirm the user has an approved teacher account in public.teachers
-    const { data: teacher, error: teacherError } = await supabase
-      .from("teachers")
-      .select("id")
-      .eq("id", signInData.user.id)
-      .maybeSingle();
-
-    if (teacherError || !teacher) {
-      await supabase.auth.signOut();
-      setFormError("This account is not approved as a teacher. Please contact your administrator.");
-      setPassword("");
-      setIsSubmitting(false);
-      return;
-    }
-
-    router.push("/admin");
   }
 
   return (
@@ -111,13 +112,6 @@ function TeacherLoginForm() {
             <Link href="/create-account/teacher" className={authSecondaryLinkClassName}>
               Create account
             </Link>
-            <button
-              type="button"
-              onClick={() => void handleForgottenPassword()}
-              className={authSecondaryLinkClassName}
-            >
-              Forgot password?
-            </button>
             <Link href="/login/student" className={authSecondaryLinkClassName}>
               Not a teacher?
             </Link>
