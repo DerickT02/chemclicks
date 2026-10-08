@@ -26,10 +26,8 @@ export default function QuizShell({
   const [index, setIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
-  const [localResult, setLocalResult] = useState<QuizCompleteResult | null>(null);
   const [serverResult, setServerResult] = useState<QuizCompleteResult | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -49,20 +47,14 @@ export default function QuizShell({
 
   const current = questions[index];
   const total = questions.length;
-  const percent = total === 0 ? 0 : Math.round((score / total) * 100);
-  const passed = percent >= passingThresholdPercent;
-  const isCorrect =
-    selectedIndex !== null && selectedIndex === current.correctIndex;
 
   function resetQuiz() {
     onRetry?.();
     setIndex(0);
     setSelectedIndex(null);
     setSubmitted(false);
-    setScore(0);
     setFinished(false);
     setAnswers([]);
-    setLocalResult(null);
     setServerResult(null);
     setSubmissionError(null);
     setSubmitting(false);
@@ -74,7 +66,9 @@ export default function QuizShell({
     setSubmitting(true);
     setSubmissionError(null);
     try {
-      setServerResult(await onSubmit(finalAnswers));
+      const result = await onSubmit(finalAnswers);
+      setServerResult(result);
+      onComplete?.(result);
     } catch (error) {
       setSubmissionError(
         error instanceof Error
@@ -89,27 +83,15 @@ export default function QuizShell({
   async function handleSubmit() {
     if (selectedIndex === null || submitted) return;
 
-    const correct = selectedIndex === current.correctIndex;
-    const nextScore = score + (correct ? 1 : 0);
     const answer: QuizAnswer = {
       questionId: current.id,
       selectedIndex: current.answerOrder?.[selectedIndex] ?? selectedIndex,
     };
     const nextAnswers = [...answers, answer];
-    setScore(nextScore);
     setAnswers(nextAnswers);
     setSubmitted(true);
 
     if (index === total - 1) {
-      const finalPercent = Math.round((nextScore / total) * 100);
-      const localResult = {
-        score: nextScore,
-        total,
-        percent: finalPercent,
-        passed: finalPercent >= passingThresholdPercent,
-      };
-      setLocalResult(localResult);
-      onComplete?.(localResult);
       await saveFinalResult(nextAnswers);
     }
   }
@@ -133,7 +115,22 @@ export default function QuizShell({
   }
 
   if (finished) {
-    const result = serverResult ?? localResult ?? { score, total, percent, passed };
+    if (!serverResult) {
+      return (
+        <article className="rounded-2xl border border-border bg-card p-8 md:p-10">
+          <h2 className="text-2xl font-semibold text-foreground md:text-3xl">
+            {title}
+          </h2>
+          <p className="mt-6 text-lg text-destructive" role="alert">
+            The server did not return a quiz result. Please try again.
+          </p>
+          <button type="button" onClick={resetQuiz} className={primaryButtonClassName}>
+            Try again
+          </button>
+        </article>
+      );
+    }
+    const result = serverResult;
     return (
       <article className="rounded-2xl border border-border bg-card p-8 md:p-10">
         <h2 className="text-2xl font-semibold text-foreground md:text-3xl">
@@ -207,19 +204,9 @@ export default function QuizShell({
           {current.options.map((option, optionIndex) => {
             const optionId = `${groupId}-option-${index}-${optionIndex}`;
             const selected = selectedIndex === optionIndex;
-            const showResult = submitted && selected;
-            const showCorrectAnswer =
-              submitted && optionIndex === current.correctIndex;
-
             let optionStateClass =
               "border-border bg-background hover:border-ring/60";
-            if (showCorrectAnswer) {
-              optionStateClass =
-                "border-accent bg-accent/10 text-foreground";
-            } else if (showResult && !isCorrect) {
-              optionStateClass =
-                "border-destructive bg-destructive/10 text-foreground";
-            } else if (selected && !submitted) {
+            if (selected && !submitted) {
               optionStateClass = "border-ring bg-muted";
             }
 
@@ -250,14 +237,10 @@ export default function QuizShell({
 
       {submitted && (
         <p
-          className={`mt-6 text-base font-medium md:text-lg ${
-            isCorrect ? "text-accent" : "text-destructive"
-          }`}
+          className="mt-6 text-base font-medium text-muted-foreground md:text-lg"
           role="status"
         >
-          {isCorrect
-            ? "Correct!"
-            : `Incorrect. The correct answer is: ${current.options[current.correctIndex]}`}
+          Answer recorded. Continue to the next question.
         </p>
       )}
 

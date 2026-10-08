@@ -29,7 +29,6 @@ const question = {
   id: "bohr-boron-outer",
   question: "How many?",
   options: ["2", "3"],
-  correctIndex: 1,
 };
 
 beforeEach(() => {

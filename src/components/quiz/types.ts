@@ -2,8 +2,6 @@ export type QuizQuestion = {
   id: string;
   question: string;
   options: string[];
-  /** Zero-based index of the correct option in `options`. */
-  correctIndex: number;
   /** Maps a displayed option index back to the authored/database index. */
   answerOrder?: number[];
 };

@@ -46,7 +46,7 @@ function assignmentOf(type: string, window: { opens_at?: string | null; closes_a
 const covalentLesson = assignmentOf("lewis_structures_covalent");
 const ionicLesson = assignmentOf("lewis_structures_ionic");
 const diagram = assignmentOf("lewis_diagram");
-const question = { id: "q1", question: "Q?", options: ["A", "B"], correctIndex: 0 };
+const question = { id: "q1", question: "Q?", options: ["A", "B"] };
 
 const withAssignments = (assignments: unknown[]) =>
   mocks.reader.mockResolvedValue({ status: "ok", assignments });

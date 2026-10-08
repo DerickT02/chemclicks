@@ -15,15 +15,13 @@ function shuffleInPlace<T>(items: T[]): T[] {
 export function shuffleQuestionOptions(question: QuizQuestion): QuizQuestion {
   const entries = question.options.map((option, index) => ({
     option,
-    isCorrect: index === question.correctIndex,
-    originalIndex: index,
+    originalIndex: question.answerOrder?.[index] ?? index,
   }));
   shuffleInPlace(entries);
 
   return {
     ...question,
     options: entries.map((entry) => entry.option),
-    correctIndex: entries.findIndex((entry) => entry.isCorrect),
     answerOrder: entries.map((entry) => entry.originalIndex),
   };
 }
