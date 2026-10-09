@@ -16,6 +16,7 @@ export default function CreateClassPage() {
   const [hasGenerated, setHasGenerated] = useState(false);
   const [classCodeError, setClassCodeError] = useState<string | undefined>();
   const [classNameError, setClassNameError] = useState<string | undefined>();
+  const [nameSectionError, setNameSectionError] = useState<string | undefined>();
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [submitSuccess, setSubmitSuccess] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
@@ -58,6 +59,7 @@ export default function CreateClassPage() {
     if (busyRef.current) return;
     setClassCodeError(undefined);
     setClassNameError(undefined);
+    setNameSectionError(undefined);
     setSubmitError(undefined);
     setSubmitSuccess(undefined);
 
@@ -85,6 +87,8 @@ export default function CreateClassPage() {
         if (!result.ok) {
           if (result.field === "classCode") {
             setClassCodeError(result.message);
+          } else if (result.field === "nameSection") {
+            setNameSectionError(result.message);
           } else {
             setSubmitError(result.message);
           }
@@ -105,6 +109,10 @@ export default function CreateClassPage() {
   }
 
   const isCodeComplete = classCode.length === 6;
+  const classNameDescribedBy =
+    [classNameError ? "className-error" : null, nameSectionError ? "nameSection-error" : null]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   return (
     <div className="min-h-screen bg-background p-6 text-foreground md:p-10">
@@ -141,10 +149,11 @@ export default function CreateClassPage() {
               onChange={(e) => {
                 setClassName(e.target.value);
                 if (classNameError) setClassNameError(undefined);
+                if (nameSectionError) setNameSectionError(undefined);
                 if (submitError) setSubmitError(undefined);
               }}
-              aria-invalid={classNameError ? true : undefined}
-              aria-describedby={classNameError ? "className-error" : undefined}
+              aria-invalid={classNameError || nameSectionError ? true : undefined}
+              aria-describedby={classNameDescribedBy}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
             />
             {classNameError ? (
@@ -166,9 +175,20 @@ export default function CreateClassPage() {
               autoComplete="off"
               placeholder="e.g. Fall 2026 · Room 204"
               value={section}
-              onChange={(e) => setSection(e.target.value)}
+              onChange={(e) => {
+                setSection(e.target.value);
+                if (nameSectionError) setNameSectionError(undefined);
+                if (submitError) setSubmitError(undefined);
+              }}
+              aria-invalid={nameSectionError ? true : undefined}
+              aria-describedby={nameSectionError ? "nameSection-error" : undefined}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
             />
+            {nameSectionError ? (
+              <p id="nameSection-error" className="text-sm text-destructive" role="alert">
+                {nameSectionError}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2">

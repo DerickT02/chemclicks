@@ -4,8 +4,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTeacherId } from "@/lib/server/teacher";
-import { findClassByCode, insertClass, isDuplicateClassCodeError } from "@/lib/db/classes";
+import {
+  findClassByCode,
+  insertClass,
+  isDuplicateClassCodeError,
+  isDuplicateClassNameSectionError,
+  teacherHasClassNamed,
+} from "@/lib/db/classes";
 import { isValidClassCode, normalizeClassCode, randomClassCode } from "@/lib/classes/class-code";
+import { normalizeClassLabel } from "@/lib/classes/class-name";
 import { DATABASE_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 type CreateClassInput = {
@@ -20,6 +27,8 @@ const DUPLICATE_CODE_MESSAGE =
   "That class code is already in use. Please choose a different code.";
 const GENERATION_EXHAUSTED_MESSAGE =
   "Couldn't generate a unique code. Try again or enter one manually.";
+const DUPLICATE_NAME_SECTION_MESSAGE =
+  "You already have a class with this name and section. Change the name or section and try again.";
 
 type UniqueCodeResult = { ok: true; code: string } | { ok: false; message: string };
 
@@ -50,9 +59,9 @@ export async function generateClassCode(): Promise<UniqueCodeResult> {
 
 export async function createClass(input: CreateClassInput): Promise<
   | { ok: true; classId: string; classCode: string }
-  | { ok: false; message: string; field?: "classCode" }
+  | { ok: false; message: string; field?: "classCode" | "nameSection" }
 > {
-  const name = typeof input.className === "string" ? input.className.trim() : "";
+  const name = typeof input.className === "string" ? normalizeClassLabel(input.className) : "";
   if (!name) return { ok: false, message: "Class name is required." };
 
   const codeSource = input.codeSource === "generated" ? "generated" : "manual";
@@ -66,7 +75,7 @@ export async function createClass(input: CreateClassInput): Promise<
     };
   }
 
-  const section = typeof input.section === "string" ? input.section.trim() : "";
+  const section = typeof input.section === "string" ? normalizeClassLabel(input.section) : "";
 
   const supabase = await createClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -90,6 +99,19 @@ export async function createClass(input: CreateClassInput): Promise<
   }
   const admin = createAdminClient();
 
+  const { exists: nameTaken, error: nameLookupError } = await teacherHasClassNamed(
+    admin,
+    userData.user.id,
+    name,
+    section,
+  );
+  if (nameLookupError) {
+    return { ok: false, message: DATABASE_RETRY_MESSAGE };
+  }
+  if (nameTaken) {
+    return { ok: false, field: "nameSection", message: DUPLICATE_NAME_SECTION_MESSAGE };
+  }
+
   for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
     const { data, error } = await insertClass(admin, {
       teacher_id: userData.user.id,
@@ -99,6 +121,10 @@ export async function createClass(input: CreateClassInput): Promise<
     });
 
     if (data && !error) return { ok: true, classId: data.id, classCode: data.class_code };
+
+    if (error && isDuplicateClassNameSectionError(error)) {
+      return { ok: false, field: "nameSection", message: DUPLICATE_NAME_SECTION_MESSAGE };
+    }
 
     if (!error || !isDuplicateClassCodeError(error)) {
       return { ok: false, message: DATABASE_RETRY_MESSAGE };
