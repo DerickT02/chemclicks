@@ -24,7 +24,7 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                   ?? student.attempts.filter((attempt) => attempt.kind === 'quiz' || (attempt.kind === undefined && attempt.quizKey != null)).length
                 return (
                   <p className="mt-1">
-                    {student.attemptCount} {student.attemptCount === 1 ? 'attempt' : 'attempts'} · {explorationCount} exploration · {quizCount} quizzes · {student.completedCount} completed · {student.inProgressCount} in progress
+                    {student.attemptCount} {student.attemptCount === 1 ? 'attempt' : 'attempts'} · {explorationCount} exploration {explorationCount === 1 ? 'attempt' : 'attempts'} · {quizCount} quiz {quizCount === 1 ? 'attempt' : 'attempts'} · {student.completedCount} completed · {student.inProgressCount} in progress
                   </p>
                 )
               })()}
