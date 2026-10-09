@@ -23,9 +23,8 @@ export async function recordMeasurementAnswerAction(
 export async function completeMeasurementQuizAction(
   assignmentId: string,
   attemptId: string,
-  submissionKey: string,
 ) {
-  const attempt = await completeStudentMeasurementQuiz(assignmentId, attemptId, submissionKey);
+  const attempt = await completeStudentMeasurementQuiz(assignmentId, attemptId);
   revalidatePath(`/student/assignments/${assignmentId}`);
   return {
     attemptId: attempt.id,

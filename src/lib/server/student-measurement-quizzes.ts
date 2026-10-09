@@ -140,12 +140,11 @@ export async function recordStudentMeasurementAnswer(
 export async function completeStudentMeasurementQuiz(
   assignmentId: string,
   attemptId: string,
-  submissionKey: string,
 ): Promise<StudentAttempt> {
   const session = await getStudentSession();
   if (!session) throw new Error("A student session is required.");
   if (!UUID_PATTERN.test(assignmentId) || !UUID_PATTERN.test(attemptId)
-    || !UUID_PATTERN.test(submissionKey)) {
+  ) {
     throw new Error("Invalid measurement quiz completion.");
   }
 
@@ -156,7 +155,6 @@ export async function completeStudentMeasurementQuiz(
       p_class_id: session.classId,
       p_assignment_id: assignmentId,
       p_attempt_id: attemptId,
-      p_submission_key: submissionKey,
     },
   );
   if (error || !Array.isArray(data) || data.length !== 1) {

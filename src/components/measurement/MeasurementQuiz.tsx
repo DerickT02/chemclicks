@@ -484,8 +484,7 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
     if (!assignmentId || !question.attemptId || question.attemptNumber === undefined) return;
     setPending(true);
     setError(null);
-    const submissionKey = crypto.randomUUID();
-    completeMeasurementQuizAction(assignmentId, question.attemptId, submissionKey)
+    completeMeasurementQuizAction(assignmentId, question.attemptId)
       .then((result) => dispatch({
         type: "server-complete",
         attemptId: result.attemptId,
