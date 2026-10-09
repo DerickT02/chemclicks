@@ -10,9 +10,11 @@ import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
 import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
+import MeasurementQuiz from "@/components/measurement/MeasurementQuiz";
 
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
+import { measurementQuizModeForActivity } from "@/lib/measurement/modes";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,7 @@ export default async function AssignmentPage({ params }: {
 
   const type = assignment.activity.type;
   const quizKind = lewisQuizForLesson(type);
+  const measurementQuizMode = measurementQuizModeForActivity(type);
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
   const latest = attempts[0];
   return (
@@ -60,6 +63,12 @@ export default async function AssignmentPage({ params }: {
               <p className="text-muted-foreground">This activity’s exercise is not available yet.</p>
             )}
           </section>
+          {measurementQuizMode && (
+            <section className="rounded-xl border border-border bg-card p-6">
+              <h2 className="mb-4 text-xl font-semibold">Measurement quiz</h2>
+              <MeasurementQuiz mode={measurementQuizMode.key} />
+            </section>
+          )}
         </AssignmentAccess>
         {quizKind && <LewisQuizCard kind={quizKind} assignments={result.assignments} />}
       </div>

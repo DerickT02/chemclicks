@@ -32,6 +32,10 @@ import {
   type QuizAction,
   type ResultsState,
 } from "@/lib/measurement/quiz";
+import {
+  getMeasurementQuizMode,
+  type MeasurementQuizModeKey,
+} from "@/lib/measurement/modes";
 
 const PROMPTS: Record<InstrumentId, string> = {
   ruler: "What length does the cursor point to on the ruler?",
@@ -110,10 +114,30 @@ function Verdict({ success, title, message, children }: VerdictProps) {
 
 type ChooserProps = {
   returned: boolean;
+  assignedMode?: MeasurementQuizModeKey;
   onStart: (instrument: InstrumentId) => void;
 };
 
-function InstrumentChooser({ returned, onStart }: ChooserProps) {
+function InstrumentChooser({ returned, assignedMode, onStart }: ChooserProps) {
+  const mode = assignedMode ? getMeasurementQuizMode(assignedMode) : null;
+
+  if (mode) {
+    return (
+      <Panel heading="Start your measurement quiz" focusHeading={returned}>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {`${mode.spec.name}: report each reading to ${describeDecimalPlaces(mode.spec.decimals)}.`}
+        </p>
+        <button
+          type="button"
+          onClick={() => onStart(mode.instrument)}
+          className={`${PRIMARY_BUTTON_CLASS} mt-5`}
+        >
+          Start quiz
+        </button>
+      </Panel>
+    );
+  }
+
   // On first load, leave focus where the browser put it.
   return (
     <Panel heading="Choose an instrument" focusHeading={returned}>
@@ -176,10 +200,13 @@ function Feedback({ result, countedInScore }: FeedbackProps) {
 type QuestionProps = {
   question: QuestionState;
   dispatch: (action: QuizAction) => void;
+  assignedMode?: MeasurementQuizModeKey;
 };
 
-export function MeasurementQuestion({ question, dispatch }: QuestionProps) {
-  const spec = INSTRUMENTS[question.instrument];
+export function MeasurementQuestion({ question, dispatch, assignedMode }: QuestionProps) {
+  const spec = question.mode
+    ? getMeasurementQuizMode(question.mode).spec
+    : INSTRUMENTS[question.instrument];
   const reading = currentReading(question);
   const questionCount = question.readings.length;
   const isLastQuestion = question.questionIndex === questionCount - 1;
@@ -207,7 +234,7 @@ export function MeasurementQuestion({ question, dispatch }: QuestionProps) {
     <Panel
       heading={`${spec.name} question ${question.questionIndex + 1} of ${questionCount}`}
       focusHeading
-      action={
+      action={!assignedMode && (
         <button
           type="button"
           onClick={() => dispatch({ type: "choose-instrument" })}
@@ -215,7 +242,7 @@ export function MeasurementQuestion({ question, dispatch }: QuestionProps) {
         >
           Choose a different instrument
         </button>
-      }
+      )}
     >
       <p className="mt-2 text-foreground">{PROMPTS[question.instrument]}</p>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -327,12 +354,15 @@ export function MeasurementQuestion({ question, dispatch }: QuestionProps) {
 
 type ResultsProps = {
   results: ResultsState;
+  assignedMode?: MeasurementQuizModeKey;
   onTryAgain: () => void;
   onChooseInstrument: () => void;
 };
 
-export function AttemptResults({ results, onTryAgain, onChooseInstrument }: ResultsProps) {
-  const spec = INSTRUMENTS[results.instrument];
+export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInstrument }: ResultsProps) {
+  const spec = results.mode
+    ? getMeasurementQuizMode(results.mode).spec
+    : INSTRUMENTS[results.instrument];
   const passed = hasPassed(results.score, results.total);
   const percent = Math.round((results.score / results.total) * 100);
 
@@ -354,31 +384,44 @@ export function AttemptResults({ results, onTryAgain, onChooseInstrument }: Resu
         <button type="button" onClick={onTryAgain} className={PRIMARY_BUTTON_CLASS}>
           Try again with new questions
         </button>
-        <button type="button" onClick={onChooseInstrument} className={SECONDARY_BUTTON_CLASS}>
-          Choose a different instrument
-        </button>
+        {!assignedMode && (
+          <button type="button" onClick={onChooseInstrument} className={SECONDARY_BUTTON_CLASS}>
+            Choose a different instrument
+          </button>
+        )}
       </div>
     </Panel>
   );
 }
 
-export default function MeasurementQuiz() {
+type MeasurementQuizProps = {
+  assignmentId?: string;
+  mode?: MeasurementQuizModeKey;
+};
+
+export default function MeasurementQuiz({ mode }: MeasurementQuizProps) {
   const [state, dispatch] = useReducer(quizReducer, INITIAL_QUIZ_STATE);
 
   // The random draw happens here, in an event handler, rather than in the
   // reducer: React can call a reducer twice and needs the same result both times.
   function startAttempt(instrument: InstrumentId) {
-    dispatch({ type: "start", instrument, readings: pickReadings(instrument) });
+    dispatch({
+      type: "start",
+      instrument,
+      mode: mode ?? null,
+      readings: pickReadings(instrument, Math.random, mode ?? null),
+    });
   }
 
   if (state.phase === "choosing") {
-    return <InstrumentChooser returned={state.returned} onStart={startAttempt} />;
+    return <InstrumentChooser returned={state.returned} assignedMode={mode} onStart={startAttempt} />;
   }
 
   if (state.phase === "results") {
     return (
       <AttemptResults
         results={state}
+        assignedMode={mode}
         onTryAgain={() => startAttempt(state.instrument)}
         onChooseInstrument={() => dispatch({ type: "choose-instrument" })}
       />
@@ -390,6 +433,7 @@ export default function MeasurementQuiz() {
       key={`${state.instrument}-${state.questionIndex}`}
       question={state}
       dispatch={dispatch}
+        assignedMode={mode}
     />
   );
 }
