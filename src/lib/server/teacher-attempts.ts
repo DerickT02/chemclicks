@@ -14,6 +14,8 @@ export type TeacherActivityAttemptSummary = {
     lastName: string
     verified: boolean
     attemptCount: number
+    explorationAttemptCount?: number
+    quizAttemptCount?: number
     completedCount: number
     inProgressCount: number
     attempts: {
@@ -22,6 +24,14 @@ export type TeacherActivityAttemptSummary = {
       status: 'in_progress' | 'completed'
       startedAt: string
       completedAt: string | null
+      kind?: 'exploration' | 'quiz'
+      quizKey?: string | null
+      instrument?: 'ruler' | 'cylinder' | null
+      precisionMode?: 'tenths' | 'hundredths' | null
+      score?: number | null
+      questionTotal?: number | null
+      percentage?: number | null
+      passed?: boolean | null
     }[]
   }[]
 }
