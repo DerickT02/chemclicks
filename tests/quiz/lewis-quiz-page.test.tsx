@@ -33,7 +33,6 @@ const question = {
   id: "lewis-n2-bond",
   question: "How many bonds?",
   options: ["Single", "Triple"],
-  correctIndex: 1,
 };
 
 beforeEach(() => {

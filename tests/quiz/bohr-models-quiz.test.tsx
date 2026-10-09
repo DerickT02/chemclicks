@@ -14,7 +14,7 @@ function makePool(size: number): QuizQuestion[] {
     id: `q-${index + 1}`,
     question: `Database question ${index + 1}?`,
     options: ["Wrong A", "Right", "Wrong B", "Wrong C"],
-    correctIndex: 1,
+    answerOrder: [0, 1, 2, 3],
   }));
 }
 
@@ -32,21 +32,15 @@ describe("BohrModelsQuiz", () => {
     expect(await screen.findByText("Question 1 of 5")).toBeInTheDocument();
   });
 
-  it("scores answers against the correct index from the database", async () => {
+  it("does not reveal answer correctness in the client", async () => {
     const user = userEvent.setup();
     render(<BohrModelsQuiz questions={makePool(3)} />);
 
     await screen.findByText("Question 1 of 3");
-    for (let n = 1; n <= 3; n += 1) {
-      await user.click(screen.getByRole("radio", { name: "Right" }));
-      await user.click(screen.getByRole("button", { name: "Submit" }));
-      expect(screen.getByRole("status")).toHaveTextContent("Correct!");
-      await user.click(
-        screen.queryByRole("button", { name: "Next question" }) ??
-          screen.getByRole("button", { name: "See results" }),
-      );
-    }
+    await user.click(screen.getByRole("radio", { name: "Right" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
 
-    expect(screen.getByText(/Score: 3 \/ 3 \(100%\)/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Answer recorded");
+    expect(screen.queryByText("Correct!")).not.toBeInTheDocument();
   });
 });

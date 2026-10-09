@@ -38,7 +38,7 @@ describe("listQuizQuestions", () => {
     ]);
   });
 
-  it("maps rows to the quiz question shape the quiz shell already uses", async () => {
+  it("maps rows without exposing the database answer key", async () => {
     const { client } = fakeClient({ data: [row], error: null });
 
     const result = await listQuizQuestions(client, BOHR_QUIZ_KEY);
@@ -49,7 +49,7 @@ describe("listQuizQuestions", () => {
         id: "bohr-boron-outer",
         question: row.question,
         options: ["2", "5", "8", "3"],
-        correctIndex: 3,
+        answerOrder: [0, 1, 2, 3],
       },
     ]);
   });
