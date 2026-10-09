@@ -36,6 +36,12 @@ import {
   getMeasurementQuizMode,
   type MeasurementQuizModeKey,
 } from "@/lib/measurement/modes";
+import { useState } from "react";
+import {
+  completeMeasurementQuizAction,
+  recordMeasurementAnswerAction,
+  startMeasurementQuizAction,
+} from "@/app/(student)/student/assignments/[assignmentId]/measurement-actions";
 
 const PROMPTS: Record<InstrumentId, string> = {
   ruler: "What length does the cursor point to on the ruler?",
@@ -115,10 +121,11 @@ function Verdict({ success, title, message, children }: VerdictProps) {
 type ChooserProps = {
   returned: boolean;
   assignedMode?: MeasurementQuizModeKey;
+  pending?: boolean;
   onStart: (instrument: InstrumentId) => void;
 };
 
-function InstrumentChooser({ returned, assignedMode, onStart }: ChooserProps) {
+function InstrumentChooser({ returned, assignedMode, pending = false, onStart }: ChooserProps) {
   const mode = assignedMode ? getMeasurementQuizMode(assignedMode) : null;
 
   if (mode) {
@@ -129,6 +136,7 @@ function InstrumentChooser({ returned, assignedMode, onStart }: ChooserProps) {
         </p>
         <button
           type="button"
+          disabled={pending}
           onClick={() => onStart(mode.instrument)}
           className={`${PRIMARY_BUTTON_CLASS} mt-5`}
         >
@@ -201,9 +209,19 @@ type QuestionProps = {
   question: QuestionState;
   dispatch: (action: QuizAction) => void;
   assignedMode?: MeasurementQuizModeKey;
+  pending?: boolean;
+  onSubmit?: (question: QuestionState) => void;
+  onContinue?: (question: QuestionState) => void;
 };
 
-export function MeasurementQuestion({ question, dispatch, assignedMode }: QuestionProps) {
+export function MeasurementQuestion({
+  question,
+  dispatch,
+  assignedMode,
+  pending = false,
+  onSubmit,
+  onContinue,
+}: QuestionProps) {
   const spec = question.mode
     ? getMeasurementQuizMode(question.mode).spec
     : INSTRUMENTS[question.instrument];
@@ -224,7 +242,8 @@ export function MeasurementQuestion({ question, dispatch, assignedMode }: Questi
     // Invalid and incorrect answers keep the student on the input to retry. A
     // correct answer mounts the Next button, which takes focus with autoFocus.
     inputRef.current?.focus();
-    dispatch({ type: "submit" });
+    if (onSubmit) onSubmit(question);
+    else dispatch({ type: "submit" });
   }
 
   const continueLabel = isLastQuestion ? "See results" : "Next question";
@@ -294,6 +313,7 @@ export function MeasurementQuestion({ question, dispatch, assignedMode }: Questi
                 dispatch({ type: "edit-answer", answer: event.target.value })
               }
               readOnly={isCorrect}
+              disabled={pending}
               aria-invalid={result?.status === "invalid"}
               aria-describedby={`${hintId} ${feedbackId}`}
               className="w-32 rounded-md border border-border bg-background px-3 py-2 font-mono text-foreground outline-none read-only:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive"
@@ -303,7 +323,7 @@ export function MeasurementQuestion({ question, dispatch, assignedMode }: Questi
             </span>
           </div>
           {!isCorrect && (
-            <button type="submit" className={PRIMARY_BUTTON_CLASS}>
+            <button type="submit" disabled={pending} className={PRIMARY_BUTTON_CLASS}>
               Check answer
             </button>
           )}
@@ -331,7 +351,7 @@ export function MeasurementQuestion({ question, dispatch, assignedMode }: Questi
               key="next"
               type="button"
               autoFocus
-              onClick={() => dispatch({ type: "next" })}
+              onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
               className={PRIMARY_BUTTON_CLASS}
             >
               {continueLabel}
@@ -340,7 +360,7 @@ export function MeasurementQuestion({ question, dispatch, assignedMode }: Questi
             <button
               key="skip"
               type="button"
-              onClick={() => dispatch({ type: "next" })}
+              onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
               className={SECONDARY_BUTTON_CLASS}
             >
               {isLastQuestion ? "Skip and see results" : "Skip to next question"}
@@ -363,7 +383,7 @@ export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInst
   const spec = results.mode
     ? getMeasurementQuizMode(results.mode).spec
     : INSTRUMENTS[results.instrument];
-  const passed = hasPassed(results.score, results.total);
+  const passed = results.passed ?? hasPassed(results.score, results.total);
   const percent = Math.round((results.score / results.total) * 100);
 
   // The button that finished the attempt is gone, so focus starts on the score.
@@ -379,6 +399,11 @@ export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInst
           message={`You answered ${results.score} of ${results.total} correctly on the first try (${percent}%). Passing takes ${passingScore(results.total)} of ${results.total} (${PASS_PERCENT}%).`}
         />
       </div>
+      {results.attemptNumber !== undefined && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {`Attempt ${results.attemptNumber}${results.attemptId ? ` · ${results.attemptId}` : ""}`}
+        </p>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-3">
         <button type="button" onClick={onTryAgain} className={PRIMARY_BUTTON_CLASS}>
@@ -399,12 +424,30 @@ type MeasurementQuizProps = {
   mode?: MeasurementQuizModeKey;
 };
 
-export default function MeasurementQuiz({ mode }: MeasurementQuizProps) {
+export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizProps) {
   const [state, dispatch] = useReducer(quizReducer, INITIAL_QUIZ_STATE);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // The random draw happens here, in an event handler, rather than in the
   // reducer: React can call a reducer twice and needs the same result both times.
   function startAttempt(instrument: InstrumentId) {
+    setError(null);
+    if (mode && assignmentId) {
+      setPending(true);
+      startMeasurementQuizAction(assignmentId, mode)
+        .then((attempt) => dispatch({
+          type: "start",
+          instrument,
+          mode,
+          readings: attempt.questions.map((question) => question.reading),
+          attemptId: attempt.attemptId,
+          attemptNumber: attempt.attemptNumber,
+        }))
+        .catch(() => setError("The quiz could not be started. Please try again."))
+        .finally(() => setPending(false));
+      return;
+    }
     dispatch({
       type: "start",
       instrument,
@@ -413,27 +456,81 @@ export default function MeasurementQuiz({ mode }: MeasurementQuizProps) {
     });
   }
 
+  function submitAnswer(question: QuestionState) {
+    if (!assignmentId || !question.attemptId) return;
+    setPending(true);
+    setError(null);
+    recordMeasurementAnswerAction(
+      assignmentId,
+      question.attemptId,
+      question.questionIndex,
+      question.answer,
+    )
+      .then((receipt) => dispatch({
+        type: "server-submit",
+        result: receipt.result,
+        counted: receipt.counted,
+        firstTryCorrect: receipt.firstTryCorrect,
+      }))
+      .catch(() => setError("Your answer could not be saved. Please try again."))
+      .finally(() => setPending(false));
+  }
+
+  function continueQuestion(question: QuestionState) {
+    if (question.questionIndex < question.readings.length - 1) {
+      dispatch({ type: "next" });
+      return;
+    }
+    if (!assignmentId || !question.attemptId || question.attemptNumber === undefined) return;
+    setPending(true);
+    setError(null);
+    const submissionKey = crypto.randomUUID();
+    completeMeasurementQuizAction(assignmentId, question.attemptId, submissionKey)
+      .then((result) => dispatch({
+        type: "server-complete",
+        attemptId: result.attemptId,
+        attemptNumber: result.attemptNumber,
+        score: result.score,
+        total: result.total,
+        passed: result.passed,
+      }))
+      .catch(() => setError("The quiz could not be completed. Please try again."))
+      .finally(() => setPending(false));
+  }
+
   if (state.phase === "choosing") {
-    return <InstrumentChooser returned={state.returned} assignedMode={mode} onStart={startAttempt} />;
+    return <>
+      {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
+      <InstrumentChooser returned={state.returned} assignedMode={mode} pending={pending} onStart={startAttempt} />
+    </>;
   }
 
   if (state.phase === "results") {
     return (
+      <>
+      {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
       <AttemptResults
         results={state}
         assignedMode={mode}
         onTryAgain={() => startAttempt(state.instrument)}
         onChooseInstrument={() => dispatch({ type: "choose-instrument" })}
       />
+      </>
     );
   }
 
   return (
+    <>
+    {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
     <MeasurementQuestion
       key={`${state.instrument}-${state.questionIndex}`}
       question={state}
       dispatch={dispatch}
-        assignedMode={mode}
+      assignedMode={mode}
+      pending={pending}
+      onSubmit={mode && assignmentId ? submitAnswer : undefined}
+      onContinue={mode && assignmentId ? continueQuestion : undefined}
     />
+    </>
   );
 }

@@ -55,6 +55,8 @@ export type QuestionState = {
   phase: "question";
   instrument: InstrumentId;
   mode?: MeasurementQuizModeKey | null;
+  attemptId?: string;
+  attemptNumber?: number;
   /** This attempt's readings, one per question. */
   readings: readonly number[];
   questionIndex: number;
@@ -72,6 +74,9 @@ export type ResultsState = {
   phase: "results";
   instrument: InstrumentId;
   mode?: MeasurementQuizModeKey | null;
+  attemptId?: string;
+  attemptNumber?: number;
+  passed?: boolean;
   score: number;
   total: number;
 };
@@ -87,9 +92,19 @@ export type QuizState =
 
 export type QuizAction =
   /** Readings come from pickReadings in the caller, so the reducer stays pure. */
-  | { type: "start"; instrument: InstrumentId; mode?: MeasurementQuizModeKey | null; readings: readonly number[] }
+  | {
+      type: "start";
+      instrument: InstrumentId;
+      mode?: MeasurementQuizModeKey | null;
+      readings: readonly number[];
+      attemptId?: string;
+      attemptNumber?: number;
+      score?: number;
+    }
   | { type: "edit-answer"; answer: string }
   | { type: "submit" }
+  | { type: "server-submit"; result: AnswerResult; counted: boolean; firstTryCorrect: boolean | null }
+  | { type: "server-complete"; attemptId: string; attemptNumber: number; score: number; total: number; passed: boolean }
   | { type: "next" }
   | { type: "choose-instrument" };
 
@@ -106,11 +121,15 @@ function startQuestion(
   readings: readonly number[],
   questionIndex: number,
   score: number,
+  attemptId?: string,
+  attemptNumber?: number,
 ): QuestionState {
   return {
     phase: "question",
     instrument,
     mode,
+    attemptId,
+    attemptNumber,
     readings,
     questionIndex,
     answer: "",
@@ -127,7 +146,27 @@ export function canContinue(question: QuestionState): boolean {
 }
 
 export function quizReducer(state: QuizState, action: QuizAction): QuizState {
-  if (action.type === "start") return startQuestion(action.instrument, action.mode ?? null, action.readings, 0, 0);
+  if (action.type === "start") return startQuestion(
+    action.instrument,
+    action.mode ?? null,
+    action.readings,
+    0,
+    action.score ?? 0,
+    action.attemptId,
+    action.attemptNumber,
+  );
+  if (action.type === "server-complete") {
+    return {
+      phase: "results",
+      instrument: state.phase === "question" ? state.instrument : "ruler",
+      mode: state.phase === "question" ? state.mode : null,
+      attemptId: action.attemptId,
+      attemptNumber: action.attemptNumber,
+      passed: action.passed,
+      score: action.score,
+      total: action.total,
+    };
+  }
   if (action.type === "choose-instrument") return { phase: "choosing", returned: true };
   if (state.phase !== "question") return state;
 
@@ -156,16 +195,37 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       };
     }
 
+    case "server-submit": {
+      const addsPoint = action.counted && action.firstTryCorrect === true;
+      return {
+        ...state,
+        result: action.result,
+        attempt: state.attempt + 1,
+        firstTryCorrect: action.firstTryCorrect ?? state.firstTryCorrect,
+        score: state.score + (addsPoint ? 1 : 0),
+      };
+    }
+
     case "next": {
       if (!canContinue(state)) return state;
 
       const nextIndex = state.questionIndex + 1;
       return nextIndex < state.readings.length
-        ? startQuestion(state.instrument, state.mode ?? null, state.readings, nextIndex, state.score)
+        ? startQuestion(
+            state.instrument,
+            state.mode ?? null,
+            state.readings,
+            nextIndex,
+            state.score,
+            state.attemptId,
+            state.attemptNumber,
+          )
         : {
             phase: "results",
             instrument: state.instrument,
             mode: state.mode,
+            attemptId: state.attemptId,
+            attemptNumber: state.attemptNumber,
             score: state.score,
             total: state.readings.length,
           };

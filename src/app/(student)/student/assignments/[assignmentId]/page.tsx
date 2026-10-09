@@ -66,7 +66,7 @@ export default async function AssignmentPage({ params }: {
           {measurementQuizMode && (
             <section className="rounded-xl border border-border bg-card p-6">
               <h2 className="mb-4 text-xl font-semibold">Measurement quiz</h2>
-              <MeasurementQuiz mode={measurementQuizMode.key} />
+              <MeasurementQuiz assignmentId={assignmentId} mode={measurementQuizMode.key} />
             </section>
           )}
         </AssignmentAccess>
