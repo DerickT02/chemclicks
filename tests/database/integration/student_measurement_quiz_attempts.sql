@@ -87,8 +87,8 @@ BEGIN
     );
     IF v_attempt.attempt_number <> 1 OR v_attempt.question_total <> 5
        OR v_attempt.score <> 4 OR v_attempt.passed IS NOT TRUE
-       OR v_attempt.instrument <> CASE WHEN v_mode LIKE 'ruler_%' THEN 'ruler' ELSE 'cylinder' END
-       OR v_attempt.precision_mode <> CASE WHEN v_mode = 'ruler_hundredths' THEN 'hundredths' ELSE 'tenths' END THEN
+       OR v_attempt.instrument <> (CASE WHEN v_mode LIKE 'ruler_%' THEN 'ruler' ELSE 'cylinder' END)
+       OR v_attempt.precision_mode <> (CASE WHEN v_mode = 'ruler_hundredths' THEN 'hundredths' ELSE 'tenths' END) THEN
       RAISE EXCEPTION 'Completed result metadata or score is wrong for %', v_mode;
     END IF;
 

@@ -9,10 +9,10 @@ ALTER TABLE public.student_attempts
     (quiz_key IS NULL AND instrument IS NULL AND precision_mode IS NULL)
     OR (quiz_key IN ('measurement_ruler_tenths', 'measurement_ruler_hundredths')
         AND instrument = 'ruler'
-        AND precision_mode = CASE quiz_key
+        AND precision_mode = (CASE quiz_key
           WHEN 'measurement_ruler_tenths' THEN 'tenths'
           ELSE 'hundredths'
-        END)
+        END))
     OR (quiz_key = 'measurement_cylinder_tenths'
         AND instrument = 'cylinder'
         AND precision_mode = 'tenths')
@@ -129,11 +129,11 @@ BEGIN
     AND (ca.closes_at IS NULL OR ca.closes_at > now())
   FOR SHARE OF ca, c, s, a;
 
-  IF NOT FOUND OR v_activity_type <> CASE p_mode
+  IF NOT FOUND OR v_activity_type <> (CASE p_mode
       WHEN 'ruler_tenths' THEN 'measurement_ruler_tenths'
       WHEN 'ruler_hundredths' THEN 'measurement_ruler_hundredths'
       ELSE 'measurement_graduated_cylinder'
-    END THEN
+    END) THEN
     RAISE EXCEPTION 'Measurement quiz assignment unavailable' USING ERRCODE = '42501';
   END IF;
 
@@ -248,11 +248,11 @@ BEGIN
     AND c.is_active
     AND (ca.opens_at IS NULL OR ca.opens_at <= now())
     AND (ca.closes_at IS NULL OR ca.closes_at > now())
-    AND a.type::text = CASE v_session.mode
+    AND a.type::text = (CASE v_session.mode
       WHEN 'ruler_tenths' THEN 'measurement_ruler_tenths'
       WHEN 'ruler_hundredths' THEN 'measurement_ruler_hundredths'
       ELSE 'measurement_graduated_cylinder'
-    END
+    END)
   FOR SHARE OF ca, c, s, a;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Measurement quiz assignment unavailable' USING ERRCODE = '42501';
@@ -280,10 +280,10 @@ BEGIN
   IF p_answer IS NOT NULL AND length(p_answer) <= 64
      AND p_answer ~ '^[+-]?([0-9]+([.][0-9]+)?|[.][0-9]+)$' THEN
     v_answer := p_answer::numeric;
-    IF v_answer >= 0 AND v_answer <= CASE v_mode
+    IF v_answer >= 0 AND v_answer <= (CASE v_mode
         WHEN 'cylinder_tenths' THEN 50
         ELSE 15
-      END THEN
+      END) THEN
       v_gradable := true;
       v_is_correct := length(split_part(p_answer, '.', 2)) = v_decimals
         AND abs(round(v_answer * v_scale) - round(v_reading * v_scale))
@@ -359,11 +359,11 @@ BEGIN
     AND c.is_active
     AND (ca.opens_at IS NULL OR ca.opens_at <= now())
     AND (ca.closes_at IS NULL OR ca.closes_at > now())
-    AND a.type::text = CASE v_session.mode
+    AND a.type::text = (CASE v_session.mode
       WHEN 'ruler_tenths' THEN 'measurement_ruler_tenths'
       WHEN 'ruler_hundredths' THEN 'measurement_ruler_hundredths'
       ELSE 'measurement_graduated_cylinder'
-    END
+    END)
   FOR SHARE OF ca, c, s, a;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Measurement quiz assignment unavailable' USING ERRCODE = '42501';
