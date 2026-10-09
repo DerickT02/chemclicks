@@ -401,7 +401,7 @@ export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInst
       </div>
       {results.attemptNumber !== undefined && (
         <p className="mt-3 text-sm text-muted-foreground">
-          {`Attempt ${results.attemptNumber}${results.attemptId ? ` · ${results.attemptId}` : ""}`}
+          {`Attempt ${results.attemptNumber}`}
         </p>
       )}
 

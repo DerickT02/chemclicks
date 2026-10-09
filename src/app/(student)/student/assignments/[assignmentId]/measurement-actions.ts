@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import {
   completeStudentMeasurementQuiz,
   recordStudentMeasurementAnswer,
@@ -25,6 +26,7 @@ export async function completeMeasurementQuizAction(
   submissionKey: string,
 ) {
   const attempt = await completeStudentMeasurementQuiz(assignmentId, attemptId, submissionKey);
+  revalidatePath(`/student/assignments/${assignmentId}`);
   return {
     attemptId: attempt.id,
     attemptNumber: attempt.attempt_number,

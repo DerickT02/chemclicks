@@ -33,7 +33,9 @@ export default async function AssignmentPage({ params }: {
   const quizKind = lewisQuizForLesson(type);
   const measurementQuizMode = measurementQuizModeForActivity(type);
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
-  const latest = attempts[0];
+  const explorationAttempts = attempts.filter((attempt) => attempt.quiz_key === null);
+  const measurementAttempts = attempts.filter((attempt) => attempt.instrument !== null && attempt.instrument !== undefined);
+  const latest = explorationAttempts[0];
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -44,9 +46,9 @@ export default async function AssignmentPage({ params }: {
             <section aria-label="Exploration attempts" className="rounded-xl border border-border bg-card p-6">
               <h2 className="mb-3 text-lg font-semibold">Exploration attempts</h2>
               <AttemptControls key={latest?.id ?? 'new'} assignmentId={assignmentId} attemptId={latest?.id} completed={latest?.status === 'completed'} />
-              <p className="mt-3 text-sm text-muted-foreground">{attempts.length} attempts. Completion records exploration participation, not a quiz score.</p>
+              <p className="mt-3 text-sm text-muted-foreground">{explorationAttempts.length} attempts. Completion records exploration participation, not a quiz score.</p>
               <ul className="mt-3 space-y-2 text-sm">
-                {attempts.map(attempt => <li key={attempt.id}>
+                {explorationAttempts.map(attempt => <li key={attempt.id}>
                   Attempt {attempt.attempt_number}: {attempt.status === 'completed' ? 'Completed' : 'In progress'} — started {new Date(attempt.started_at).toLocaleString('en-US', { timeZone: 'UTC' })} UTC
                   {attempt.completed_at && <>; completed {new Date(attempt.completed_at).toLocaleString('en-US', { timeZone: 'UTC' })} UTC</>}
                 </li>)}
@@ -64,10 +66,38 @@ export default async function AssignmentPage({ params }: {
             )}
           </section>
           {measurementQuizMode && (
-            <section className="rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-4 text-xl font-semibold">Measurement quiz</h2>
-              <MeasurementQuiz assignmentId={assignmentId} mode={measurementQuizMode.key} />
-            </section>
+            <>
+              <section aria-label="Measurement quiz history" className="rounded-xl border border-border bg-card p-6">
+                <h2 className="text-xl font-semibold">Measurement quiz history</h2>
+                {measurementAttempts.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">No quiz attempts yet.</p>
+                ) : (
+                  <ol className="mt-4 space-y-3">
+                    {measurementAttempts.map((attempt) => (
+                      <li key={attempt.id} className="rounded-lg border border-border bg-muted p-3 text-sm">
+                        <p className="font-medium">
+                          {`${attempt.instrument === "cylinder" ? "Graduated cylinder" : "Ruler"} · ${attempt.precision_mode === "hundredths" ? "hundredths" : "tenths"} · Attempt ${attempt.attempt_number}`}
+                        </p>
+                        {attempt.status === "completed" ? (
+                          <p className="mt-1">
+                            {`${attempt.score ?? 0} of ${attempt.question_total ?? 0} correct · ${attempt.passed ? "Passed" : "Not passed"}`}
+                            {attempt.completed_at && (
+                              <> · completed <time dateTime={attempt.completed_at}>{new Date(attempt.completed_at).toLocaleString("en-US", { timeZone: "UTC" })} UTC</time></>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="mt-1">In progress</p>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+              <section className="rounded-xl border border-border bg-card p-6">
+                <h2 className="mb-4 text-xl font-semibold">Measurement quiz</h2>
+                <MeasurementQuiz assignmentId={assignmentId} mode={measurementQuizMode.key} />
+              </section>
+            </>
           )}
         </AssignmentAccess>
         {quizKind && <LewisQuizCard kind={quizKind} assignments={result.assignments} />}
