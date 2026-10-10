@@ -37,11 +37,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Newsletter placeholder — keep no vertical padding so it does not steal viewport from the hero */}
-        <section className="mx-auto w-full max-w-7xl px-8 md:px-16">
-          <div className="w-full" />
-        </section>
-
         {/* Divider + lesson content — #features lands here (not deep inside overview) */}
         <section id="features" className="w-full border-t border-border">
           <Lesson_Overview />

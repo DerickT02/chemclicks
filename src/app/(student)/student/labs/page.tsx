@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Labs — ChemClicks",
+  title: "Practice labs — ChemClicks",
   description: "Interactive chemistry labs: Bohr Models, Lewis Structures, and Measurement.",
 };
 
@@ -18,14 +18,14 @@ const LABS = [
     href: "/student/labs/lewis",
     icon: "🧪",
     title: "Lewis Structures",
-    description: "Draw Lewis diagrams and explore covalent and ionic bonding.",
+    description: "Explore Lewis diagrams and compare covalent and ionic bonding.",
     status: "available" as const,
   },
   {
     href: "/student/labs/measurement",
     icon: "📏",
     title: "Measurement Lab",
-    description: "Practice reading scales to tenths and hundredths using a graduated cylinder.",
+    description: "Explore ruler scales and read a graduated cylinder at the bottom of the meniscus.",
     status: "available" as const,
   },
 ];
@@ -36,9 +36,10 @@ export default function LabsPage() {
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
 
         <header className="mb-10">
-          <h1 className="text-3xl font-bold text-foreground mb-1">Labs</h1>
+          <Link href="/student" className="mb-4 inline-block text-sm text-foreground underline">Back to assignments</Link>
+          <h1 className="text-3xl font-bold text-foreground mb-1">Practice labs</h1>
           <p className="text-muted-foreground text-sm">
-            Pick a lab below to start learning.
+            Untracked practice — exploring here does not record assignment completion. Pick a lab to start learning.
           </p>
         </header>
 
