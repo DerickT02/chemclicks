@@ -9,11 +9,13 @@ const BOHR_QUESTIONS_PER_ATTEMPT = 12;
 type BohrModelsQuizProps = {
   /** The full question pool, loaded from the database by the page. */
   questions: QuizQuestion[];
+  assignmentId?: string;
   onComplete?: (result: QuizCompleteResult) => void;
 };
 
 export default function BohrModelsQuiz({
   questions,
+  assignmentId,
   onComplete,
 }: BohrModelsQuizProps) {
   return (
@@ -22,6 +24,8 @@ export default function BohrModelsQuiz({
       pool={questions}
       questionsPerAttempt={BOHR_QUESTIONS_PER_ATTEMPT}
       passingThresholdPercent={80}
+      assignmentId={assignmentId}
+      quizKey="bohr_models"
       onComplete={onComplete}
     />
   );
