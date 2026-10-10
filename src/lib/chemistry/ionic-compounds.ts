@@ -151,6 +151,37 @@ export function getNetCharge(compound: IonicCompound): number {
   );
 }
 
+export type ChargeTotals = {
+  totalPositive: number;
+  totalNegative: number;
+  net: number;
+};
+
+/** Sum of cation charges and anion charges (negative) per formula unit. */
+export function getChargeTotals(compound: IonicCompound): ChargeTotals {
+  return {
+    totalPositive: compound.cation.count * compound.cation.charge,
+    totalNegative: compound.anion.count * compound.anion.charge,
+    net: getNetCharge(compound),
+  };
+}
+
+/** Signed total for summary panels, e.g. "+6", "−6", "0". */
+export function formatSignedTotalCharge(total: number): string {
+  if (total === 0) return "0";
+  if (total > 0) return `+${total}`;
+  return formatChargeValue(total);
+}
+
+export const ION_VOCABULARY = {
+  cation:
+    "Cation — a positive ion, usually from a metal that lost valence electrons.",
+  anion:
+    "Anion — a negative ion, usually from a nonmetal that gained electrons.",
+  ionicCharge:
+    "Ionic charge — the charge on one ion. A neutral formula unit has total positive and negative charges that cancel to zero.",
+} as const;
+
 export function isChargeBalanced(compound: IonicCompound): boolean {
   return getNetCharge(compound) === 0;
 }

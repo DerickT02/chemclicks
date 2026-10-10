@@ -10,8 +10,11 @@ import {
   formatCharge,
   formatChargeValue,
   formatIonSymbol,
+  formatSignedTotalCharge,
   getAtomRatio,
+  getChargeTotals,
   getTransferredElectrons,
+  ION_VOCABULARY,
   type Ion,
 } from "@/lib/chemistry/ionic-compounds";
 
@@ -134,11 +137,36 @@ export default function IonicCompoundExplorer() {
     IONIC_COMPOUNDS.find((item) => item.id === selectedId) ?? IONIC_COMPOUNDS[0];
   const { cation, anion } = compound;
   const transferred = getTransferredElectrons(compound);
+  const chargeTotals = getChargeTotals(compound);
+  const vocabularyId = `${descriptionId}-vocab`;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
       <section className="flex min-h-[22rem] flex-col rounded-xl border border-border bg-card p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-muted-foreground">Example Salts</h2>
+
+        <section
+          aria-labelledby={vocabularyId}
+          className="mt-4 rounded-xl border border-border bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground"
+        >
+          <h3 id={vocabularyId} className="text-sm font-semibold text-foreground">
+            Ion vocabulary
+          </h3>
+          <dl className="mt-2 space-y-2">
+            <div>
+              <dt className="font-medium text-foreground">Cation</dt>
+              <dd>{ION_VOCABULARY.cation}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-foreground">Anion</dt>
+              <dd>{ION_VOCABULARY.anion}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-foreground">Ionic charge</dt>
+              <dd>{ION_VOCABULARY.ionicCharge}</dd>
+            </div>
+          </dl>
+        </section>
 
         <div
           role="group"
@@ -193,6 +221,34 @@ export default function IonicCompoundExplorer() {
           </DetailRow>
           <DetailRow label="Charge balance">{describeChargeBalance(compound)}</DetailRow>
         </dl>
+
+        <section
+          aria-label="Charge summary for this formula unit"
+          aria-live="polite"
+          className="mt-5 rounded-xl border border-border bg-muted/50 p-4"
+        >
+          <h3 className="text-sm font-semibold text-foreground">Charge summary</h3>
+          <dl className="mt-3 divide-y divide-border text-sm">
+            <div className="flex items-start justify-between gap-4 py-2.5">
+              <dt className="text-muted-foreground">Total positive charge</dt>
+              <dd className="font-semibold text-foreground">
+                {formatSignedTotalCharge(chargeTotals.totalPositive)}
+              </dd>
+            </div>
+            <div className="flex items-start justify-between gap-4 py-2.5">
+              <dt className="text-muted-foreground">Total negative charge</dt>
+              <dd className="font-semibold text-foreground">
+                {formatSignedTotalCharge(chargeTotals.totalNegative)}
+              </dd>
+            </div>
+            <div className="flex items-start justify-between gap-4 py-2.5">
+              <dt className="text-muted-foreground">Net charge</dt>
+              <dd className="font-semibold text-foreground">
+                {formatSignedTotalCharge(chargeTotals.net)}
+              </dd>
+            </div>
+          </dl>
+        </section>
       </section>
 
       <section className="flex min-h-[22rem] flex-col rounded-xl border border-border bg-card p-5 sm:p-6">

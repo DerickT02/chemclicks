@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import Dropdown from "@/components/ui/Dropdown";
-import { calculateIonicCharge, describeIonicCharge, evaluateNobleGasRule } from "@/lib/chemistry/bohr-explorer";
+import {
+  calculateIonicCharge,
+  describeChargeRule,
+  describeIonicCharge,
+  describeNeutralChargeStability,
+  describeNobleGasStability,
+  describeProtonElectronDifference,
+  evaluateNobleGasRule,
+} from "@/lib/chemistry/bohr-explorer";
 import { BOHR_ION_INFO } from "@/lib/chemistry/bohr-ions";
 import { ELEMENTS } from "@/lib/chemistry/elements";
 import { getElectronShells } from "@/lib/chemistry/lewis";
@@ -229,14 +237,20 @@ export default function BohrModelViewer() {
 
   const valenceCount      = shells[shells.length - 1] ?? 0;
   const totalElectrons    = shells.reduce((a, b) => a + b, 0);
-  const charge            = calculateIonicCharge(element.atomicNumber, electronCount);
+  const protons = element.atomicNumber;
+  const charge = calculateIonicCharge(protons, electronCount);
   const chargeDescription = charge === null ? "unavailable" : describeIonicCharge(charge);
-  const shellRule         = evaluateNobleGasRule(electronCount);
-  const stabilitySummary  = !shellRule
+  const chargeDifference = describeProtonElectronDifference(protons, electronCount);
+  const chargeRule = describeChargeRule(charge);
+  const nobleGasStability = describeNobleGasStability(electronCount);
+  const neutralChargeStability = describeNeutralChargeStability(protons, electronCount);
+  const shellRule = evaluateNobleGasRule(electronCount);
+  const shellRuleSummary = !shellRule
     ? "Shell status unavailable"
     : shellRule.meetsRule
-      ? charge === 0 ? "Noble-gas stable (neutral atom)" : `${shellRule.rule} rule met (ion)`
+      ? `${shellRule.rule} rule met`
       : `${shellRule.rule} rule not met`;
+  const accessibilitySummary = `${nobleGasStability.label}; ${neutralChargeStability.label}; ${chargeDifference ?? "charge unavailable"}`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -304,7 +318,7 @@ export default function BohrModelViewer() {
             atomicNumber={element.atomicNumber}
             electronCount={electronCount}
             chargeDescription={chargeDescription}
-            stabilitySummary={stabilitySummary}
+            stabilitySummary={accessibilitySummary}
             activeShell={activeShell}
             onShellClick={handleShellToggle}
           />
@@ -336,6 +350,10 @@ export default function BohrModelViewer() {
             {/* Stats */}
             <div className="rounded-xl bg-muted/50 border border-border divide-y divide-border">
               <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Protons</span>
+                <span className="font-semibold text-foreground">{protons}</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
                 <span className="text-muted-foreground">Valence electrons</span>
                 <span className="font-semibold text-foreground">{valenceCount}</span>
               </div>
@@ -348,6 +366,10 @@ export default function BohrModelViewer() {
                 <span className="font-semibold text-foreground">{shells.length}</span>
               </div>
               <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Protons − electrons</span>
+                <span className="font-semibold text-foreground">{chargeDifference ?? "—"}</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
                 <span className="text-muted-foreground">Ionic charge</span>
                 <output aria-label={`Ionic charge: ${chargeDescription}`} aria-live="polite" className="font-semibold text-foreground">
                   {chargeDescription}
@@ -355,8 +377,20 @@ export default function BohrModelViewer() {
               </div>
             </div>
             <div className="mt-3 rounded-xl border border-border bg-muted/50 p-4" aria-live="polite" aria-atomic="true">
-              <p className={`text-sm font-semibold ${shellRule?.meetsRule ? "text-accent" : "text-foreground"}`}>
-                Outer-shell stability: {stabilitySummary}
+              <h3 className="text-sm font-semibold text-foreground">Charge and stability</h3>
+              <dl className="mt-2 space-y-2 text-sm">
+                <div>
+                  <dt className="font-medium text-foreground">{nobleGasStability.label}</dt>
+                  <dd className="text-xs text-muted-foreground">{nobleGasStability.explanation}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-foreground">{neutralChargeStability.label}</dt>
+                  <dd className="text-xs text-muted-foreground">{neutralChargeStability.explanation}</dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-xs text-muted-foreground">{chargeRule}</p>
+              <p className="mt-3 text-xs font-medium text-foreground">
+                Outer-shell rule (duet/octet): {shellRuleSummary}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {shellRule?.explanation ?? "Counts are outside the supported range."}

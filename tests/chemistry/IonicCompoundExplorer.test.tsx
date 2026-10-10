@@ -19,12 +19,14 @@ function details() {
 }
 
 function detailRow(label: string) {
-  return screen.getByText(label, { selector: "dt" }).parentElement as HTMLElement;
+  return within(details()).getByText(label, { selector: "dt" }).parentElement as HTMLElement;
 }
 
 describe("IonicCompoundExplorer", () => {
   it("offers all four salts as named buttons, with the first selected", () => {
     render(<IonicCompoundExplorer />);
+    expect(screen.getByRole("heading", { name: "Ion vocabulary" })).toBeInTheDocument();
+    expect(screen.getByText(/Cation — a positive ion/)).toBeInTheDocument();
     const group = screen.getByRole("group", { name: "Choose an example salt" });
 
     for (const salt of SALTS) {
@@ -47,6 +49,8 @@ describe("IonicCompoundExplorer", () => {
     expect(table.getByText(salt.cation)).toBeInTheDocument();
     expect(table.getByText(salt.anion)).toBeInTheDocument();
     expect(table.getByText(salt.ratio)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Charge summary for this formula unit" })).toBeInTheDocument();
+    expect(screen.getByText("Net charge").nextElementSibling).toHaveTextContent("0");
     expect(screen.getByRole("img", { name: new RegExp(`Diagram of ${salt.name}`, "i") })).toBeInTheDocument();
   });
 

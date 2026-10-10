@@ -8,6 +8,8 @@ import {
   formatChargeValue,
   formatIonSymbol,
   getAtomRatio,
+  formatSignedTotalCharge,
+  getChargeTotals,
   getNetCharge,
   getTransferredElectrons,
   isChargeBalanced,
@@ -56,6 +58,19 @@ describe("ionic compound examples", () => {
       expect(isChargeBalanced(compound)).toBe(true);
     },
   );
+
+  it.each([
+    ["nacl", 1, -1, 0],
+    ["mgo", 2, -2, 0],
+    ["caf2", 2, -2, 0],
+    ["al2o3", 6, -6, 0],
+  ])("%s charge totals sum to a neutral formula unit", (id, positive, negative, net) => {
+    const totals = getChargeTotals(compoundById(id));
+    expect(totals.totalPositive).toBe(positive);
+    expect(totals.totalNegative).toBe(negative);
+    expect(totals.net).toBe(net);
+    expect(formatSignedTotalCharge(totals.net)).toBe("0");
+  });
 
   it("counts the electrons transferred per formula unit", () => {
     expect(getTransferredElectrons(compoundById("nacl"))).toBe(1);
