@@ -4,7 +4,11 @@ import { useActionState, useCallback, useState, useSyncExternalStore } from "rea
 import { saveAssignment, type AssignmentFormState } from "@/app/admin/assignments/actions";
 import type { ClassActivity } from "@/lib/db/class_activities";
 import type { AvailabilityWindow } from "@/lib/assignments/availability";
-import { formatUtcTimestamp, parseUtcInput, scheduleStatus, toUtcInput } from "@/lib/assignments/schedule";
+import { scheduleStatus } from "@/lib/assignments/schedule";
+import { occurrenceForInstant, parseZonedInput, toZonedInput, type TimeOccurrence } from "@/lib/datetime/time-zone";
+import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
+import TimeZoneBoundary from "@/components/datetime/TimeZoneBoundary";
+import ScheduleDateField from "@/components/assignments/ScheduleDateField";
 
 type Assignment = Pick<ClassActivity, "id" | "activity_id" | "opens_at" | "closes_at">;
 type Props = { classId: string; className: string; activityTitle: string; assignment: Assignment; renderedAt: number };
@@ -39,7 +43,7 @@ function Dates({ window }: { window: AvailabilityWindow }) {
         <div key={label} className="flex flex-wrap gap-x-2">
           <dt className="font-medium text-foreground/80">{label}</dt>
           <dd>{value === null ? empty : Number.isFinite(Date.parse(value))
-            ? <time dateTime={value}>{formatUtcTimestamp(value)}</time> : "Date unavailable"}</dd>
+            ? <LocalizedTimestamp value={value} /> : "Date unavailable"}</dd>
         </div>
       ))}
     </dl>
@@ -86,12 +90,19 @@ type EditorProps = {
   onCancel: () => void; onSaved: (result: AssignmentFormState) => void;
 };
 
-function DateEditor({ classId, activityTitle, assignment, original, stale, onCancel, onSaved }: EditorProps) {
-  const [opensAt, setOpensAt] = useState(toUtcInput(original.opens_at));
-  const [closesAt, setClosesAt] = useState(toUtcInput(original.closes_at));
+function DateEditor(props: EditorProps) {
+  return <TimeZoneBoundary>{zone => <LocalDateEditor {...props} timeZone={zone} />}</TimeZoneBoundary>;
+}
+
+function LocalDateEditor({ classId, activityTitle, assignment, original, stale, onCancel, onSaved, timeZone }: EditorProps & { timeZone: string }) {
+  const [opensAt, setOpensAt] = useState(toZonedInput(original.opens_at, timeZone));
+  const [closesAt, setClosesAt] = useState(toZonedInput(original.closes_at, timeZone));
+  const [openOccurrence, setOpenOccurrence] = useState<TimeOccurrence>(occurrenceForInstant(original.opens_at, timeZone));
+  const [closeOccurrence, setCloseOccurrence] = useState<TimeOccurrence>(occurrenceForInstant(original.closes_at, timeZone));
   const [reviewing, setReviewing] = useState(false);
   const [validation, setValidation] = useState("");
-  const changed = opensAt !== toUtcInput(original.opens_at) || closesAt !== toUtcInput(original.closes_at);
+  const changed = opensAt !== toZonedInput(original.opens_at, timeZone) || closesAt !== toZonedInput(original.closes_at, timeZone)
+    || openOccurrence !== occurrenceForInstant(original.opens_at, timeZone) || closeOccurrence !== occurrenceForInstant(original.closes_at, timeZone);
   const [state, action, pending] = useActionState(async (previous: EditorState, data: FormData): Promise<EditorState> => {
     const responseVersion = previous.responseVersion + 1;
     if (!reviewing || stale) return { status: "error", message: "Review the current schedule before saving.", responseVersion };
@@ -104,8 +115,8 @@ function DateEditor({ classId, activityTitle, assignment, original, stale, onCan
 
   const review = () => {
     try {
-      const opens = parseUtcInput(opensAt);
-      const closes = parseUtcInput(closesAt);
+      const opens = parseZonedInput(opensAt, timeZone, openOccurrence);
+      const closes = parseZonedInput(closesAt, timeZone, closeOccurrence);
       if (opens && closes && opens >= closes) {
         setValidation("The opening date must be earlier than the closing date.");
         return;
@@ -123,22 +134,21 @@ function DateEditor({ classId, activityTitle, assignment, original, stale, onCan
       <input type="hidden" name="original_opens_at" value={original.opens_at ?? ""} />
       <input type="hidden" name="original_closes_at" value={original.closes_at ?? ""} />
       <input type="hidden" name="confirm_schedule_change" value={reviewing ? "true" : ""} />
+      <input type="hidden" name="schedule_time_zone" value={timeZone} />
       <p className="text-sm font-medium">Edit dates: {activityTitle}</p>
-      <p className="text-sm text-muted-foreground">Enter schedule times in UTC. Blank opening means immediate availability; blank closing means no deadline.</p>
+      <p className="text-sm text-muted-foreground">Enter schedule times in {timeZone}. Each date uses its daylight-saving offset. Blank opening means immediate availability; blank closing means no deadline.</p>
       <fieldset disabled={pending} className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1 text-sm"><span>Opens at (UTC) — optional</span>
-          <input type="datetime-local" step="0.001" name="opens_at" value={opensAt} readOnly={reviewing}
-            onChange={event => setOpensAt(event.target.value)} className="min-w-0 w-full rounded-md border border-border bg-background px-3 py-2 text-foreground" /></label>
-        <label className="space-y-1 text-sm"><span>Closes at (UTC) — optional</span>
-          <input type="datetime-local" step="0.001" name="closes_at" value={closesAt} readOnly={reviewing}
-            onChange={event => setClosesAt(event.target.value)} className="min-w-0 w-full rounded-md border border-border bg-background px-3 py-2 text-foreground" /></label>
+        <ScheduleDateField key={`opens-${state.responseVersion}`} name="opens_at" value={opensAt} zone={timeZone} occurrence={openOccurrence} readOnly={reviewing} showZoneInLabel
+          onChange={setOpensAt} onOccurrence={setOpenOccurrence} />
+        <ScheduleDateField key={`closes-${state.responseVersion}`} name="closes_at" value={closesAt} zone={timeZone} occurrence={closeOccurrence} readOnly={reviewing} showZoneInLabel
+          onChange={setClosesAt} onOccurrence={setCloseOccurrence} />
       </fieldset>
       {stale && <p role="alert" className="text-sm text-destructive">The schedule changed. Cancel and reopen the editor before trying again.</p>}
       {validation && <p role="alert" className="text-sm text-destructive">{validation}</p>}
       {reviewing && (
         <div className="space-y-2 text-sm">
           <p>Confirm these dates for {activityTitle}? Changes can immediately close, reopen, or interrupt currently open work. Existing exploration attempts will be kept. Closing permits no further submissions.</p>
-          <Dates window={{ opens_at: parseUtcInput(opensAt), closes_at: parseUtcInput(closesAt) }} />
+          <Dates window={{ opens_at: parseZonedInput(opensAt, timeZone, openOccurrence), closes_at: parseZonedInput(closesAt, timeZone, closeOccurrence) }} />
         </div>
       )}
       <div className="flex flex-wrap gap-3">

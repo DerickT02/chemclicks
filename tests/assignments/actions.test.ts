@@ -163,6 +163,41 @@ describe("schedule editing safeguards", () => {
   });
 });
 
+describe("local-time action validation", () => {
+  it("converts a named-zone wall time on the server and ignores supplied UTC/offset claims", async () => {
+    const result = await saveAssignment(initial, form({ schedule_time_zone: "America/New_York", closes_at: "2026-09-12T15:00", closes_at_utc: "2026-09-12T00:00Z", timezone_offset: "0" }));
+    expect(result.status).toBe("success");
+    expect(mocks.insert).toHaveBeenCalledWith(mocks.writer, {
+      class_id: classId, activity_id: activityId, opens_at: null, closes_at: "2026-09-12T19:00:00.000Z",
+    });
+  });
+  it.each([
+    { schedule_time_zone: "unknown", opens_at: "" },
+    { schedule_time_zone: "", opens_at: "" },
+    { schedule_time_zone: "America/New_York", opens_at: "2026-03-08T02:30" },
+    { schedule_time_zone: "America/New_York", opens_at: "2026-11-01T01:30" },
+    { schedule_time_zone: "America/New_York", opens_at: "2026-11-01T01:30", opens_at_occurrence: "guess" },
+  ])("rejects invalid zones, gaps, and undisambiguated folds before database access: %j", async values => {
+    const result = await saveAssignment(initial, form(values));
+    expect(result.status).toBe("error");
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+  it("checks opening/closing order in UTC even across a repeated local hour", async () => {
+    const result = await saveAssignment(initial, form({ schedule_time_zone: "America/New_York",
+      opens_at: "2026-11-01T01:45", opens_at_occurrence: "earlier",
+      closes_at: "2026-11-01T01:15", closes_at_occurrence: "later" }));
+    expect(result.status).toBe("success");
+    expect(mocks.insert.mock.calls[0][1]).toMatchObject({ opens_at: "2026-11-01T05:45:00.000Z", closes_at: "2026-11-01T06:15:00.000Z" });
+  });
+  it("rejects reversed absolute times despite increasing wall-clock numbers", async () => {
+    expect((await saveAssignment(initial, form({ schedule_time_zone: "America/New_York",
+      opens_at: "2026-11-01T01:15", opens_at_occurrence: "later",
+      closes_at: "2026-11-01T01:45", closes_at_occurrence: "earlier" }))).status).toBe("error");
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+});
+
 it('does not perform privileged writes when teacher authorization fails', async () => {
   mocks.teacher.mockRejectedValue(new Error('Unauthorized'));
   expect((await saveAssignment(initial, form())).status).toBe('error');

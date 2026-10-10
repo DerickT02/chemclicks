@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { LEWIS_QUIZZES, lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
@@ -35,7 +36,7 @@ export default async function StudentAssignmentsPage() {
                 <h2 className="text-lg font-semibold">{assignment.activity.title}</h2>
                 <p className="text-sm text-muted-foreground">
                   {assignment.closes_at
-                    ? `Closes ${new Date(assignment.closes_at).toISOString().replace("T", " ").slice(0, 19)} UTC`
+                    ? <>Closes <LocalizedTimestamp value={assignment.closes_at} /></>
                     : "No closing deadline"}
                 </p>
                 {hasActivityContent(assignment.activity.type) ? (

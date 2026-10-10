@@ -8,6 +8,9 @@ import {
 import ActivityCatalog from "@/app/admin/assignments/ActivityCatalog";
 import type { ActivityCatalogEntry } from "@/lib/db/activities";
 import { canAssignActivity } from "@/lib/activities/registry";
+import TimeZoneBoundary from "@/components/datetime/TimeZoneBoundary";
+import ScheduleDateField from "@/components/assignments/ScheduleDateField";
+import type { TimeOccurrence } from "@/lib/datetime/time-zone";
 
 type Props = {
   classId: string;
@@ -23,15 +26,22 @@ const initialState: ClientFormState = {
   responseVersion: 0,
 };
 
-export default function AssignmentForm({
+export default function AssignmentForm(props: Props) {
+  return <TimeZoneBoundary>{zone => <LocalAssignmentForm {...props} timeZone={zone} />}</TimeZoneBoundary>;
+}
+
+function LocalAssignmentForm({
   classId,
   className = "this class",
   activities,
   assignedActivityIds = [],
-}: Props) {
+  timeZone,
+}: Props & { timeZone: string }) {
   const [activityId, setActivityId] = useState("");
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
+  const [openOccurrence, setOpenOccurrence] = useState<TimeOccurrence>("");
+  const [closeOccurrence, setCloseOccurrence] = useState<TimeOccurrence>("");
   const selectedActivity = activities.find((activity) => activity.id === activityId);
   const selectionIsAssignable = Boolean(selectedActivity
     && canAssignActivity(selectedActivity.type)
@@ -46,6 +56,8 @@ export default function AssignmentForm({
       setActivityId("");
       setOpensAt("");
       setClosesAt("");
+      setOpenOccurrence("");
+      setCloseOccurrence("");
       return { ...result, responseVersion, message: `${title} — ${className}: ${result.message}` };
     }
     return { ...result, responseVersion };
@@ -55,6 +67,7 @@ export default function AssignmentForm({
     <form action={action} aria-busy={pending} className="space-y-4">
       <input type="hidden" name="class_id" value={classId} />
       <input type="hidden" name="assignment_id" value="" />
+      <input type="hidden" name="schedule_time_zone" value={timeZone} />
       <fieldset disabled={pending} className="space-y-4">
         {/* Reassert controlled radios after React's native form reset, including repeat errors. */}
         <ActivityCatalog
@@ -66,22 +79,14 @@ export default function AssignmentForm({
         />
 
         <p className="text-sm text-muted-foreground">
-          Enter optional schedule times in UTC.
+          Enter optional schedule times in {timeZone}. Each date uses the offset for that date, including daylight saving time.
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block space-y-1 text-sm">
-            <span>Opens at — optional</span>
-            <input type="datetime-local" name="opens_at" step="0.001" value={opensAt}
-              onChange={event => setOpensAt(event.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground" />
-          </label>
-          <label className="block space-y-1 text-sm">
-            <span>Closes at — optional</span>
-            <input type="datetime-local" name="closes_at" step="0.001" value={closesAt}
-              onChange={event => setClosesAt(event.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground" />
-          </label>
+          <ScheduleDateField key={`opens-${state.responseVersion}`} name="opens_at" value={opensAt} zone={timeZone} occurrence={openOccurrence}
+            onChange={setOpensAt} onOccurrence={setOpenOccurrence} />
+          <ScheduleDateField key={`closes-${state.responseVersion}`} name="closes_at" value={closesAt} zone={timeZone} occurrence={closeOccurrence}
+            onChange={setClosesAt} onOccurrence={setCloseOccurrence} />
         </div>
 
         <p className="text-xs text-muted-foreground">

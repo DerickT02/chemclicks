@@ -3,6 +3,7 @@ import DisableClassControl from "@/app/admin/classes/DisableClassControl";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import AssignmentSchedule from "@/app/admin/assignments/AssignmentSchedule";
+import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
@@ -12,10 +13,6 @@ import { summarizeCurrentExplorations } from "@/lib/assignments/exploration-prog
 
 
 type ClassWithStudents = ClassListItem & { students: TeacherRosterStudent[] };
-
-function formatAssignmentTimestamp(value: string): string {
-  return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
-}
 
 export default async function AdminPage({
   searchParams,
@@ -257,7 +254,7 @@ export default async function AdminPage({
                                       Assigned
                                     </dt>
                                     <dd>
-                                      {formatAssignmentTimestamp(assignment.created_at)}
+                                      <LocalizedTimestamp value={assignment.created_at} />
                                     </dd>
                                   </div>
                                 </dl>

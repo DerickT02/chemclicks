@@ -7,6 +7,7 @@ import { requireTeacherId } from "@/lib/server/teacher";
 import { insertClassActivity, updateClassActivity } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { parseUtcInput } from "@/lib/assignments/schedule";
+import { parseZonedInput } from "@/lib/datetime/time-zone";
 import type { ClassActivity } from "@/lib/db/class_activities";
 
 export type AssignmentFormState = {
@@ -39,10 +40,21 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
   }
 
   try {
-    opensAt = parseUtcInput(readString(formData, "opens_at"));
-    closesAt = parseUtcInput(readString(formData, "closes_at"));
-  } catch {
-    return { status: "error", message: "Enter valid opening and closing dates." };
+    const parse = (name: string) => formData.has("schedule_time_zone")
+      ? parseZonedInput(readString(formData, name), readString(formData, "schedule_time_zone"), readString(formData, `${name}_occurrence`))
+      : parseUtcInput(readString(formData, name)); // Existing direct callers retain their explicit UTC contract.
+    opensAt = parse("opens_at");
+    closesAt = parse("closes_at");
+  } catch (error) {
+    const safeMessages = [
+      "Select a valid time zone.", "Select a valid time occurrence.",
+      "This local time does not exist because the clocks change. Choose another time.",
+      "This local time occurs twice. Choose the first or second occurrence.",
+    ];
+    return {
+      status: "error",
+      message: error instanceof Error && safeMessages.includes(error.message) ? error.message : "Enter valid opening and closing dates.",
+    };
   }
 
   if (opensAt && closesAt && opensAt >= closesAt) {

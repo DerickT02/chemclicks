@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getAssignmentAttempts } from '@/lib/server/student-assignments';
 import AttemptControls from './AttemptControls';
 import { notFound, redirect } from "next/navigation";
@@ -46,8 +47,8 @@ export default async function AssignmentPage({ params }: {
               <p className="mt-3 text-sm text-muted-foreground">{attempts.length} attempts. Completion records exploration participation, not a quiz score.</p>
               <ul className="mt-3 space-y-2 text-sm">
                 {attempts.map(attempt => <li key={attempt.id}>
-                  Attempt {attempt.attempt_number}: {attempt.status === 'completed' ? 'Completed' : 'In progress'} — started {new Date(attempt.started_at).toLocaleString('en-US', { timeZone: 'UTC' })} UTC
-                  {attempt.completed_at && <>; completed {new Date(attempt.completed_at).toLocaleString('en-US', { timeZone: 'UTC' })} UTC</>}
+                  Attempt {attempt.attempt_number}: {attempt.status === 'completed' ? 'Completed' : 'In progress'} — started <LocalizedTimestamp value={attempt.started_at} />
+                  {attempt.completed_at && <>; completed <LocalizedTimestamp value={attempt.completed_at} /></>}
                 </li>)}
               </ul>
             </section>

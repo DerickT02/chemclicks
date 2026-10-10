@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ save: vi.fn() }));
 vi.mock("@/app/admin/assignments/actions", () => ({ saveAssignment: mocks.save }));
+vi.mock("@/components/datetime/useViewerTimeZone", () => ({ useViewerTimeZone: () => "UTC" }));
 import AssignmentSchedule from "@/app/admin/assignments/AssignmentSchedule";
 import type { AssignmentFormState } from "@/app/admin/assignments/actions";
 const now = Date.parse("2026-09-12T12:00Z");

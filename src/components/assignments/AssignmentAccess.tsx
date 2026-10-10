@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
 
@@ -72,7 +73,7 @@ export default function AssignmentAccess({ closesAt, children, contentType = "ex
     <>
       {closesAt && deadline !== null && Number.isFinite(deadline) && (
         <p className="text-sm text-muted-foreground">
-          Closes <time dateTime={closesAt}>{new Date(deadline).toISOString().slice(0, 19).replace("T", " ")} UTC</time>.
+          Closes <LocalizedTimestamp value={closesAt} />.
           No further work can be submitted after closing.
         </p>
       )}
