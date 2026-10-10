@@ -7,6 +7,7 @@ import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { listActiveClassesForTeacher } from "@/lib/db/classes";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
+import { createServiceClient } from "@/lib/server/database";
 import { LessonProgressList } from "@/app/admin/LessonProgressList";
 
 type StudentSummary = {
@@ -62,11 +63,15 @@ export default async function AdminPage({
   const baseClasses: ClassWithStudents[] = ((classesData ?? []) as Omit<ClassWithStudents, "students">[])
     .map((classItem) => ({ ...classItem, students: [] }));
 
+  // classIds are already scoped to this teacher by listActiveClassesForTeacher
+  // above, so reading student counts via the service-role client here is safe
+  // (no separate ownership check needed) and avoids depending on an RLS
+  // policy granting teachers direct SELECT on students.
   const classIds = baseClasses.map((classItem) => classItem.id);
   const { data: studentsData } =
     classIds.length === 0
       ? { data: [] as StudentSummary[] }
-      : await supabase
+      : await createServiceClient()
           .from("students")
           .select("id, class_id")
           .in("class_id", classIds);
@@ -111,7 +116,6 @@ export default async function AdminPage({
   const assignmentsLoadFailed = Boolean(assignmentsResult.error);
   const lessonProgressLoadFailed = Boolean(lessonProgressResult.error);
   const lessonProgressStudents = lessonProgressResult.data?.students ?? [];
-
 
   async function removeSelectedClass(formData: FormData) {
     "use server";
@@ -322,14 +326,15 @@ export default async function AdminPage({
                 </Link>
                 <div className="mt-7">
                   <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
-                  {/* Live DB-backed list: once student signup writes records, students appear automatically here. */}
                   <div className="mt-4">
                     {lessonProgressLoadFailed ? (
                       <p role="alert" className="text-sm text-destructive">
                         Student progress could not be loaded. Please refresh the page.
                       </p>
                     ) : (
-                      <LessonProgressList students={lessonProgressStudents} />
+                      <div className="max-h-[480px] overflow-y-auto rounded-lg border border-border p-4">
+                        <LessonProgressList students={lessonProgressStudents} />
+                      </div>
                     )}
                   </div>
                 </div>

@@ -38,6 +38,8 @@ export async function getTeacherClassLessonProgress(
     p_teacher_id: teacherId,
     p_class_id: classId,
   })
-  if (error || !data) throw new Error('Class progress access denied or unavailable.')
+  if (error || !data) {
+    throw new Error('Class progress access denied or unavailable.')
+  }
   return data as TeacherClassLessonProgress
 }

@@ -64,7 +64,7 @@ BEGIN
                     THEN 'in_progress'
                   ELSE 'not_started'
                 END
-              ELSE COALESCE(p.status, 'not_started')
+              ELSE COALESCE(p.status::text, 'not_started')
             END AS status
           FROM public.class_activities ca
           JOIN public.activities a ON a.id = ca.activity_id

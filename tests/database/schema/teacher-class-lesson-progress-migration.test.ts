@@ -48,7 +48,7 @@ describe("teacher_class_lesson_progress migration", () => {
   });
 
   it("falls back to student_progress.status for every other (exploration-only) lesson type", () => {
-    expect(migration).toContain("else coalesce(p.status, 'not_started')");
+    expect(migration).toContain("else coalesce(p.status::text, 'not_started')");
   });
 
   it("maps each quiz-bearing activity type to its own quiz_key", () => {
