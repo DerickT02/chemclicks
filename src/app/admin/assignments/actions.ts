@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { insertClassActivity, updateClassActivity } from "@/lib/db/class_activities";
+import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 
 export type AssignmentFormState = { status: "idle" | "success" | "error"; message: string; };
 
@@ -80,6 +81,7 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
        .select("id")
        .eq("id", classId)
        .eq("teacher_id", authData.user.id)
+       .eq("is_active", true)
        .maybeSingle();
 
      if (classError || !ownedClass) {
@@ -107,7 +109,7 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
      } else {
        const { data: activity, error } = await supabase
          .from("activities")
-         .select("id")
+         .select("id, type")
          .eq("id", activityId)
          .maybeSingle();
 
@@ -117,6 +119,12 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
            message: "The selected activity is unavailable.",
          };
        }
+
+       // Derive support from the stored activity, never a browser-supplied type or flag.
+       const blockReason = typeof activity.type === "string"
+         ? getNewAssignmentBlockReason(activity.type)
+         : "The selected activity is unavailable.";
+       if (blockReason !== null) return { status: "error", message: blockReason };
      }
 
      await requireTeacherId();

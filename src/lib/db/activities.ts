@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getActivityDefinition } from '@/lib/activities/registry'
 
 // Logic and types regarding the ACTIVITIES table.
 
@@ -36,31 +37,10 @@ export type ActivityCatalogResult = {
   error: CatalogError | null
 }
 
-const ACTIVITY_DESCRIPTIONS: Record<ActivityType, string> = {
-  bohr_model_intro: 'Introduction to electron shells',
-  bohr_model_stability: 'Determine atomic stability from electron shells',
-  lewis_diagram: 'Explore valence electrons with Lewis dot diagrams',
-  lewis_structures_covalent: 'Build covalent Lewis structures',
-  lewis_structures_ionic: 'Build ionic Lewis structures',
-  measurement_ruler_tenths: 'Practice ruler measurements to the nearest tenth',
-  measurement_ruler_hundredths: 'Practice ruler measurements to the nearest hundredth',
-  measurement_graduated_cylinder: 'Read liquid volume from a graduated cylinder',
-}
-
-const ACTIVITY_CATEGORIES: Record<ActivityType, string> = {
-  bohr_model_intro: 'Bohr Models',
-  bohr_model_stability: 'Bohr Models',
-  lewis_diagram: 'Lewis Structures',
-  lewis_structures_covalent: 'Lewis Structures',
-  lewis_structures_ionic: 'Lewis Structures',
-  measurement_ruler_tenths: 'Measurement',
-  measurement_ruler_hundredths: 'Measurement',
-  measurement_graduated_cylinder: 'Measurement',
-}
-
 /**
- * The current schema has no publication column, so every catalog row is
- * considered available. A secondary ID ordering keeps ties deterministic.
+ * Retain all rows for existing-assignment labels; the shared application
+ * registry determines new-assignment support and selector visibility.
+ * A secondary ID ordering keeps ties deterministic.
  */
 export async function listActivityCatalog(
   supabase: SupabaseClient,
@@ -74,11 +54,14 @@ export async function listActivityCatalog(
   if (error) return { data: null, error }
 
   return {
-    data: ((data ?? []) as Activity[]).map((activity) => ({
-      ...activity,
-      description: ACTIVITY_DESCRIPTIONS[activity.type],
-      category: ACTIVITY_CATEGORIES[activity.type],
-    })),
+    data: ((data ?? []) as Activity[]).map((activity) => {
+      const definition = getActivityDefinition(activity.type)
+      return {
+        ...activity,
+        description: definition?.description ?? 'This activity is not supported yet.',
+        category: definition?.category ?? 'Unavailable',
+      }
+    }),
     error: null,
   }
 }

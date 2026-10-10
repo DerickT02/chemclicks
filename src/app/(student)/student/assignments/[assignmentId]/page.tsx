@@ -12,6 +12,7 @@ import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
 import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
 
 import { hasActivityContent } from "@/lib/assignments/activity-content";
+import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function AssignmentPage({ params }: {
   if (!assignment) notFound();
 
   const type = assignment.activity.type;
+  const explorer = getActivityDefinition(type)?.explorer;
   const quizKind = lewisQuizForLesson(type);
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
   const latest = attempts[0];
@@ -51,13 +53,16 @@ export default async function AssignmentPage({ params }: {
             </section>
           )}
           <section className="rounded-xl border border-border bg-card p-6">
-            {type === "lewis_diagram" && <LewisDotExplorer />}
-            {type === "lewis_structures_ionic" && <IonicCompoundExplorer />}
-            {type === "lewis_structures_covalent" && <CovalentBondExplorer />}
-            {type === "measurement_graduated_cylinder" && <GraduatedCylinder />}
-            {(type === "measurement_ruler_tenths" || type === "measurement_ruler_hundredths") && <PrecisionRuler />}
+            {explorer === "lewis-diagram" && <LewisDotExplorer />}
+            {explorer === "ionic" && <IonicCompoundExplorer />}
+            {explorer === "covalent" && <CovalentBondExplorer />}
+            {explorer === "cylinder" && <GraduatedCylinder />}
+            {explorer === "ruler" && <PrecisionRuler />}
             {!hasActivityContent(type) && (
-              <p className="text-muted-foreground">This activity’s exercise is not available yet.</p>
+              <div className="space-y-2 text-muted-foreground" role="status">
+                <p>This activity’s exercise is not available yet.</p>
+                <p>{getNewAssignmentBlockReason(type)}</p>
+              </div>
             )}
           </section>
         </AssignmentAccess>

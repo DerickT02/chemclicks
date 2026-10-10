@@ -18,19 +18,19 @@ afterEach(cleanup);
 const activities: ActivityCatalogEntry[] = [
   {
     id: "11111111-1111-4111-8111-111111111111",
-    title: "Ruler Practice",
-    type: "measurement_ruler_tenths",
+    title: "Lewis Practice",
+    type: "lewis_diagram",
     order_index: 1,
-    description: "Practice ruler measurements to the nearest tenth",
-    category: "Measurement",
+    description: "Explore valence electrons with Lewis dot diagrams",
+    category: "Lewis Structures",
   },
   {
     id: "22222222-2222-4222-8222-222222222222",
-    title: "Ruler Practice",
-    type: "measurement_ruler_hundredths",
+    title: "Lewis Practice",
+    type: "lewis_structures_ionic",
     order_index: 2,
-    description: "Practice ruler measurements to the nearest hundredth",
-    category: "Measurement",
+    description: "Explore ionic compounds and charge balance",
+    category: "Lewis Structures",
   },
 ];
 
@@ -44,13 +44,13 @@ describe("assignment activity selection", () => {
       />,
     );
 
-    expect(screen.getAllByText("Ruler Practice")).toHaveLength(2);
-    expect(screen.getAllByText("Measurement")).toHaveLength(2);
+    expect(screen.getAllByText("Lewis Practice")).toHaveLength(2);
+    expect(screen.getAllByText("Lewis Structures")).toHaveLength(2);
     expect(
-      screen.getByText("Practice ruler measurements to the nearest tenth"),
+      screen.getByText("Explore valence electrons with Lewis dot diagrams"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Practice ruler measurements to the nearest hundredth"),
+      screen.getByText("Explore ionic compounds and charge balance"),
     ).toBeInTheDocument();
     expect(screen.getByText("Opens at — optional")).toBeInTheDocument();
     expect(screen.getByText("Closes at — optional")).toBeInTheDocument();
@@ -78,6 +78,41 @@ describe("assignment activity selection", () => {
     expect(screen.getByText("Assigned")).toBeInTheDocument();
     expect(screen.getAllByRole("radio")[0]).toBeDisabled();
     expect(screen.getAllByRole("radio")[1]).toBeEnabled();
+  });
+
+  it("disables Bohr and pending ruler assignments with reasons and hides the retired ruler choice", async () => {
+    const user = userEvent.setup();
+    const unavailable: ActivityCatalogEntry[] = [
+      { ...activities[0], id: "bohr-intro", title: "Bohr intro", type: "bohr_model_intro" },
+      { ...activities[0], id: "bohr-stability", title: "Bohr stability", type: "bohr_model_stability" },
+      { ...activities[0], id: "tenths", title: "Tenths ruler", type: "measurement_ruler_tenths" },
+      { ...activities[0], id: "hundredths", title: "Retired ruler", type: "measurement_ruler_hundredths" },
+    ];
+    render(<AssignmentForm classId="class" activities={unavailable} />);
+    const radios = screen.getAllByRole("radio");
+    expect(radios).toHaveLength(3);
+    expect(screen.queryByText("Retired ruler")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/assigned exploration experience is not supported/)).toHaveLength(2);
+    expect(screen.getByText(/paused until the ruler reports measurements to 0.1 cm/)).toBeInTheDocument();
+    for (const radio of radios) {
+      expect(radio).toBeDisabled();
+      await user.click(radio);
+      expect(radio).not.toBeChecked();
+    }
+    expect(screen.getByRole("button", { name: "Assign activity" })).toBeDisabled();
+  });
+
+  it.each(["unsupported", "assigned", "removed"])("invalidates a selected activity when it becomes %s", async (change) => {
+    const user = userEvent.setup();
+    const view = render(<AssignmentForm classId="class" activities={activities} />);
+    await user.click(screen.getAllByRole("radio")[0]);
+    expect(screen.getByRole("button", { name: "Assign activity" })).toBeEnabled();
+    const next = change === "removed" ? activities.slice(1)
+      : change === "unsupported" ? [{ ...activities[0], type: "bohr_model_intro" as const }, activities[1]] : activities;
+    view.rerender(<AssignmentForm classId="class" activities={next}
+      assignedActivityIds={change === "assigned" ? [activities[0].id] : []} />);
+    expect(screen.getByRole("button", { name: "Assign activity" })).toBeDisabled();
+    expect(screen.getAllByRole("radio").every((radio) => !(radio as HTMLInputElement).checked)).toBe(true);
   });
 
   it("shows an explicit empty state and disables assignment", () => {

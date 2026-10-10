@@ -1,10 +1,6 @@
-import type { ActivityType } from "@/lib/db/activities";
+import { getActivityDefinition } from "@/lib/activities/registry";
 
-export function hasActivityContent(type: ActivityType): boolean {
-  return type === "lewis_diagram"
-    || type === "lewis_structures_ionic"
-    || type === "lewis_structures_covalent"
-    || type === "measurement_ruler_tenths"
-    || type === "measurement_ruler_hundredths"
-    || type === "measurement_graduated_cylinder";
+/** Existing exercise/participation access is separate from allowing a new assignment. */
+export function hasActivityContent(type: string): boolean {
+  return Boolean(getActivityDefinition(type)?.explorer);
 }

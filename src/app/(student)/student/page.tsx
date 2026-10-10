@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { hasActivityContent } from "@/lib/assignments/activity-content";
+import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { LEWIS_QUIZZES, lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -43,7 +44,9 @@ export default async function StudentAssignmentsPage() {
                     Open activity
                   </Link>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Exercise not available yet.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Exercise not available yet. {getNewAssignmentBlockReason(assignment.activity.type)}
+                  </p>
                 )}
                 {quizKind && (
                   <Link href={LEWIS_QUIZZES[quizKind].path} prefetch={false}

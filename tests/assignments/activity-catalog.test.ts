@@ -27,7 +27,7 @@ function catalogClient(result: {
 }
 
 describe("activity catalog retrieval", () => {
-  it("retrieves entries in deterministic display order with distinguishing metadata", async () => {
+  it("retrieves deterministic metadata while retaining retired rows for existing assignment labels", async () => {
     const activities: Activity[] = [
       {
         id: "11111111-1111-4111-8111-111111111111",
@@ -57,15 +57,24 @@ describe("activity catalog retrieval", () => {
     expect(result.data).toEqual([
       {
         ...activities[0],
-        description: "Practice ruler measurements to the nearest tenth",
+        description: "Ruler exploration; the 0.1 cm reporting update is pending",
         category: "Measurement",
       },
       {
         ...activities[1],
-        description: "Practice ruler measurements to the nearest hundredth",
+        description: "Retired ruler offering; use the single tenths experience after its precision update",
         category: "Measurement",
       },
     ]);
+  });
+
+  it("labels unknown database types as unavailable rather than exposing missing descriptions", async () => {
+    const activity = { id: "future", title: "Future activity", type: "future_activity", order_index: 1 } as unknown as Activity;
+    const { client } = catalogClient({ data: [activity], error: null });
+    expect(await listActivityCatalog(client)).toEqual({
+      data: [{ ...activity, description: "This activity is not supported yet.", category: "Unavailable" }],
+      error: null,
+    });
   });
 
   it("returns an explicit empty catalog", async () => {

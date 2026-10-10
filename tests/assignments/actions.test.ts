@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
-  teacher: vi.fn(), writer: {}, getUser: vi.fn(), query: vi.fn(), insert: vi.fn(), update: vi.fn(), refresh: vi.fn(), create: vi.fn(),
+  teacher: vi.fn(), writer: {}, admin: vi.fn(), getUser: vi.fn(), query: vi.fn(), insert: vi.fn(), update: vi.fn(), refresh: vi.fn(), create: vi.fn(), eq: vi.fn(), select: vi.fn(),
 }));
 vi.mock('@/lib/server/teacher', () => ({ requireTeacherId: mocks.teacher }));
-vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => mocks.writer }));
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: mocks.admin }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.refresh }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.create }));
 vi.mock("@/lib/db/class_activities", () => ({ insertClassActivity: mocks.insert, updateClassActivity: mocks.update }));
@@ -15,18 +15,21 @@ const assignmentId = "33333333-3333-4333-8333-333333333333";
 const initial = { status: "idle" as const, message: "" };
 function form(values: Record<string, string | undefined> = {}): FormData {
   const data = new FormData();
-  for (const [key, value] of Object.entries({ class_id: classId, activity_id: activityId, ...values })) if (value !== undefined) data.set(key, value);
+  for (const [key, value] of Object.entries({ class_id: classId, activity_id: activityId, ...(values.assignment_id ? { confirm_schedule_change: "true" } : {}), ...values })) if (value !== undefined) data.set(key, value);
   return data;
 }
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.teacher.mockResolvedValue("teacher");
-  const builder = { select: () => builder, eq: () => builder, maybeSingle: mocks.query };
+  mocks.admin.mockReturnValue(mocks.writer);
+  const builder = { select: mocks.select, eq: mocks.eq, maybeSingle: mocks.query };
+  mocks.select.mockReturnValue(builder);
+  mocks.eq.mockReturnValue(builder);
   mocks.create.mockResolvedValue({ auth: { getUser: mocks.getUser }, from: () => builder });
   mocks.getUser.mockResolvedValue({ data: { user: { id: "teacher" } }, error: null });
-  mocks.query.mockResolvedValue({ data: { id: classId }, error: null });
-  mocks.insert.mockResolvedValue({ data: { id: assignmentId }, error: null });
-  mocks.update.mockResolvedValue({ data: { id: assignmentId }, error: null });
+  mocks.query.mockResolvedValue({ data: { id: classId, type: "lewis_diagram" }, error: null });
+  mocks.insert.mockResolvedValue({ data: { id: assignmentId, class_id: classId, activity_id: activityId, opens_at: null, closes_at: null }, error: null });
+  mocks.update.mockResolvedValue({ data: { id: assignmentId, class_id: classId, activity_id: activityId, opens_at: null, closes_at: null }, error: null });
 });
 
 describe("teacher assignment action", () => {
@@ -48,6 +51,38 @@ describe("teacher assignment action", () => {
     expect((await saveAssignment(initial, form())).status).toBe("error");
     expect(mocks.insert).not.toHaveBeenCalled();
   });
+  it.each([
+    "bohr_model_intro", "bohr_model_stability", "measurement_ruler_tenths", "measurement_ruler_hundredths", "future_activity", "constructor",
+  ])("rejects new unsupported %s assignments using stored metadata before privileged writes", async (type) => {
+    mocks.query.mockResolvedValueOnce({ data: { id: classId }, error: null })
+      .mockResolvedValueOnce({ data: { id: activityId, type }, error: null });
+    const result = await saveAssignment(initial, form({ activity_type: "lewis_diagram", assignable: "true" }));
+    expect(result.status).toBe("error");
+    expect(result.message).not.toBe("");
+    expect(mocks.select).toHaveBeenCalledWith("id, type");
+    expect(mocks.eq).toHaveBeenCalledWith("teacher_id", "teacher");
+    expect(mocks.eq).toHaveBeenCalledWith("is_active", true);
+    expect(mocks.admin).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+
+  it("allows date updates on existing unsupported assignments without creating new work", async () => {
+    mocks.query.mockResolvedValue({ data: { id: assignmentId, type: "bohr_model_intro" }, error: null });
+    expect((await saveAssignment(initial, form({ assignment_id: assignmentId }))).status).toBe("success");
+    expect(mocks.update).toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(mocks.select).not.toHaveBeenCalledWith("id, type");
+  });
+
+  it.each([null, { id: activityId }])("rejects missing or malformed activity metadata (%j)", async (activity) => {
+    mocks.query.mockResolvedValueOnce({ data: { id: classId }, error: null })
+      .mockResolvedValueOnce({ data: activity, error: null });
+    expect((await saveAssignment(initial, form())).status).toBe("error");
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+
   it("converts UTC input and reports a successful save", async () => {
     const result = await saveAssignment(initial, form({ opens_at: "2026-09-12T12:34" }));
     expect(result.status).toBe("success");
@@ -75,7 +110,7 @@ describe("teacher assignment action", () => {
   });
 });
 
-it('does not perform privileged writes when teacher approval fails', async () => {
+it('does not perform privileged writes when teacher authorization fails', async () => {
   mocks.teacher.mockRejectedValue(new Error('Unauthorized'));
   expect((await saveAssignment(initial, form())).status).toBe('error');
   expect(mocks.insert).not.toHaveBeenCalled();

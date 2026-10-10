@@ -7,6 +7,7 @@ import {
 } from "@/app/admin/assignments/actions";
 import ActivityCatalog from "@/app/admin/assignments/ActivityCatalog";
 import type { ActivityCatalogEntry } from "@/lib/db/activities";
+import { canAssignActivity } from "@/lib/activities/registry";
 
 type Props = {
   classId: string;
@@ -35,7 +36,10 @@ export default function AssignmentForm({
   const [activityId, setActivityId] = useState("");
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
-  const noActivities = activities.length === 0;
+  const selectedActivity = activities.find((activity) => activity.id === activityId);
+  const selectionIsAssignable = Boolean(selectedActivity
+    && canAssignActivity(selectedActivity.type)
+    && !assignedActivityIds.includes(selectedActivity.id));
 
   return (
     <form action={action} className="space-y-4">
@@ -44,7 +48,7 @@ export default function AssignmentForm({
       <ActivityCatalog
         activities={activities}
         assignedActivityIds={assignedActivityIds}
-        selectedActivityId={activityId}
+        selectedActivityId={selectionIsAssignable ? activityId : ""}
         onSelect={setActivityId}
       />
 
@@ -85,7 +89,7 @@ export default function AssignmentForm({
 
       <button
         type="submit"
-        disabled={pending || noActivities || !activityId}
+        disabled={pending || !selectionIsAssignable}
         className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground disabled:opacity-50"
       >
         {pending ? "Saving…" : "Assign activity"}

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
+import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { listActiveClassesForTeacher } from "@/lib/db/classes";
 
 
@@ -270,15 +271,17 @@ export default async function AdminPage({
                     </p>
                   ) : (
                     <>
-                      <div className="space-y-4 rounded-lg border border-border p-4">
-                        <h4 className="font-medium">Assign an activity</h4>
-                        <AssignmentForm
-                          key={selectedClass.id}
-                          classId={selectedClass.id}
-                          activities={activities}
-                          assignedActivityIds={assignedActivityIds}
-                        />
-                      </div>
+                      {!assignmentsLoadFailed && (
+                        <div className="space-y-4 rounded-lg border border-border p-4">
+                          <h4 className="font-medium">Assign an activity</h4>
+                          <AssignmentForm
+                            key={selectedClass.id}
+                            classId={selectedClass.id}
+                            activities={activities}
+                            assignedActivityIds={assignedActivityIds}
+                          />
+                        </div>
+                      )}
 
                       {assignmentsLoadFailed ? (
                         <p role="alert" className="text-sm text-destructive">
@@ -293,6 +296,9 @@ export default async function AdminPage({
                           const activity = activities.find(
                             (item) => item.id === assignment.activity_id,
                           );
+                          const blockReason = activity
+                            ? getNewAssignmentBlockReason(activity.type)
+                            : "This activity is unavailable in the current catalog.";
 
                           return (
                             <div
@@ -306,6 +312,11 @@ export default async function AdminPage({
                                 {activity ? (
                                   <p className="mt-1 text-xs text-muted-foreground">
                                     {activity.description}
+                                  </p>
+                                ) : null}
+                                {blockReason ? (
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    New assignments unavailable: {blockReason}
                                   </p>
                                 ) : null}
                                 <dl className="mt-3 space-y-1 text-xs text-muted-foreground">

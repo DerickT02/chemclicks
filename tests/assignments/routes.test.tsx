@@ -17,6 +17,7 @@ vi.mock("@/components/lewis/IonicCompoundExplorer", () => ({ default: () => <p>I
 vi.mock("@/components/lewis/CovalentBondExplorer", () => ({ default: () => <p>Covalent exercise</p> }));
 import AssignmentPage from "@/app/(student)/student/assignments/[assignmentId]/page";
 import StudentPage from "@/app/(student)/student/page";
+import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 
 const assignment = {
   id: "assignment-a", opens_at: null, closes_at: null,
@@ -78,6 +79,17 @@ describe("student assignment pages", () => {
     expect(html).not.toContain("/student/assignments/bohr");
     expect(html).toContain("Exercise not available yet");
   });
+  it.each(["bohr_model_intro", "bohr_model_stability"])("explains unsupported %s work without attempt controls", async (type) => {
+    reader.mockResolvedValue({ status: "ok", assignments: [{
+      ...assignment, id: "unsupported", activity: { ...assignment.activity, title: "Bohr activity", type },
+    }] });
+    const html = renderToStaticMarkup(await page("unsupported"));
+    expect(html).toContain("This activity’s exercise is not available yet.");
+    expect(html).toContain(getNewAssignmentBlockReason(type));
+    expect(html).not.toContain("Start exploration");
+    expect(html).not.toContain("Exploration attempts");
+  });
+
   it.each([
     ["lewis_structures_covalent", "/student/quizzes/covalent"],
     ["lewis_structures_ionic", "/student/quizzes/ionic"],
