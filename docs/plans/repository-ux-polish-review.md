@@ -33,7 +33,238 @@ git diff --check
 
 No live Supabase queries, writes, Auth operations, migrations, database fixture tests, production build, or browser acceptance have been run for this slice. Default `npm test` still discovers database-writing suites; do not use it with existing project credentials until P2-06 test separation is implemented.
 
-**Still pending:** Provisioning/role isolation and deployment investigation; real shared navigation; deliverable catalog filtering; confirmed class disabling; footer/marketing cleanup; safe default test separation; later Phase B/C work. Phase A's exit criteria are **not** met yet. Existing permanent-class-removal behavior is not changed by this slice. Each DB/Auth remediation or live mutation needs its own explanation and approval.
+### Implementation progress — second application slice
+
+Implemented:
+
+- **P1-01:** Replace placeholder links with My assignments/Practice labs for students and Classrooms for teachers. Use real homepage anchors for public navigation, dashboard logo destinations, and active states for nested routes. Resolve navigation identity through a read-only server function using the verified Auth user and scoped membership reads—not pathname, browser session claims, or editable role metadata. Student linking takes precedence over conflicting legacy teacher profiles **for navigation only**; student dashboard links additionally require that the linked class is active. Disabled/missing classes and class-read failures retain Sign out without student or teacher dashboard shortcuts. This does not repair provisioning or authorization. Refresh identity on Auth changes and ignore stale responses. Desktop/mobile controls now share the same session state; the mobile menu announces expansion and closes on navigation. Add explicit return links and untracked-practice copy to the practice index, Bohr, and measurement pages.
+- **P1-13, partial:** Get Started opens the existing role chooser rather than teacher-only login. Sign-out failures are announced and retryable; the UI returns to role selection only after local and server session checks confirm sign out. Teacher/student login methods remain separate.
+- **P2-02, partial:** Replace the placeholder footer with consistent ChemClicks branding and working sign-in/homepage links. Remove the newsletter input, empty newsletter section, and nonexistent resource/legal destinations rather than inventing policies. Correct Student ID/classroom code and Explore terminology; remove clickable-looking hover treatment from static marketing cards. Real privacy/help material remains required before classroom rollout.
+
+Validation:
+
+```sh
+npx vitest run tests/auth tests/assignments tests/routes tests/measurement tests/quiz tests/chemistry tests/bohr tests/ui
+# 46 files / 465 tests passed (explicitly selected mocked/non-database suites)
+npx tsc --noEmit --incremental false
+# Passed
+npm run lint
+# Passed; no warnings
+git diff --check
+# Passed
+```
+
+Pre-commit review fixes: coordinate sign-out with Auth events using operation ownership checks at every async boundary. Local SIGNED_OUT events do not publish success before server confirmation; failed confirmation keeps desktop/mobile retry controls available even after later SIGNED_OUT updates. Newer login/session changes supersede older sign-out work, including its success, error, finalizer, and navigation. Remove the stale “tenths and hundredths” homepage/practice-index promise using neutral instrument-reading copy; P1-04's ruler specification/catalog consolidation remains pending.
+
+Added regression coverage for verified navigation identity (including conflicting profiles, active/disabled/missing classes, class-read failures, unverified teachers, metadata spoofing, and failed reads), public/protected-path navigation, nested active states, mobile semantics/closure, existing reduced-motion anchor scrolling, Auth-change races, sign-out failure/pending/confirmation, early/late SIGNED_OUT retry availability, and superseded sign-out requests/confirmations after a newer login. Public/practice link tests check real route files and homepage anchor targets. No live Supabase queries, writes, Auth operations, migrations, database fixtures, production build, or manual browser/viewport checks were run. Browser usability remains unverified; no full accessibility certification is implied.
+
+### Implementation progress — third application slice
+
+Implemented:
+
+- **P1-03, application guard/registry:** Add `src/lib/activities/registry.ts` as shared metadata for canonical titles, descriptions, categories, assignment explorers, practice locations, quiz associations, selector visibility, and new-assignment restrictions. Catalog descriptions, content-support checks, assignment rendering, and Lewis quiz associations consume this registry. Unknown database types fail closed. New assignments currently enable only Lewis diagrams, covalent/ionic explorations, and graduated-cylinder exploration; Bohr choices explain that assigned exploration support is missing, without expanding RPC support.
+- **Ruler safety prerequisite for P1-04:** Pause new tenths-ruler assignments until reporting is consistently 0.1 cm. Hide the retired hundredths choice from the new-assignment selector and reject both ruler types at the server create boundary. Existing ruler content/participation access remains unchanged in this catalog-only slice; this is not a new compatibility mode or a requirement to preserve testing records. Ruler specification/question/readout/type consolidation and separately approved database cleanup are still pending.
+- **Assignment boundary/UX:** Determine support from the stored activity type, not browser flags. Reject unsupported creates before obtaining the privileged writer, require an active owned class, and retain existing authorized date-update behavior. Prevent stale/removed/already-assigned selections from enabling submission. Hide the new-assignment form when catalog or existing-assignment reads fail. Preserve catalog rows for labeling existing assignments and show their new-assignment restrictions; explain unsupported Bohr content to students without attempt controls.
+
+Validation:
+
+```sh
+npx vitest run tests/auth tests/assignments tests/routes tests/measurement tests/quiz tests/chemistry tests/bohr tests/ui
+# 49 files / 502 tests passed (explicitly selected mocked/non-database suites)
+npx tsc --noEmit --incremental false
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --check
+# Passed; recognizes the existing CRLF format of src/app/admin/page.tsx
+```
+
+The default `git diff --check` reports CR-at-EOL on added admin-page lines; its existing CRLF formatting was preserved rather than rewriting the entire file. The command above still checks trailing spaces and other specified whitespace errors and changes no Git configuration.
+
+Regression coverage includes the registry's enabled set, unknown/prototype-key types, real practice routes, quiz associations, disabled/retired catalog controls, stale selections, stored-type server rejection, existing date updates, load-failure states, existing-assignment labels, and a mocked teacher-assign → student-open → exploration-start/finish contract for every enabled type. These are **not** browser or deployed-RPC acceptance tests. No live Supabase queries, mutations, Auth operations, migrations, database fixtures, production build, or manual browser checks were run. No quiz persistence, progression, grading/retry-policy changes, student approval, or Bohr tracking expansion were introduced.
+
+### Implementation progress — fourth application slice
+
+Implemented:
+
+- **P1-09, application:** Replace `deleteOwnedClass()` with `disableOwnedClass()`. Validate the class ID, resolve the authenticated teacher server-side, and update only `is_active = false` on that teacher's active class. Require one confirmed returned row; reject unauthorized, missing, already-disabled, and failed updates. Remove the old hard-delete Server Action, the unused database deletion helper, and the unused mock class-deletion function. No application class-removal path issues DELETE.
+- **Confirmation/recovery:** Add an inline named-class confirmation explaining lost student access and retained class, student, assignment, progress, and attempt data. Opening/cancelling does not invoke a mutation. Disable confirmation/Cancel while pending; announce safe errors and permit retry. Reset confirmation when selecting another class. On confirmed success, invalidate teacher/student layouts and return to `/admin?classDisabled=1`, with a success message and a remaining active class (or a truthful no-active-classes state). A cache-refresh failure after a confirmed flag update is not reported as a failed write. No disabled-class list, Undo, or reactivation UI was added.
+- **Disabled-state access:** Require active ownership before teacher assignment/report reads, including before the privileged summary RPC. Existing student session/login/enrollment/assignment readers and repository attempt RPC definitions already check active class state; new assignment/date writes retain their existing active-class guard. Deployed RPC behavior and races still require separately approved integration verification.
+
+Ruler work is owned by the existing `feat/jira-66,111` branch (local tip `a8dd7e6`, with ruler commits `48405cf` and `d596cc1`). At the user's direction, the attempted duplicate ruler edits were reversed. That branch was not merged or fetched for this independent class-disabling slice. Earlier catalog pauses remain unchanged until branch integration/consistency review; do not reimplement the ruler here.
+
+Validation:
+
+```sh
+npx vitest run tests/auth tests/assignments tests/routes tests/measurement tests/quiz tests/chemistry tests/bohr tests/ui
+# 52 files / 531 tests passed (explicitly selected mocked/non-database suites)
+npx tsc --noEmit --incremental false
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --check
+# Passed
+```
+
+Regression coverage includes owner/active-scoped flag-only updates without DELETE, authorization/ID/update failures, server confirmation validation, safe transport/database errors, post-write cache failure, Cancel/no-write behavior, pending duplicate prevention, retry, changed selections, active-class listing, remaining/last-class dashboard states, and denied disabled-class report reads before privileged RPC access. These checks are mocked, not deployed or browser acceptance. No live Supabase queries, writes, Auth operations, migrations, database fixtures, production build, or manual browser checks were run. Existing database DELETE policies/grants and cascade fixtures were not changed or tested; preventing direct database API deletion, if currently permitted, remains a separately approved DB/Auth remediation—not a guarantee of this application slice.
+
+### Implementation progress — fifth slice: safe test separation
+
+Implemented **P2-06, testing/setup subset**:
+
+- Default run/watch scripts explicitly select `vitest.config.mts`. Its reviewed directory allowlist includes mocked/unit/component suites and excludes all of `tests/database/`, including database-writing schema tests. Remove application dotenv loading; supply inert values for the three application Supabase variables and block unmocked `fetch` before test modules load. Keep SSR tests in Node and existing DOM suites' jsdom annotations. This is accident prevention, not a network/process sandbox or permission to stop mocking external clients.
+- Add a separate `vitest.database.config.mts`/`test:database` command. Require a shell-only write acknowledgement before fixture-file reads or test-module imports, four dedicated `TEST_SUPABASE_*` variables, and a separately identified disposable target. Never fall back to application credentials. Reject non-origin/unsafe URLs, hosted reference mismatches, configured application targets (including known env-file URLs and local aliases), malformed keys, and detectable JWT role/reference mismatches. Publishable/secret key association, signatures, project purpose, and unknown production targets cannot be verified locally. Explicit project-specific approval is still required. Serialize database files to reduce fixture collisions; do not claim existing fixtures are repaired or safe.
+- Add `docs/database-testing.md`, update README runtime/testing/setup instructions, remove the routine shared-project migration-push recipe, and add `typecheck`. Use explicit `.mts` tooling imports with TypeScript's no-emit-compatible extension setting. Add `.github/workflows/checks.yml` for credential-free unit/component tests, TypeScript, and lint—not database operations, migrations, browser acceptance, or deployment. The hosted workflow has not been run.
+
+Validation:
+
+```sh
+npm test
+# 53 files / 572 mocked/unit/component tests passed
+npm run typecheck
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --check
+# Passed
+npx vitest list --config vitest.config.mts --filesOnly --json
+# Only the 53 reviewed non-database files were discovered
+npm test -- tests/database
+# Expected exit 1: no matching files; default configuration cannot select fixture suites
+# Negative configuration check, with the acknowledgement explicitly unset:
+env -u CHEMCLICKS_ALLOW_DATABASE_WRITES npm run test:database -- tests/database/integration/student_attempt_lifecycle.test.ts
+# Expected exit 1 at the acknowledgement guard; no fixture module imported
+```
+
+Regression coverage checks the actual default config/scripts, inert credentials, blocked fetch, allowlist, exact opt-in, missing fixture variables/no application fallback, local aliases, configured application targets, URL/ref restrictions, malformed/role-mismatched keys, and supported key formats with honest validation limits. Only the refusal path of the database CLI was exercised; accepted preflight cases were tested as pure functions with synthetic keys and URLs. No live Supabase queries, writes, Auth operations, migration/schema/fixture tests, production build, browser checks, branch integration, commits, or hosted CI execution were performed. Earlier progress entries' warnings about the old default runner are historical; the current default is now separated.
+
+### Implementation progress — sixth slice: quiz refresh stability
+
+Implemented **P1-06, application stability/deadline-UX subset**:
+
+- `RandomizedQuiz` draws after mount into a per-attempt snapshot of questions, shuffled options/correct indices, and the existing passing threshold. Fresh/changed/empty pool props do not replace an active attempt or reset its selection, score, feedback, or result. Only explicit Try again clears the snapshot and initializes from the latest eligible pool. No randomness during SSR; StrictMode effect replay does not draw twice. Empty pools and invalid draw counts have real empty/error states and return links instead of endless loading.
+- Keep Bohr and available Lewis client quiz boundaries mounted across returned/thrown question-load failures. Pass only a sanitized load-error string, show a warning without discarding the current attempt, and block new draws from failed data. Successful recovery removes the warning without redrawing. Authentication/assignment-availability failures still fail closed; preserving state does not grant access or bypass the server reader.
+- Key assigned quiz/exploration boundaries by assignment ID, not closing timestamp. Valid date edits no longer remount the exercise. Separate clock subscription from route revalidation; retain 30-second/focus refreshes, one bounded deadline timeout, and cleanup of old timers/listeners. Invalid dates fail closed; extensions/removals/reopening metadata do not leave a sticky closed flag. Display an exact UTC `<time>` warning and, on closure, remove interactive work and provide a real return path with explicit unsaved-quiz/confirmed-exploration-save language. Client clock behavior is UX only; existing server ownership/deadline checks remain authoritative and unchanged.
+
+Validation:
+
+```sh
+npm test
+# 55 files / 600 mocked/unit/component tests passed
+npm run typecheck
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --check
+# Passed
+```
+
+Regression coverage includes SSR-safe initialization, StrictMode, question/choice/selection/score/feedback/result stability, source mutation independence, explicit retry from fresh data, empty/error recovery, invalid counts, pending initialization cleanup, stable server boundary keys, sanitized thrown loads, exact close boundaries, timer/focus cleanup, changed/removed/reopened dates, invalid dates, browser timer clamping, and a real quiz inside the revalidation wrapper with mocked refresh payloads. No new persistence, progression, policy settings, passing-threshold values, scoring rules, retry limits, or keyboard interactions were introduced. `QuizShell` scoring logic and server mutations/RPCs were not changed. No ruler implementation/branch integration, live Supabase operations, database fixtures, migrations, production build, hosted CI, or manual browser checks were run.
+
+**P1-06 remains partial:** Full page reloads/navigation or loss of authorized access can still discard these unsaved local attempts; no storage/resume feature was added. Closing ends the interactive view. A separately authorized read-only path for completed closed work/history is still pending with P1-07/P1-08; do not claim closed-history access is implemented. Mocked component reconciliation/timers do not certify actual App Router streaming, browser suspension, deployed RPC checks, or end-to-end behavior.
+
+### Implementation progress — seventh slice: teacher progress accuracy
+
+Implemented **P1-10, application count/error/pagination subset**:
+
+- Define the dashboard denominator as **all assignment IDs in the selected active owned class**, including untouched, scheduled, closed, and existing unsupported assignments. Show X of Y assigned activities **currently** completed, plus in-progress/not-started counts. Missing progress means not started; duplicate identical records cannot inflate counts. Conflicting duplicates or invalid status values show unavailable progress rather than choosing an arbitrary row. With no assignments, show a genuine no-activities state without a fabricated percentage.
+- Use current `student_progress.status` explicitly, not ever-completed history or quiz grades. Explain that retrying can move current completion back to in progress while earlier saved exploration attempts remain in the existing Activity attempts report. Remove the unordered “Completed current activity” inference; rename Active students to Enrolled students. No historical-completion badge, selected-activity view, quiz reporting, or assessment/retry-policy change was added.
+- Preserve independent failures: roster errors hide enrollment counts and the empty-roster claim; assignment/progress errors retain known enrollment but hide percentages and not-started claims. Announce safe refresh guidance without SQL/transport details. Keep the existing class-list error boundary and assignment/catalog creation guards; reject an Auth result carrying an error before reading classroom data.
+- Add a shared all-pages reader with stable caller ordering, advancement by actual returned rows (including smaller backend caps), and an empty-page termination check. Any later-page failure discards partial data. Paginate active owned class metadata, selected-class assignment metadata, rosters, and selected-class progress. Batch roster class-ID filters; constrain progress on both student and assignment class relationships. Use only the existing request-scoped client and owned-class selection, with no privileged client, RPC, or mutation changes.
+- Add accessible, labeled completion bars only when the count is known. Preserve the admin page's existing CRLF formatting.
+
+Validation:
+
+```sh
+npm test
+# 57 files / 636 mocked/unit/component tests passed
+npm run typecheck
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --check
+# Passed
+```
+
+Regression coverage includes 1/5 versus 100%, missing/explicit not-started rows, current retries, query-order independence, duplicate/conflicting/invalid rows, empty assignments, separate read failures, URL class scoping, authentication errors, active ownership filters, both progress relationship filters, bounded roster batches, later-batch/page failures, and more than 1,000 rows for each paged reader. These are mocked checks, not deployed RLS/relationship/compatibility or browser acceptance. Pagination is not an atomic database snapshot across concurrent changes. Existing provisioning/role-isolation defects and deployed report/privacy audits remain separate P0 work; this slice does not certify teacher authorization. No live Supabase queries/writes, Auth operations, fixtures, migrations, production build, hosted CI, manual browser checks, ruler integration, or commits were performed.
+
+### Implementation progress — eighth slice: assignment date editing
+
+Implemented **P1-11, application editor/recovery subset**:
+
+- Add `AssignmentSchedule` to existing assignment cards, with semantic UTC timestamps and Open/Scheduled/Closed/unavailable badges. Prefill both optional dates; blank bounds retain immediate-opening/no-deadline semantics. Add Edit dates, Cancel, review/confirmation, Back to dates, pending lockout, safe error/retry feedback, and activity/class-named success. Confirm all edits, including changes that close, reopen, or interrupt currently open work. Existing unsupported/retired assignments remain date-editable; new-assignment restrictions are unchanged. Existing date controls remain available when catalog labels fail, but not when assignment metadata fails.
+- Update the existing assignment ID rather than creating replacement work. The new editor submits its original window; the action rejects stale snapshots, and the writer conditionally matches original dates plus class/activity relationships to avoid a later overwrite. Changed server metadata blocks an open stale draft. Legacy direct callers without snapshots retain their previous date-update behavior, but the action now requires explicit update confirmation. This is not a deployment-wide concurrency/authorization guarantee.
+- Return only confirmed assignment/schedule metadata after a successful write. Display that receipt if refresh fails; genuinely new server props supersede the local receipt, including a later revert. Revalidation failure does not turn a confirmed write into a failed-write claim. Invalidate teacher and student views after saves. No assignment IDs, attempt/progress records, passing thresholds, score-selection rules, or retry policies are changed by date editing.
+- Reset the new-assignment selection and date fields only after confirmed success; identify the activity/class. Preserve inputs on returned/thrown errors and disable fields while pending. Reassert controlled radio selection after React's native form reset, including repeated identical errors. Duplicate-assignment feedback now points to the real Edit dates control.
+- Retain the current **UTC entry/storage contract** rather than silently reinterpreting existing forms as local time. Share strict UTC parsing and allow millisecond entry; preserve unchanged original timestamp precision. P1-12 local-time entry and viewer-zone formatting remain pending. Schedule badges subscribe to bounded deadline timers, periodic/focus clock checks, and cleanup; these are display-only. A narrow lint exception documents the request-time Server Component clock snapshot used for stable hydration, not a client render-time side effect.
+
+Validation:
+
+```sh
+npm test
+# 60 files / 674 mocked/unit/component tests passed
+npm run typecheck
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --check
+# Passed
+```
+
+Regression coverage includes UTC prefill/fractions/calendar validation, null bounds, inclusive opening/exclusive closing, exact clock boundaries, focus/long-timer cleanup, review/Cancel/no-write behavior, confirmed existing IDs, pending duplicate prevention, safe returned/thrown failures, stale snapshots and conditional-update misses, class/activity scoping, inactive-class denial, unchanged precision, closed-work reopening, confirmed receipts/newer server data, catalog failures/unsupported existing types, new-form reset, repeated-error selection retention, and cache failure after confirmed writes. No live Supabase queries/writes, Auth operations, database fixtures, migrations, browser/mobile acceptance, production build, hosted CI, ruler integration, or commits were performed. Existing P0 provisioning/privacy/deployment questions and parent-class ownership/disable races still require separately approved investigation; no deployed policy or transactional-parent guarantee is claimed.
+
+### Implementation progress — ninth slice: local entry and viewer-zone timestamps
+
+Implemented **P1-12, application conversion/display subset**:
+
+- New-assignment and date-edit forms detect and visibly name the device's IANA zone after hydration, pin it for the form's lifetime, and submit local wall-clock values plus that zone. A changed device zone on focus updates timestamp displays but cannot reinterpret an existing draft. Failed zone detection requires an explicit Use UTC instead choice. SSR does not guess a local zone or enable ambiguously labeled entry.
+- Convert/validate on the **server**, independently of browser UTC/offset claims. Keep UTC instants in the existing timestamp columns; add no zone column, account setting, database configuration, or authorization/time-policy change. Legacy direct action callers without the new zone field retain their UTC contract. Reject invalid zones/calendars, nonexistent spring-forward times, and undisambiguated repeated times before database access. Repeated-hour selects explicitly distinguish first/second UTC instants; existing edits preselect the original instant's occurrence. Compare opening/closing order in UTC, including valid windows whose local clock numbers run backward across a repeated hour.
+- Share semantic `LocalizedTimestamp` rendering across teacher assigned/schedule/attempt timestamps, student deadline cards, deadline warnings, and exploration attempt history. Render explicitly labeled UTC during SSR and initial hydration; then show the viewer zone, offset applicable to that date, and consistent numeric date/time formatting. Retain the original `dateTime` instant and an exact UTC tooltip/accessibility label. Invalid dates do not create invalid `<time>` elements. Use a shared, cleaned-up focus subscription and bounded formatter caching rather than per-timestamp listeners/formatter construction.
+- Retain schedule confirmation, original-window conditional updates, confirmed-write receipts, all assignment IDs/attempt records, and policy values. Preserve drafts and repeated-time choices through native React form resets and identical errors. Client gap feedback participates in native validity; server validation remains authoritative. This supersedes the eighth slice's intentionally temporary UTC-only entry, not its storage/authorization contract.
+
+Validation:
+
+```sh
+npm test
+# 62 files / 709 mocked/unit/component tests passed
+npm run typecheck
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --check
+# Passed
+```
+
+Coverage includes teacher New York 3 PM → stored UTC → Los Angeles noon for the same instant; date-specific winter/summer offsets; fractional offsets/milliseconds/midnight; New York/London repeated hours; Lord Howe half-hour gaps/folds; Apia's skipped date; UTC order across repeated hours; invalid zones/calendars/occurrences; ignored forged UTC/offset claims; legacy UTC inputs; explicit fallback; pinned drafts; preserved original snapshots/occurrences and repeat-error choices; viewer focus updates/cleanup; invalid timestamps; and actual React SSR/hydration in jsdom without recovery errors. This uses the runtime's Intl/IANA data; it is not actual App Router/mobile/browser or deployed acceptance. No live Supabase queries/writes, Auth operations, fixtures, migrations, production build, hosted CI, ruler integration, or commits were performed. Closed-history authorization, provisioning/privacy/deployment remediation, and parent-class races remain separately scoped; no quiz persistence, progression, grading/retry-policy changes, or keyboard-control expansion was introduced.
+
+### Implementation progress — tenth slice: student work queue
+
+Implemented **P1-07, authorized metadata/current-progress subset**:
+
+- Show student/class context and grouped In progress, To do, Completed explorations, progress-unavailable, unsupported, Upcoming, Closed, and invalid-schedule states. Sort available work by deadline and upcoming work by opening time. Offer open/start, resume, and review destinations only for available supported work; keep untracked practice separate and explain the explicit Start/Finish participation controls.
+- Read own-class schedule metadata through a server-only reader. Validate active membership before and after reads, paginate metadata/progress, bound progress ID batches, constrain both progress relationships, and read progress only for currently open supported assignments. Discard partial or conflicting progress rather than inventing completion or not-started counts. Recheck metadata after progress reads and withhold saved status when the schedule changed. No exercise content, credentials, quiz grades, or closed attempt history is returned.
+- Add manual, periodic, focus, and near-boundary refreshes. Browser timers request fresh authorized server data; they do not grant access. Closed cards explicitly state that saved status/history is not available there yet. Read-only closed-history authorization and the exploration-page flow remain pending.
+
+### Atomic commit checkpoint
+
+The reviewed changes were committed in separate testing, navigation, marketing, catalog, class-disabling, quiz-stability, teacher-progress, schedule-editor, time-zone, and student-work-queue batches. Overlapping files were split through the Git index without overwriting newer working-tree edits. Every staged application/testing snapshot passed its safe tests, TypeScript, and lint in an isolated temporary checkout. The new-assignment success assertion now waits for message content rather than the initially empty status element.
+
+Latest staged application snapshot:
+
+```sh
+npm test
+# 63 files / 728 mocked/unit/component tests passed
+npm run typecheck
+# Passed
+npm run lint
+# Passed; no warnings
+git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --cached --check
+# Passed; preserves existing CRLF formatting
+```
+
+The work-queue checks cover scoped reads, current saved progress, missing rows, invalid/conflicting records, later-page/batch failures, more than 1,000 rows, membership/disabled-state rechecks, schedule changes during reads, sanitized failures, and existing route contracts. They do not certify browser refresh/grouping usability, deployed relationship/RLS behavior, or transactional snapshots. No live Supabase queries/writes, Auth operations, database fixtures, migrations, production build, hosted CI, browser acceptance, ruler integration, or pushes were performed during this commit pass. Earlier implementation entries' no-commit statements describe their historical validation checkpoints.
+
+**Still pending:** Provisioning/role isolation and deployment investigation; ruler branch integration/consistency review; deployed/browser acceptance of class disabling, quiz stability, teacher progress, date editing, time-zone behavior, and the student work queue; closed-history/exploration-flow improvements; privacy/help material and remaining onboarding/copy; migration-history/scaffolding/documentation cleanup and dedicated-fixture auditing under P2-06; later Phase B/C work. Phase A's exit criteria are **not** met yet. Each DB/Auth remediation, live mutation, or fixture run needs its own explanation and approval. Routine validation can use `npm test`, `npm run typecheck`, and `npm run lint`.
 
 ### Recorded review decisions
 
@@ -253,7 +484,9 @@ No new `/teacher/dashboard` is necessary just to improve labels: `/admin` can re
 
 ### P1-10 — Correct teacher progress and distinguish errors from zeros [M; application]
 
-**Evidence:** `src/app/admin/page.tsx` divides completed progress rows by existing progress rows, not all assigned activities. One finished assignment out of five can therefore show 100%. “Completed current activity” uses the last item of a query with no defined chronological/activity order. Student, class-activity, and progress query errors are ignored and converted into empty collections.
+**Application tracking:** Count/error/pagination subset implemented in the seventh slice above. Dashboard counts explicitly report current exploration status; historical completion remains in the existing attempts report. Deployed read-policy/relationship compatibility, concurrent behavior, and browser acceptance are not certified.
+
+**Evidence (baseline):** `src/app/admin/page.tsx` divides completed progress rows by existing progress rows, not all assigned activities. One finished assignment out of five can therefore show 100%. “Completed current activity” uses the last item of a query with no defined chronological/activity order. Student, class-activity, and progress query errors are ignored and converted into empty collections.
 
 **Change:** Define the report denominator and display **X of Y assigned activities completed** (or selected-activity participation). Include missing progress as not started. Use an explicit activity selection/order and clearly distinguish ever-completed from latest-retry status. Handle each query error and avoid showing false student counts or progress. Reuse the attempt report's error-versus-zero discipline. Paginate large rosters/progress reads instead of assuming one query returns every row.
 
@@ -261,7 +494,9 @@ No new `/teacher/dashboard` is necessary just to improve labels: `/admin` can re
 
 ### P1-11 — Add the schedule editor the UI already promises [M; application]
 
-**Evidence:** `saveAssignment()` supports an assignment ID and updating dates, but `AssignmentForm.tsx` always sends an empty `assignment_id`. Existing cards are read-only. Duplicate-assignment errors tell users to “Edit its dates below,” where no editor exists. Catalog selection/form dates also remain after success.
+**Application tracking:** Editor/recovery subset implemented in the eighth slice above. Local-time entry is now supplied by the ninth slice (P1-12); deployed authorization/races and actual browser/mobile acceptance remain unverified.
+
+**Evidence (baseline):** `saveAssignment()` supports an assignment ID and updating dates, but `AssignmentForm.tsx` always sends an empty `assignment_id`. Existing cards are read-only. Duplicate-assignment errors tell users to “Edit its dates below,” where no editor exists. Catalog selection/form dates also remain after success.
 
 **Change:** Add an **Edit dates** control on existing assignments, prefilled values, save/cancel states, and open/scheduled/closed badges. Confirm changes affecting active work. Reset the new-assignment form after successful creation and identify the saved activity/class. Block assigning when the existing assignment list failed to load rather than treating it as empty.
 
@@ -269,7 +504,9 @@ No new `/teacher/dashboard` is necessary just to improve labels: `/admin` can re
 
 ### P1-12 — Use understandable time zones consistently [M; application]
 
-**Evidence:** Assignment scheduling uses `datetime-local` but asks teachers to enter UTC; server action appends `Z`. Student cards and reports show UTC with differing formats. This is technically labeled but easy to misinterpret when entering classroom deadlines.
+**Application tracking:** Conversion/display subset implemented in the ninth slice above. Actual browser/App Router, mobile date controls, runtime zone-data compatibility, and deployed acceptance remain unverified.
+
+**Evidence (baseline):** Assignment scheduling uses `datetime-local` but asks teachers to enter UTC; server action appends `Z`. Student cards and reports show UTC with differing formats. This is technically labeled but easy to misinterpret when entering classroom deadlines.
 
 **Change:** Prefer local-time entry with an explicit displayed zone, convert to UTC for storage, and format consistently for the viewer. A small reusable date/time component should use semantic `<time>`. Provide exact timestamps where useful; do not rely only on “tomorrow.” Test daylight-saving transitions and deadline boundaries. Keep all actual authorization on server time.
 
