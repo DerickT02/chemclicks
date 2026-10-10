@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { deleteOwnedClass } from "@/lib/server/classes";
-import { redirect } from "next/navigation";
+import DisableClassControl from "@/app/admin/classes/DisableClassControl";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import { listActivityCatalog } from "@/lib/db/activities";
@@ -55,10 +54,10 @@ function scheduleTimestamp(value: string | null, whenEmpty: string): string {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ classId?: string }>;
+  searchParams: Promise<{ classId?: string; classDisabled?: string }>;
 }) {
   const supabase = await createClient();
-  const [{ classId }, { data: userData }] = await Promise.all([
+  const [{ classId, classDisabled }, { data: userData }] = await Promise.all([
     searchParams,
     supabase.auth.getUser(),
   ]);
@@ -150,18 +149,16 @@ export default async function AdminPage({
   const assignmentsLoadFailed = Boolean(assignmentsResult.error);
 
 
-  async function removeSelectedClass(formData: FormData) {
-    "use server";
-    const id = formData.get("classId") as string;
-    if (!id) return;
-    await deleteOwnedClass(id);
-    redirect("/admin");
-  }
 
   return (
     <div className="min-h-screen bg-background px-6 py-10 text-foreground md:px-10">
       <div className="mx-auto max-w-6xl">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Classrooms</h1>
+        {classDisabled === "1" && (
+          <p role="status" className="mt-3 text-sm text-foreground">
+            Class disabled. Student access is blocked; classroom data has been kept.
+          </p>
+        )}
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
           Teacher admin view. Create classes, share classroom codes, and see where students
           are in the lesson.
@@ -179,12 +176,12 @@ export default async function AdminPage({
             <div className="space-y-2">
               {classes.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                  <p>No classes yet.</p>
+                  <p>No active classes.</p>
                   <Link
                     href="/admin/create-class"
                     className="mt-2 inline-flex text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    Create your first class
+                    Create a class
                   </Link>
                 </div>
               ) : (
@@ -246,15 +243,7 @@ export default async function AdminPage({
                       {selectedClass.class_code}
                     </span>
                   </div>
-                  <form action={removeSelectedClass}>
-                    <input type="hidden" name="classId" value={selectedClass.id} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-destructive px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      Remove class
-                    </button>
-                  </form>
+                  <DisableClassControl key={selectedClass.id} classId={selectedClass.id} className={selectedClass.name} />
                 </div>
                 {selectedClass.section ? (
                   <p className="mt-2 text-sm text-muted-foreground">{selectedClass.section}</p>

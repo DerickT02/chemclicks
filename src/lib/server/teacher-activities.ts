@@ -9,7 +9,8 @@ export async function getTeacherClassActivities(classId: string) {
   }
   const client = await createClient()
   const { data: classroom, error: classError } = await client.from('classes')
-    .select('id, name').eq('id', classId).eq('teacher_id', teacherId).maybeSingle()
+    .select('id, name').eq('id', classId).eq('teacher_id', teacherId)
+    .eq('is_active', true).maybeSingle()
   if (classError || !classroom) throw new Error('Class access denied or unavailable.')
   const { data, error } = await client.from('class_activities')
     .select('id, activities!inner(title)').eq('class_id', classId).order('created_at')

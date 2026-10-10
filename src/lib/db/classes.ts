@@ -73,18 +73,6 @@ export async function findClassByCode(
 }
 
 /**
- * Deletes a row from `classes` by id. RLS enforces that only the owning teacher
- * can delete (teacher_id = auth.uid()), so use the request-scoped server client.
- */
-export async function deleteClass(
-  supabase: SupabaseClient,
-  id: string,
-): Promise<{ error: PostgrestError | null }> {
-  const { error } = await supabase.from("classes").delete().eq("id", id);
-  return { error };
-}
-
-/**
  * Inserts a row into `classes`. Use the request-scoped client from
  * `@/lib/supabase/server` so RLS applies (`teacher_id` must match `auth.uid()`).
  */

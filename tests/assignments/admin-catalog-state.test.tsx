@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { getActivityDefinition } from "@/lib/activities/registry";
 
 const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), roster: vi.fn(), progress: vi.fn(), user: vi.fn() }));
-vi.mock("@/lib/server/classes", () => ({ deleteOwnedClass: vi.fn() }));
+vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
   auth: { getUser: mocks.user },
   from: () => ({ select: () => ({ in: async () => ({ data: [], error: null }) }) }),
@@ -32,7 +32,27 @@ beforeEach(() => {
 });
 
 describe("teacher catalog safety states", () => {
+  it("falls back to a remaining active class when a disabled class was selected", async () => {
+    const remainingId = "22222222-2222-4222-8222-222222222222";
+    mocks.classes.mockResolvedValue({ data: [{ id: remainingId, name: "Remaining class", section: "B", class_code: "XYZ789" }], error: null });
+    const html = await render();
+    expect(html).toContain(`data-class-id="${remainingId}"`);
+    expect(html).not.toContain(`data-class-id="${classId}"`);
+    expect(html).not.toContain("Remove class");
+    expect(mocks.assignments).toHaveBeenCalledWith(expect.anything(), remainingId);
+  });
 
+  it("confirms disabling even when the last active class is gone", async () => {
+    mocks.classes.mockResolvedValue({ data: [], error: null });
+    const html = renderToStaticMarkup(await AdminPage({ searchParams: Promise.resolve({ classDisabled: "1" }) }));
+    expect(html).toContain('role="status"');
+    expect(html).toContain("Class disabled. Student access is blocked; classroom data has been kept.");
+    expect(html).toContain("No active classes");
+    expect(html).toContain("Create a class");
+    expect(html).not.toContain("data-class-id");
+    expect(html).not.toContain("New assignment form");
+    expect(mocks.assignments).not.toHaveBeenCalled();
+  });
 
   it("blocks assigning when existing assignments could not be loaded", async () => {
     mocks.assignments.mockResolvedValue({ data: null, error: { message: "private error" } });

@@ -15,9 +15,9 @@ beforeEach(() => {
 })
 it('scopes the class to the verified teacher before loading its assignments', async () => {
   expect((await getTeacherClassActivities(id)).assignments).toEqual([{ id: 'assignment', title: 'Lewis' }])
-  expect(mock.eq.mock.calls).toEqual([['id', id], ['teacher_id', 'teacher'], ['class_id', id]])
+  expect(mock.eq.mock.calls).toEqual([['id', id], ['teacher_id', 'teacher'], ['is_active', true], ['class_id', id]])
 })
-it('rejects a foreign or unavailable class before querying assignments', async () => {
+it('rejects a foreign, disabled or unavailable class before querying assignments', async () => {
   mock.maybeSingle.mockResolvedValue({ data: null, error: null })
   await expect(getTeacherClassActivities(id)).rejects.toThrow('access denied')
   expect(mock.from).toHaveBeenCalledTimes(1)
