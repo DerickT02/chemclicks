@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { readAllPages } from '@/lib/db/read-pages'
 
 // Logic and types regarding the CLASS_ACTIVITIES table.
 export type ClassActivity = {
@@ -59,15 +60,12 @@ function validateDates(opensAt: string | null, closesAt: string | null): Assignm
 export async function getClassActivities(supabase: SupabaseClient,classId: string): Promise<AssignmentResult<ClassActivity[]>> {
   if (!isUuid(classId)) { return failure('VALIDATION_ERROR', 'Select a valid class.') }
 
-  const { data, error } = await supabase
+  return readAllPages((from, to) => supabase
     .from('class_activities')
     .select(assignmentFields)
     .eq('class_id', classId)
     .order('created_at', { ascending: false })
-    .order('id')
-
-  if (error) return { data: null, error }
-  return { data: data as ClassActivity[], error: null}
+    .order('id').range(from, to).returns<ClassActivity[]>())
 }
 
 export async function insertClassActivity(supabase: SupabaseClient, input: InsertClassActivity): Promise<AssignmentResult<ClassActivity>> {

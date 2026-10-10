@@ -11,6 +11,7 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
 vi.mock("@/lib/db/activities", () => ({ listActivityCatalog: mocks.catalog }));
 vi.mock("@/lib/db/class_activities", () => ({ getClassActivities: mocks.assignments }));
 vi.mock("@/lib/db/classes", () => ({ listActiveClassesForTeacher: mocks.classes }));
+vi.mock("@/lib/db/teacher-dashboard", () => ({ getTeacherRoster: mocks.roster, getClassCurrentProgress: mocks.progress }));
 vi.mock("@/app/admin/assignments/AssignmentForm", () => ({ default: () => <p>New assignment form</p> }));
 vi.mock("@/app/admin/assignments/actions", () => ({ saveAssignment: vi.fn() }));
 
@@ -93,5 +94,113 @@ describe("teacher catalog safety states", () => {
     const html = await render();
     expect(html).toContain("Assigned activity");
     expect(html).toContain("This activity is unavailable in the current catalog");
+  });
+});
+
+const student = { id: "student-one", class_id: classId, first_name: "Mina", last_name: "Chen" };
+const fiveAssignments = Array.from({ length: 5 }, (_, index) => ({ ...assignment, id: `assignment-${index}`, activity_id: `activity-${index}` }));
+function populateClass() {
+  mocks.roster.mockResolvedValue({ data: [student], error: null });
+  mocks.assignments.mockResolvedValue({ data: fiveAssignments, error: null });
+}
+
+describe("teacher enrollment and current exploration progress", () => {
+  it("shows one completion of five assignments as 20%, with missing work not started", async () => {
+    populateClass();
+    mocks.progress.mockResolvedValue({ data: [{ student_id: student.id, class_activity_id: "assignment-0", status: "completed" }], error: null });
+    const html = await render();
+    expect(html).toContain("1 of 5 assigned activities currently completed");
+    expect(html).toContain("0 in progress · 4 not started");
+    expect(html).toContain('aria-valuenow="20"');
+    expect(html).toContain('role="progressbar"');
+    expect(html).not.toContain("100%");
+    expect(html).not.toContain("Completed current activity");
+    expect(html).toContain("1 student enrolled");
+    expect(html).toContain("Enrolled students");
+    expect(html).not.toContain("Active students");
+    expect(html).toContain("not quiz grades or ever-completed history");
+    expect(mocks.progress).toHaveBeenCalledWith(expect.anything(), classId);
+  });
+  it("does not count other students or other assignments toward a student's percentage", async () => {
+    populateClass();
+    mocks.progress.mockResolvedValue({ data: [
+      { student_id: "someone-else", class_activity_id: "assignment-0", status: "completed" },
+      { student_id: student.id, class_activity_id: "foreign-assignment", status: "completed" },
+      { student_id: student.id, class_activity_id: "assignment-0", status: "in_progress" },
+    ], error: null });
+    const html = await render();
+    expect(html).toContain("0 of 5 assigned activities currently completed");
+    expect(html).toContain("1 in progress · 4 not started");
+    expect(html).toContain("earlier saved attempts remain in Activity attempts");
+  });
+  it("shows a true empty roster only after a successful read", async () => {
+    const html = await render();
+    expect(html).toContain("0 students enrolled");
+    expect(html).toContain("No students in this class yet.");
+    expect(html).not.toContain("Enrollment unavailable");
+    expect(mocks.progress).not.toHaveBeenCalled();
+  });
+  it("does not fabricate enrollment counts or an empty class after a roster failure", async () => {
+    populateClass();
+    mocks.roster.mockResolvedValue({ data: null, error: { message: "private SQL details" } });
+    const html = await render();
+    expect(html).toContain("Enrollment unavailable");
+    expect(html).toContain("Enrollment count unavailable");
+    expect(html).toContain("Enrollment data could not be loaded");
+    expect(html).not.toContain("0 students enrolled");
+    expect(html).not.toContain("No students in this class yet.");
+    expect(html).not.toContain("private SQL");
+    expect(html).not.toContain('role="progressbar"');
+    expect(mocks.progress).not.toHaveBeenCalled();
+  });
+  it.each(["progress", "assignments"] as const)("keeps valid enrollment but hides percentages after a %s read failure", async source => {
+    populateClass();
+    mocks[source].mockResolvedValue({ data: null, error: { message: "private SQL details" } });
+    const html = await render();
+    expect(html).toContain("Mina Chen");
+    expect(html).toContain("1 student enrolled");
+    expect(html).toContain("Exploration progress could not be loaded");
+    expect(html).toContain("Progress unavailable.");
+    expect(html).not.toContain("0%");
+    expect(html).not.toContain("not started</p>");
+    expect(html).not.toContain('role="progressbar"');
+    expect(html).not.toContain("private SQL");
+    if (source === "assignments") expect(mocks.progress).not.toHaveBeenCalled();
+  });
+  it("does not invent a zero percentage when a student has no assigned activities", async () => {
+    mocks.roster.mockResolvedValue({ data: [student], error: null });
+    const html = await render();
+    expect(html).toContain("No activities assigned.");
+    expect(html).not.toContain("0%");
+    expect(html).not.toContain('role="progressbar"');
+    expect(mocks.progress).not.toHaveBeenCalled();
+  });
+  it("handles conflicting progress as unavailable instead of choosing a row arbitrarily", async () => {
+    populateClass();
+    mocks.progress.mockResolvedValue({ data: [
+      { student_id: student.id, class_activity_id: "assignment-0", status: "completed" },
+      { student_id: student.id, class_activity_id: "assignment-0", status: "in_progress" },
+    ], error: null });
+    const html = await render();
+    expect(html).toContain("Progress unavailable.");
+    expect(html).not.toContain('role="progressbar"');
+  });
+  it("does not query a foreign class requested through the URL", async () => {
+    populateClass();
+    await AdminPage({ searchParams: Promise.resolve({ classId: "foreign-class" }) });
+    expect(mocks.roster).toHaveBeenCalledWith(expect.anything(), [classId]);
+    expect(mocks.assignments).toHaveBeenCalledWith(expect.anything(), classId);
+    expect(mocks.progress).toHaveBeenCalledWith(expect.anything(), classId);
+  });
+  it("does not mask a class-list failure as no active classes", async () => {
+    mocks.classes.mockResolvedValue({ data: null, error: { message: "private SQL details" } });
+    await expect(render()).rejects.toThrow("We couldn't load your classes. Please try again.");
+    expect(mocks.roster).not.toHaveBeenCalled();
+  });
+  it("does not read classroom data when verified authentication returns an error", async () => {
+    mocks.user.mockResolvedValue({ data: { user: { id: "teacher" } }, error: { message: "private auth details" } });
+    expect(await render()).toContain("Please sign in to view your classes");
+    expect(mocks.classes).not.toHaveBeenCalled();
+    expect(mocks.roster).not.toHaveBeenCalled();
   });
 });

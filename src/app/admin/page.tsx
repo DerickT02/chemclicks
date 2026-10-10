@@ -5,43 +5,12 @@ import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
-import { listActiveClassesForTeacher } from "@/lib/db/classes";
+import { listActiveClassesForTeacher, type ClassListItem } from "@/lib/db/classes";
+import { getTeacherRoster, getClassCurrentProgress, type TeacherRosterStudent, type TeacherProgressRow } from "@/lib/db/teacher-dashboard";
+import { summarizeCurrentExplorations } from "@/lib/assignments/exploration-progress";
 
 
-type ProgressStatus = "not_started" | "in_progress" | "completed";
-
-type StudentWithProgress = {
-  id: string;
-  class_id: string;
-  first_name: string;
-  last_name: string;
-  student_progress: Array<{ status: ProgressStatus }> | null;
-};
-
-type ClassWithStudents = {
-  id: string;
-  name: string;
-  section: string;
-  class_code: string;
-  students: StudentWithProgress[] | null;
-};
-
-type ClassActivity = {
-  id: string;
-  class_id: string;
-};
-
-type StudentProgressRow = {
-  student_id: string;
-  class_activity_id: string;
-  status: ProgressStatus;
-};
-
-function statusText(status: ProgressStatus | null): string {
-  if (status === "completed") return "Completed current activity";
-  if (status === "in_progress") return "In progress";
-  return "Not started";
-}
+type ClassWithStudents = ClassListItem & { students: TeacherRosterStudent[] };
 
 function formatAssignmentTimestamp(value: string): string {
   return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
@@ -57,12 +26,12 @@ export default async function AdminPage({
   searchParams: Promise<{ classId?: string; classDisabled?: string }>;
 }) {
   const supabase = await createClient();
-  const [{ classId, classDisabled }, { data: userData }] = await Promise.all([
+  const [{ classId, classDisabled }, { data: userData, error: authError }] = await Promise.all([
     searchParams,
     supabase.auth.getUser(),
   ]);
 
-  if (!userData.user) {
+  if (authError || !userData.user) {
     return (
       <div className="min-h-screen bg-background px-6 py-12 text-foreground md:px-10">
         <h1 className="text-3xl font-semibold">Classrooms</h1>
@@ -76,59 +45,22 @@ export default async function AdminPage({
     userData.user.id,
   );
 
-  if (classesError) {
+  if (classesError || classesData === null) {
     throw new Error("We couldn't load your classes. Please try again.");
   }
 
-  const baseClasses: ClassWithStudents[] = ((classesData ?? []) as Omit<ClassWithStudents, "students">[])
-    .map((classItem) => ({ ...classItem, students: [] }));
-
-  const classIds = baseClasses.map((classItem) => classItem.id);
-  const { data: studentsData } =
-    classIds.length === 0
-      ? { data: [] as StudentWithProgress[] }
-      : await supabase
-          .from("students")
-          .select("id, class_id, first_name, last_name")
-          .in("class_id", classIds);
-
-  const studentsByClass = new Map<string, StudentWithProgress[]>();
-  for (const student of (studentsData ?? []) as StudentWithProgress[]) {
+  const baseClasses = classesData ?? [];
+  const rosterResult = await getTeacherRoster(supabase, baseClasses.map(classItem => classItem.id));
+  const rosterLoadFailed = Boolean(rosterResult.error) || rosterResult.data === null;
+  const studentsByClass = new Map<string, TeacherRosterStudent[]>();
+  for (const student of rosterResult.data ?? []) {
     const existing = studentsByClass.get(student.class_id) ?? [];
-    existing.push({ ...student, student_progress: [] });
+    existing.push(student);
     studentsByClass.set(student.class_id, existing);
   }
-
-  const { data: classActivitiesData } =
-    classIds.length === 0
-      ? { data: [] as ClassActivity[] }
-      : await supabase.from("class_activities").select("id, class_id").in("class_id", classIds);
-
-  const classActivityIds = (classActivitiesData ?? []).map((row) => row.id);
-  const { data: studentProgressData } =
-    classActivityIds.length === 0
-      ? { data: [] as StudentProgressRow[] }
-      : await supabase
-          .from("student_progress")
-          .select("student_id, class_activity_id, status")
-          .in("class_activity_id", classActivityIds);
-
-  const progressByStudent = new Map<string, Array<{ status: ProgressStatus }>>();
-  for (const row of (studentProgressData ?? []) as StudentProgressRow[]) {
-    const list = progressByStudent.get(row.student_id) ?? [];
-    list.push({ status: row.status });
-    progressByStudent.set(row.student_id, list);
-  }
-
-  const classes: ClassWithStudents[] = baseClasses.map((classItem) => {
-    const studentsForClass = studentsByClass.get(classItem.id) ?? [];
-    const hydratedStudents = studentsForClass.map((student) => ({
-      ...student,
-      student_progress: progressByStudent.get(student.id) ?? [],
-    }));
-
-    return { ...classItem, students: hydratedStudents };
-  });
+  const classes: ClassWithStudents[] = baseClasses.map(classItem => ({
+    ...classItem, students: studentsByClass.get(classItem.id) ?? [],
+  }));
   const selectedClass =
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
@@ -145,9 +77,20 @@ export default async function AdminPage({
   const assignedActivityIds = assignments.map(
     (assignment) => assignment.activity_id,
   );
-  const catalogLoadFailed = Boolean(catalogResult.error);
-  const assignmentsLoadFailed = Boolean(assignmentsResult.error);
-
+  const catalogLoadFailed = Boolean(catalogResult.error) || catalogResult.data === null;
+  const assignmentsLoadFailed = Boolean(assignmentsResult.error) || assignmentsResult.data === null;
+  const progressResult = selectedClass && !rosterLoadFailed && !assignmentsLoadFailed
+    && selectedClass.students.length > 0 && assignments.length > 0
+    ? await getClassCurrentProgress(supabase, selectedClass.id)
+    : { data: [], error: null };
+  const progressLoadFailed = assignmentsLoadFailed || Boolean(progressResult.error) || progressResult.data === null;
+  const progressByStudent = new Map<string, TeacherProgressRow[]>();
+  for (const row of progressResult.data ?? []) {
+    const rows = progressByStudent.get(row.student_id) ?? [];
+    rows.push(row);
+    progressByStudent.set(row.student_id, rows);
+  }
+  const assignmentIds = assignments.map(assignment => assignment.id);
 
 
   return (
@@ -187,7 +130,7 @@ export default async function AdminPage({
               ) : (
                 classes.map((classItem) => {
                   const isSelected = selectedClass?.id === classItem.id;
-                  const studentCount = classItem.students?.length ?? 0;
+                  const studentCount = classItem.students.length;
                   return (
                     <Link
                       key={classItem.id}
@@ -204,7 +147,7 @@ export default async function AdminPage({
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">{classItem.section}</p>
                       ) : null}
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {studentCount} {studentCount === 1 ? "student" : "students"} · Code{" "}
+                        {rosterLoadFailed ? "Enrollment unavailable" : `${studentCount} ${studentCount === 1 ? "student" : "students"}`} · Code{" "}
                         {classItem.class_code}
                       </p>
                     </Link>
@@ -249,18 +192,17 @@ export default async function AdminPage({
                   <p className="mt-2 text-sm text-muted-foreground">{selectedClass.section}</p>
                 ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {(selectedClass.students?.length ?? 0).toString()} students enrolled
+                  {rosterLoadFailed ? "Enrollment count unavailable" : `${selectedClass.students.length} ${selectedClass.students.length === 1 ? "student" : "students"} enrolled`}
                 </p>
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
-                  {catalogLoadFailed ? (
+                  {catalogLoadFailed && (
                     <p role="alert" className="text-sm text-destructive">
                       The activity catalog could not be loaded. Please refresh the page.
                     </p>
-                  ) : (
-                    <>
-                      {!assignmentsLoadFailed && (
+                  )}
+                      {!catalogLoadFailed && !assignmentsLoadFailed && (
                         <div className="space-y-4 rounded-lg border border-border p-4">
                           <h4 className="font-medium">Assign an activity</h4>
                           <AssignmentForm
@@ -314,9 +256,7 @@ export default async function AdminPage({
                                       Assigned
                                     </dt>
                                     <dd>
-                                      {formatAssignmentTimestamp(
-                                        assignment.created_at,
-                                      )}
+                                      {formatAssignmentTimestamp(assignment.created_at)}
                                     </dd>
                                   </div>
                                   <div className="flex flex-wrap gap-x-2">
@@ -343,41 +283,39 @@ export default async function AdminPage({
                                   </div>
                                 </dl>
                               </div>
-                              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                                Assigned
-                              </span>
                             </div>
                           );
                         })
                       )}
-                    </>
-                  )}
                 </section>
                 <Link href={`/admin/classes/${selectedClass.id}/attempts`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
                   Activity attempts
                 </Link>
                 <div className="mt-7">
-                  <h3 className="text-lg font-semibold text-foreground">Active students</h3>
-                  {/* Live DB-backed list: once student signup writes records, students appear automatically here. */}
+                  <h3 className="text-lg font-semibold text-foreground">Enrolled students</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Current exploration status, not quiz grades or ever-completed history. Retrying can move
+                    completed work back to in progress; earlier saved attempts remain in Activity attempts.
+                  </p>
+                  {!rosterLoadFailed && progressLoadFailed && (
+                    <p role="alert" className="mt-3 text-sm text-destructive">
+                      Exploration progress could not be loaded. Please refresh the page.
+                    </p>
+                  )}
                   <div className="mt-4 space-y-4">
-                    {(selectedClass.students ?? []).length === 0 ? (
+                    {rosterLoadFailed ? (
+                      <p role="alert" className="text-sm text-destructive">
+                        Enrollment data could not be loaded. Please refresh the page.
+                      </p>
+                    ) : selectedClass.students.length === 0 ? (
                       <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
                         No students in this class yet.
                       </p>
                     ) : (
-                      (selectedClass.students ?? []).map((student) => {
-                        const progressItems = student.student_progress ?? [];
-                        const completedCount = progressItems.filter(
-                          (progress) => progress.status === "completed",
-                        ).length;
-                        const progressPercent =
-                          progressItems.length === 0
-                            ? 0
-                            : Math.round((completedCount / progressItems.length) * 100);
-                        const lastStatus =
-                          progressItems.length > 0
-                            ? progressItems[progressItems.length - 1].status
-                            : null;
+                      selectedClass.students.map((student) => {
+                        const summary = progressLoadFailed ? null : summarizeCurrentExplorations(
+                          assignmentIds, progressByStudent.get(student.id) ?? [],
+                        );
 
                         return (
                           <div key={student.id} className="space-y-2">
@@ -386,17 +324,34 @@ export default async function AdminPage({
                                 <p className="text-sm font-medium text-foreground">
                                   {student.first_name} {student.last_name}
                                 </p>
-                                <p className="text-xs text-muted-foreground">{statusText(lastStatus)}</p>
+                                {summary === null ? (
+                                  <p role="alert" className="text-xs text-destructive">Progress unavailable.</p>
+                                ) : summary.assigned === 0 ? (
+                                  <p className="text-xs text-muted-foreground">No activities assigned.</p>
+                                ) : (
+                                  <>
+                                    <p className="text-xs text-muted-foreground">
+                                      {summary.completed} of {summary.assigned} assigned activities currently completed
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {summary.inProgress} in progress · {summary.notStarted} not started
+                                    </p>
+                                  </>
+                                )}
                               </div>
-                              <p className="text-xs text-muted-foreground">{progressPercent}%</p>
+                              {summary && summary.percent !== null && (
+                                <p className="text-xs text-muted-foreground">{summary.percent}%</p>
+                              )}
                             </div>
 
-                            <div className="h-2 rounded-full bg-muted">
-                              <div
-                                className="h-full rounded-full bg-accent transition-all"
-                                style={{ width: `${progressPercent}%` }}
-                              />
-                            </div>
+                            {summary && summary.percent !== null && (
+                              <div role="progressbar" aria-label={`${student.first_name} ${student.last_name}: current exploration completion`}
+                                aria-valuemin={0} aria-valuemax={100} aria-valuenow={summary.percent}
+                                aria-valuetext={`${summary.completed} of ${summary.assigned} assigned activities currently completed`}
+                                className="h-2 rounded-full bg-muted">
+                                <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${summary.percent}%` }} />
+                              </div>
+                            )}
                           </div>
                         );
                       })

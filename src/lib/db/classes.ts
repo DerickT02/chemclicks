@@ -1,6 +1,7 @@
 // Logic and types regarding the CLASSES table.
 
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import { readAllPages, type ReadResult } from "@/lib/db/read-pages";
 
 export type Class = {
   id: string          // UUID, auto-generated
@@ -25,19 +26,14 @@ export type ClassListItem = Pick<Class, "id" | "name" | "section" | "class_code"
 export async function listActiveClassesForTeacher(
   supabase: SupabaseClient,
   teacherId: string,
-): Promise<{ data: ClassListItem[] | null; error: PostgrestError | null }> {
-  const { data, error } = await supabase
+): Promise<ReadResult<ClassListItem>> {
+  return readAllPages((from, to) => supabase
     .from("classes")
     .select("id, name, section, class_code")
     .eq("teacher_id", teacherId)
     .eq("is_active", true)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return { data: null, error };
-  }
-
-  return { data: data as ClassListItem[], error: null };
+    .order("created_at", { ascending: false })
+    .order("id").range(from, to).returns<ClassListItem[]>());
 }
 
 /**
