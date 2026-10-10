@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --config vitest.config.mts",
+    "test:watch": "vitest --config vitest.config.mts",
+    "test:database": "vitest run --config vitest.database.config.mts",
+    "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.6",
