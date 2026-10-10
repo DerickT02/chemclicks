@@ -1,5 +1,6 @@
 import { evaluateAnswer, type AnswerResult } from "@/lib/measurement/answer";
 import { INSTRUMENTS, type InstrumentId } from "@/lib/measurement/instruments";
+import { getMeasurementQuizMode, type MeasurementQuizModeKey } from "@/lib/measurement/modes";
 
 /**
  * Readings each attempt draws its questions from. Every one is already on the
@@ -8,6 +9,12 @@ import { INSTRUMENTS, type InstrumentId } from "@/lib/measurement/instruments";
 export const QUESTION_POOL: Record<InstrumentId, readonly number[]> = {
   ruler: [1.46, 2.85, 3.72, 4.37, 5.93, 7.18, 8.64, 9.21, 10.55, 11.62, 12.09, 13.78],
   cylinder: [6.3, 8.6, 12.7, 17.2, 19.5, 23.4, 28.8, 31.1, 36.6, 41.7, 44.3, 47.9],
+};
+
+export const MODE_QUESTION_POOL: Record<MeasurementQuizModeKey, readonly number[]> = {
+  ruler_tenths: [1.4, 2.8, 3.7, 4.3, 5.9, 7.1, 8.6, 9.2, 10.5, 11.6, 12.0, 13.7],
+  ruler_hundredths: QUESTION_POOL.ruler,
+  cylinder_tenths: QUESTION_POOL.cylinder,
 };
 
 export const QUESTIONS_PER_ATTEMPT = 5;
@@ -31,8 +38,9 @@ export function hasPassed(score: number, total: number): boolean {
 export function pickReadings(
   instrument: InstrumentId,
   random: () => number = Math.random,
+  mode: MeasurementQuizModeKey | null = null,
 ): number[] {
-  const pool = [...QUESTION_POOL[instrument]];
+  const pool = mode ? [...MODE_QUESTION_POOL[mode]] : [...QUESTION_POOL[instrument]];
 
   // Fisher–Yates shuffle: every order is equally likely.
   for (let i = pool.length - 1; i > 0; i--) {
@@ -46,6 +54,9 @@ export function pickReadings(
 export type QuestionState = {
   phase: "question";
   instrument: InstrumentId;
+  mode?: MeasurementQuizModeKey | null;
+  attemptId?: string;
+  attemptNumber?: number;
   /** This attempt's readings, one per question. */
   readings: readonly number[];
   questionIndex: number;
@@ -62,6 +73,10 @@ export type QuestionState = {
 export type ResultsState = {
   phase: "results";
   instrument: InstrumentId;
+  mode?: MeasurementQuizModeKey | null;
+  attemptId?: string;
+  attemptNumber?: number;
+  passed?: boolean;
   score: number;
   total: number;
 };
@@ -77,9 +92,19 @@ export type QuizState =
 
 export type QuizAction =
   /** Readings come from pickReadings in the caller, so the reducer stays pure. */
-  | { type: "start"; instrument: InstrumentId; readings: readonly number[] }
+  | {
+      type: "start";
+      instrument: InstrumentId;
+      mode?: MeasurementQuizModeKey | null;
+      readings: readonly number[];
+      attemptId?: string;
+      attemptNumber?: number;
+      score?: number;
+    }
   | { type: "edit-answer"; answer: string }
   | { type: "submit" }
+  | { type: "server-submit"; result: AnswerResult; counted: boolean; firstTryCorrect: boolean | null }
+  | { type: "server-complete"; attemptId: string; attemptNumber: number; score: number; total: number; passed: boolean }
   | { type: "next" }
   | { type: "choose-instrument" };
 
@@ -92,13 +117,19 @@ export function currentReading(question: QuestionState): number {
 
 function startQuestion(
   instrument: InstrumentId,
+  mode: MeasurementQuizModeKey | null,
   readings: readonly number[],
   questionIndex: number,
   score: number,
+  attemptId?: string,
+  attemptNumber?: number,
 ): QuestionState {
   return {
     phase: "question",
     instrument,
+    mode,
+    attemptId,
+    attemptNumber,
     readings,
     questionIndex,
     answer: "",
@@ -115,7 +146,27 @@ export function canContinue(question: QuestionState): boolean {
 }
 
 export function quizReducer(state: QuizState, action: QuizAction): QuizState {
-  if (action.type === "start") return startQuestion(action.instrument, action.readings, 0, 0);
+  if (action.type === "start") return startQuestion(
+    action.instrument,
+    action.mode ?? null,
+    action.readings,
+    0,
+    action.score ?? 0,
+    action.attemptId,
+    action.attemptNumber,
+  );
+  if (action.type === "server-complete") {
+    return {
+      phase: "results",
+      instrument: state.phase === "question" ? state.instrument : "ruler",
+      mode: state.phase === "question" ? state.mode : null,
+      attemptId: action.attemptId,
+      attemptNumber: action.attemptNumber,
+      passed: action.passed,
+      score: action.score,
+      total: action.total,
+    };
+  }
   if (action.type === "choose-instrument") return { phase: "choosing", returned: true };
   if (state.phase !== "question") return state;
 
@@ -126,7 +177,10 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
     case "submit": {
       if (state.result?.status === "correct") return state;
 
-      const result = evaluateAnswer(state.answer, currentReading(state), INSTRUMENTS[state.instrument]);
+      const spec = state.mode
+        ? getMeasurementQuizMode(state.mode).spec
+        : INSTRUMENTS[state.instrument];
+      const result = evaluateAnswer(state.answer, currentReading(state), spec);
       const submitted = { ...state, result, attempt: state.attempt + 1 };
 
       // Only the first gradable answer is scored. Blank or malformed input
@@ -141,15 +195,37 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       };
     }
 
+    case "server-submit": {
+      const addsPoint = action.counted && action.firstTryCorrect === true;
+      return {
+        ...state,
+        result: action.result,
+        attempt: state.attempt + 1,
+        firstTryCorrect: action.firstTryCorrect ?? state.firstTryCorrect,
+        score: state.score + (addsPoint ? 1 : 0),
+      };
+    }
+
     case "next": {
       if (!canContinue(state)) return state;
 
       const nextIndex = state.questionIndex + 1;
       return nextIndex < state.readings.length
-        ? startQuestion(state.instrument, state.readings, nextIndex, state.score)
+        ? startQuestion(
+            state.instrument,
+            state.mode ?? null,
+            state.readings,
+            nextIndex,
+            state.score,
+            state.attemptId,
+            state.attemptNumber,
+          )
         : {
             phase: "results",
             instrument: state.instrument,
+            mode: state.mode,
+            attemptId: state.attemptId,
+            attemptNumber: state.attemptNumber,
             score: state.score,
             total: state.readings.length,
           };

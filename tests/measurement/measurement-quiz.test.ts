@@ -230,7 +230,7 @@ describe("quizReducer", () => {
   });
 
   it("shows results after the last question", () => {
-    expect(playCylinderAttempt([])).toEqual({
+    expect(playCylinderAttempt([])).toMatchObject({
       phase: "results",
       instrument: "cylinder",
       score: 5,
