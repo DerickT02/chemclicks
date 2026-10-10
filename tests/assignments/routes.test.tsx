@@ -1,12 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { isValidElement } from "react";
+import type { StudentAssignment } from "@/lib/db/student-assignments";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 vi.mock('@/lib/server/student-assignments', () => ({ getAssignmentAttempts: async () => [] }));
 vi.mock('@/app/(student)/student/assignments/[assignmentId]/AttemptControls', () => ({ default: () => <button>Start exploration</button> }));
 const reader = vi.hoisted(() => vi.fn());
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignments: reader }));
+vi.mock("@/lib/server/student-work-queue", () => ({ getStudentWorkQueue: async () => {
+  const result = await reader();
+  return result.status === "ok" ? {
+    ...result, context: { studentName: "Alex Student", className: "Chemistry", section: "A" },
+    checkedAt: Date.now(), progressError: null,
+    assignments: result.assignments.map((row: StudentAssignment) => ({ ...row, progress: "not_started" })),
+  } : result;
+} }));
+vi.mock("@/components/assignments/RefreshAssignments", () => ({ default: () => <button>Refresh assignments</button> }));
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); },
   notFound: () => { throw new Error("NOT_FOUND"); },
@@ -83,7 +93,7 @@ describe("student assignment pages", () => {
   });
   it("shows an empty state and handles query failures separately", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [] });
-    expect(renderToStaticMarkup(await StudentPage())).toContain("No activities are available");
+    expect(renderToStaticMarkup(await StudentPage())).toContain("Your teacher has not assigned any activities yet");
     reader.mockResolvedValue({ status: "error", message: "Unable to load" });
     expect(renderToStaticMarkup(await StudentPage())).toContain('role="alert"');
     await expect(page()).rejects.toThrow("Unable to load");
