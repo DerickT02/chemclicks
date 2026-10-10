@@ -6,16 +6,12 @@ import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { listActiveClassesForTeacher } from "@/lib/db/classes";
+import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
+import { LessonProgressList } from "@/app/admin/LessonProgressList";
 
-
-type ProgressStatus = "not_started" | "in_progress" | "completed";
-
-type StudentWithProgress = {
+type StudentSummary = {
   id: string;
   class_id: string;
-  first_name: string;
-  last_name: string;
-  student_progress: Array<{ status: ProgressStatus }> | null;
 };
 
 type ClassWithStudents = {
@@ -23,25 +19,8 @@ type ClassWithStudents = {
   name: string;
   section: string;
   class_code: string;
-  students: StudentWithProgress[] | null;
+  students: StudentSummary[] | null;
 };
-
-type ClassActivity = {
-  id: string;
-  class_id: string;
-};
-
-type StudentProgressRow = {
-  student_id: string;
-  class_activity_id: string;
-  status: ProgressStatus;
-};
-
-function statusText(status: ProgressStatus | null): string {
-  if (status === "completed") return "Completed current activity";
-  if (status === "in_progress") return "In progress";
-  return "Not started";
-}
 
 function formatAssignmentTimestamp(value: string): string {
   return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
@@ -86,58 +65,41 @@ export default async function AdminPage({
   const classIds = baseClasses.map((classItem) => classItem.id);
   const { data: studentsData } =
     classIds.length === 0
-      ? { data: [] as StudentWithProgress[] }
+      ? { data: [] as StudentSummary[] }
       : await supabase
           .from("students")
-          .select("id, class_id, first_name, last_name")
+          .select("id, class_id")
           .in("class_id", classIds);
 
-  const studentsByClass = new Map<string, StudentWithProgress[]>();
-  for (const student of (studentsData ?? []) as StudentWithProgress[]) {
+  const studentsByClass = new Map<string, StudentSummary[]>();
+  for (const student of (studentsData ?? []) as StudentSummary[]) {
     const existing = studentsByClass.get(student.class_id) ?? [];
-    existing.push({ ...student, student_progress: [] });
+    existing.push(student);
     studentsByClass.set(student.class_id, existing);
   }
 
-  const { data: classActivitiesData } =
-    classIds.length === 0
-      ? { data: [] as ClassActivity[] }
-      : await supabase.from("class_activities").select("id, class_id").in("class_id", classIds);
-
-  const classActivityIds = (classActivitiesData ?? []).map((row) => row.id);
-  const { data: studentProgressData } =
-    classActivityIds.length === 0
-      ? { data: [] as StudentProgressRow[] }
-      : await supabase
-          .from("student_progress")
-          .select("student_id, class_activity_id, status")
-          .in("class_activity_id", classActivityIds);
-
-  const progressByStudent = new Map<string, Array<{ status: ProgressStatus }>>();
-  for (const row of (studentProgressData ?? []) as StudentProgressRow[]) {
-    const list = progressByStudent.get(row.student_id) ?? [];
-    list.push({ status: row.status });
-    progressByStudent.set(row.student_id, list);
-  }
-
-  const classes: ClassWithStudents[] = baseClasses.map((classItem) => {
-    const studentsForClass = studentsByClass.get(classItem.id) ?? [];
-    const hydratedStudents = studentsForClass.map((student) => ({
-      ...student,
-      student_progress: progressByStudent.get(student.id) ?? [],
-    }));
-
-    return { ...classItem, students: hydratedStudents };
-  });
+  const classes: ClassWithStudents[] = baseClasses.map((classItem) => ({
+    ...classItem,
+    students: studentsByClass.get(classItem.id) ?? [],
+  }));
   const selectedClass =
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
-  const [catalogResult, assignmentsResult] = await Promise.all([
+  const [catalogResult, assignmentsResult, lessonProgressResult] = await Promise.all([
     listActivityCatalog(supabase),
     selectedClass
       ? getClassActivities(supabase, selectedClass.id)
       : Promise.resolve({ data: [], error: null }),
+    selectedClass
+      ? getTeacherClassLessonProgress(selectedClass.id).then(
+          (data) => ({ data, error: null as string | null }),
+          (error: unknown) => ({
+            data: null,
+            error: error instanceof Error ? error.message : "Unknown error",
+          }),
+        )
+      : Promise.resolve({ data: null, error: null as string | null }),
   ]);
 
   const activities = catalogResult.data ?? [];
@@ -147,6 +109,8 @@ export default async function AdminPage({
   );
   const catalogLoadFailed = Boolean(catalogResult.error);
   const assignmentsLoadFailed = Boolean(assignmentsResult.error);
+  const lessonProgressLoadFailed = Boolean(lessonProgressResult.error);
+  const lessonProgressStudents = lessonProgressResult.data?.students ?? [];
 
 
   async function removeSelectedClass(formData: FormData) {
@@ -357,49 +321,15 @@ export default async function AdminPage({
                   Activity attempts
                 </Link>
                 <div className="mt-7">
-                  <h3 className="text-lg font-semibold text-foreground">Active students</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
                   {/* Live DB-backed list: once student signup writes records, students appear automatically here. */}
-                  <div className="mt-4 space-y-4">
-                    {(selectedClass.students ?? []).length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                        No students in this class yet.
+                  <div className="mt-4">
+                    {lessonProgressLoadFailed ? (
+                      <p role="alert" className="text-sm text-destructive">
+                        Student progress could not be loaded. Please refresh the page.
                       </p>
                     ) : (
-                      (selectedClass.students ?? []).map((student) => {
-                        const progressItems = student.student_progress ?? [];
-                        const completedCount = progressItems.filter(
-                          (progress) => progress.status === "completed",
-                        ).length;
-                        const progressPercent =
-                          progressItems.length === 0
-                            ? 0
-                            : Math.round((completedCount / progressItems.length) * 100);
-                        const lastStatus =
-                          progressItems.length > 0
-                            ? progressItems[progressItems.length - 1].status
-                            : null;
-
-                        return (
-                          <div key={student.id} className="space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-medium text-foreground">
-                                  {student.first_name} {student.last_name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{statusText(lastStatus)}</p>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{progressPercent}%</p>
-                            </div>
-
-                            <div className="h-2 rounded-full bg-muted">
-                              <div
-                                className="h-full rounded-full bg-accent transition-all"
-                                style={{ width: `${progressPercent}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })
+                      <LessonProgressList students={lessonProgressStudents} />
                     )}
                   </div>
                 </div>
