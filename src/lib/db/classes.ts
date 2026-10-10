@@ -1,6 +1,7 @@
 // Logic and types regarding the CLASSES table.
 
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import { classLabelKey } from "@/lib/classes/class-name";
 
 export type Class = {
   id: string          // UUID, auto-generated
@@ -47,6 +48,45 @@ export async function listActiveClassesForTeacher(
  */
 export function isDuplicateClassCodeError(error: PostgrestError): boolean {
   return error.code === "23505" && error.message.includes("class_code");
+}
+
+/**
+ * True when a PostgrestError is a teacher/name/section uniqueness violation:
+ * either the exact-match `classes_teacher_name_section_key` constraint or the
+ * normalized `classes_teacher_name_section_norm_key` index.
+ */
+export function isDuplicateClassNameSectionError(error: PostgrestError): boolean {
+  return error.code === "23505" && error.message.includes("classes_teacher_name_section");
+}
+
+/**
+ * True when the teacher already has a class (active or not) whose name and
+ * section match after normalization. Filters by `teacher_id` explicitly so it
+ * is safe with the admin client, and returns only a boolean so no other
+ * teacher's data leaves this function. A fast pre-check; the normalized unique
+ * index remains the source of truth under concurrent submissions.
+ */
+export async function teacherHasClassNamed(
+  supabase: SupabaseClient,
+  teacherId: string,
+  name: string,
+  section: string,
+): Promise<{ exists: boolean; error: PostgrestError | null }> {
+  const { data, error } = await supabase
+    .from("classes")
+    .select("name, section")
+    .eq("teacher_id", teacherId);
+
+  if (error) {
+    return { exists: false, error };
+  }
+
+  const nameKey = classLabelKey(name);
+  const sectionKey = classLabelKey(section);
+  const exists = (data as Pick<Class, "name" | "section">[]).some(
+    (row) => classLabelKey(row.name) === nameKey && classLabelKey(row.section) === sectionKey,
+  );
+  return { exists, error: null };
 }
 
 /**
