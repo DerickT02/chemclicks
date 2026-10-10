@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
-  teacher: vi.fn(), writer: {}, getUser: vi.fn(), query: vi.fn(), insert: vi.fn(), update: vi.fn(), refresh: vi.fn(), create: vi.fn(),
+  teacher: vi.fn(), writer: {}, getUser: vi.fn(), query: vi.fn(), insert: vi.fn(), update: vi.fn(), archive: vi.fn(), refresh: vi.fn(), create: vi.fn(),
 }));
 vi.mock('@/lib/server/teacher', () => ({ requireTeacherId: mocks.teacher }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => mocks.writer }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.refresh }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.create }));
-vi.mock("@/lib/db/class_activities", () => ({ insertClassActivity: mocks.insert, updateClassActivity: mocks.update }));
-import { saveAssignment } from "@/app/admin/assignments/actions";
+vi.mock("@/lib/db/class_activities", () => ({
+  insertClassActivity: mocks.insert,
+  updateClassActivity: mocks.update,
+  archiveClassActivity: mocks.archive,
+}));
+import { saveAssignment, unassignActivity } from "@/app/admin/assignments/actions";
 
 const classId = "11111111-1111-4111-8111-111111111111";
 const activityId = "22222222-2222-4222-8222-222222222222";
@@ -21,19 +25,29 @@ function form(values: Record<string, string | undefined> = {}): FormData {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.teacher.mockResolvedValue("teacher");
-  const builder = { select: () => builder, eq: () => builder, maybeSingle: mocks.query };
+  const builder = { select: () => builder, eq: () => builder, is: () => builder, maybeSingle: mocks.query };
   mocks.create.mockResolvedValue({ auth: { getUser: mocks.getUser }, from: () => builder });
   mocks.getUser.mockResolvedValue({ data: { user: { id: "teacher" } }, error: null });
   mocks.query.mockResolvedValue({ data: { id: classId }, error: null });
   mocks.insert.mockResolvedValue({ data: { id: assignmentId }, error: null });
   mocks.update.mockResolvedValue({ data: { id: assignmentId }, error: null });
+  mocks.archive.mockResolvedValue({ data: { id: assignmentId }, error: null });
 });
+
+function unassignForm(values: Record<string, string | undefined> = {}): FormData {
+  const data = new FormData();
+  for (const [key, value] of Object.entries({ class_id: classId, assignment_id: assignmentId, ...values })) {
+    if (value !== undefined) data.set(key, value);
+  }
+  return data;
+}
 
 describe("teacher assignment action", () => {
   it.each([
     { class_id: "" },
     { activity_id: "" },
     { opens_at: "2026-02-30T12:00" },
+    { opens_at: "30000-01-01T12:00" },
     { opens_at: "2026-09-12T12:00", closes_at: "2026-09-12T12:00" },
     { opens_at: "2026-09-13T12:00", closes_at: "2026-09-12T12:00" },
   ])("rejects invalid form input before database access: %j", async (values) => {
@@ -80,4 +94,27 @@ it('does not perform privileged writes when teacher approval fails', async () =>
   expect((await saveAssignment(initial, form())).status).toBe('error');
   expect(mocks.insert).not.toHaveBeenCalled();
   expect(mocks.update).not.toHaveBeenCalled();
+});
+
+describe("unassignActivity", () => {
+  it("archives an owned assignment and revalidates admin", async () => {
+    const result = await unassignActivity(initial, unassignForm());
+    expect(result.status).toBe("success");
+    expect(result.message).toContain("Activity attempts");
+    expect(mocks.archive).toHaveBeenCalledWith(expect.anything(), assignmentId);
+    expect(mocks.refresh).toHaveBeenCalledWith("/admin");
+  });
+
+  it("rejects invalid IDs before database access", async () => {
+    expect((await unassignActivity(initial, unassignForm({ assignment_id: "" }))).status).toBe("error");
+    expect(mocks.archive).not.toHaveBeenCalled();
+  });
+
+  it("rejects assignments outside the selected class", async () => {
+    mocks.query
+      .mockResolvedValueOnce({ data: { id: classId }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+    expect((await unassignActivity(initial, unassignForm())).status).toBe("error");
+    expect(mocks.archive).not.toHaveBeenCalled();
+  });
 });
