@@ -253,7 +253,9 @@ Latest staged application snapshot:
 
 ```sh
 npm test
-# 63 files / 728 mocked/unit/component tests passed
+# 65 files / 750 mocked/unit/component tests passed
+TZ=America/New_York npm test
+# 65 files / 750 tests passed in the staged temporary checkout
 npm run typecheck
 # Passed
 npm run lint
@@ -262,7 +264,7 @@ git -c core.whitespace=trailing-space,space-before-tab,cr-at-eol diff --cached -
 # Passed; preserves existing CRLF formatting
 ```
 
-The work-queue checks cover scoped reads, current saved progress, missing rows, invalid/conflicting records, later-page/batch failures, more than 1,000 rows, membership/disabled-state rechecks, schedule changes during reads, sanitized failures, and existing route contracts. They do not certify browser refresh/grouping usability, deployed relationship/RLS behavior, or transactional snapshots. No live Supabase queries/writes, Auth operations, database fixtures, migrations, production build, hosted CI, browser acceptance, ruler integration, or pushes were performed during this commit pass. Earlier implementation entries' no-commit statements describe their historical validation checkpoints.
+The work-queue checks cover scoped reads, current saved progress, missing rows, invalid/conflicting records, later-page/batch failures, more than 1,000 rows, membership/disabled-state rechecks, schedule changes during reads, sanitized failures, existing route contracts, grouping and deterministic date ordering, dashboard actions/empty/error states, SSR refresh controls, manual/interval/focus/deadline refreshes, timer/listener cleanup, and synchronous refresh failure recovery. They do not certify browser refresh/grouping usability, deployed relationship/RLS behavior, or transactional snapshots. No live Supabase queries/writes, Auth operations, database fixtures, migrations, production build, hosted CI, browser acceptance, ruler integration, or pushes were performed during this commit pass. Earlier implementation entries' no-commit statements describe their historical validation checkpoints.
 
 **Still pending:** Provisioning/role isolation and deployment investigation; ruler branch integration/consistency review; deployed/browser acceptance of class disabling, quiz stability, teacher progress, date editing, time-zone behavior, and the student work queue; closed-history/exploration-flow improvements; privacy/help material and remaining onboarding/copy; migration-history/scaffolding/documentation cleanup and dedicated-fixture auditing under P2-06; later Phase B/C work. Phase A's exit criteria are **not** met yet. Each DB/Auth remediation, live mutation, or fixture run needs its own explanation and approval. Routine validation can use `npm test`, `npm run typecheck`, and `npm run lint`.
 
