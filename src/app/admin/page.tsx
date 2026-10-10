@@ -2,6 +2,7 @@ import Link from "next/link";
 import DisableClassControl from "@/app/admin/classes/DisableClassControl";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
+import AssignmentSchedule from "@/app/admin/assignments/AssignmentSchedule";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
@@ -14,10 +15,6 @@ type ClassWithStudents = ClassListItem & { students: TeacherRosterStudent[] };
 
 function formatAssignmentTimestamp(value: string): string {
   return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
-}
-
-function scheduleTimestamp(value: string | null, whenEmpty: string): string {
-  return value ? formatAssignmentTimestamp(value) : whenEmpty;
 }
 
 export default async function AdminPage({
@@ -91,6 +88,9 @@ export default async function AdminPage({
     progressByStudent.set(row.student_id, rows);
   }
   const assignmentIds = assignments.map(assignment => assignment.id);
+  // Request-time Server Component snapshot; client clocks subscribe after hydration.
+  // eslint-disable-next-line react-hooks/purity -- This server-only clock read is not a client render-time side effect.
+  const scheduleRenderedAt = Date.now();
 
 
   return (
@@ -208,6 +208,7 @@ export default async function AdminPage({
                           <AssignmentForm
                             key={selectedClass.id}
                             classId={selectedClass.id}
+                            className={selectedClass.name}
                             activities={activities}
                             assignedActivityIds={assignedActivityIds}
                           />
@@ -236,7 +237,7 @@ export default async function AdminPage({
                               key={assignment.id}
                               className="flex items-start justify-between gap-4 rounded-lg border border-border p-4"
                             >
-                              <div>
+                              <div className="min-w-0 flex-1">
                                 <h4 className="font-medium">
                                   {activity?.title ?? "Assigned activity"}
                                 </h4>
@@ -259,29 +260,14 @@ export default async function AdminPage({
                                       {formatAssignmentTimestamp(assignment.created_at)}
                                     </dd>
                                   </div>
-                                  <div className="flex flex-wrap gap-x-2">
-                                    <dt className="font-medium text-foreground/80">
-                                      Opens
-                                    </dt>
-                                    <dd>
-                                      {scheduleTimestamp(
-                                        assignment.opens_at,
-                                        "Available immediately",
-                                      )}
-                                    </dd>
-                                  </div>
-                                  <div className="flex flex-wrap gap-x-2">
-                                    <dt className="font-medium text-foreground/80">
-                                      Closes
-                                    </dt>
-                                    <dd>
-                                      {scheduleTimestamp(
-                                        assignment.closes_at,
-                                        "No deadline",
-                                      )}
-                                    </dd>
-                                  </div>
                                 </dl>
+                                <AssignmentSchedule
+                                  classId={selectedClass.id}
+                                  className={selectedClass.name}
+                                  activityTitle={activity?.title ?? "Assigned activity"}
+                                  assignment={assignment}
+                                  renderedAt={scheduleRenderedAt}
+                                />
                               </div>
                             </div>
                           );

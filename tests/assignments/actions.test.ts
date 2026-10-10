@@ -93,7 +93,7 @@ describe("teacher assignment action", () => {
   });
   it("updates the existing ID and clears blank dates", async () => {
     expect((await saveAssignment(initial, form({ assignment_id: assignmentId }))).status).toBe("success");
-    expect(mocks.update).toHaveBeenCalledWith(expect.anything(), assignmentId, { opens_at: null, closes_at: null });
+    expect(mocks.update).toHaveBeenCalledWith(expect.anything(), assignmentId, { opens_at: null, closes_at: null }, undefined);
     expect(mocks.insert).not.toHaveBeenCalled();
   });
   it("rejects a mismatched assignment ID before updating", async () => {
@@ -107,6 +107,59 @@ describe("teacher assignment action", () => {
     expect(result.status).toBe("error");
     expect(result.message).toContain("already assigned");
     expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("schedule editing safeguards", () => {
+  it("requires explicit confirmation before any update reads or writes", async () => {
+    const data = form({ assignment_id: assignmentId });
+    data.delete("confirm_schedule_change");
+    expect((await saveAssignment(initial, data)).message).toContain("confirm saving");
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+  it("sends the expected window and relationship context to the conditional writer", async () => {
+    mocks.query.mockResolvedValue({ data: { id: assignmentId, opens_at: null, closes_at: null }, error: null });
+    const result = await saveAssignment(initial, form({ assignment_id: assignmentId, original_opens_at: "", original_closes_at: "", closes_at: "2026-09-12T12:30:00.789" }));
+    expect(result.status).toBe("success");
+    expect(mocks.update).toHaveBeenCalledWith(mocks.writer, assignmentId,
+      { opens_at: null, closes_at: "2026-09-12T12:30:00.789Z" },
+      { class_id: classId, activity_id: activityId, opens_at: null, closes_at: null });
+    expect(mocks.eq).toHaveBeenCalledWith("activity_id", activityId);
+    expect(mocks.refresh).toHaveBeenCalledWith("/student", "layout");
+  });
+  it("retains unchanged original precision rather than rewriting a rounded timestamp", async () => {
+    const original = "2026-09-12T11:00:00.123456+00:00";
+    mocks.query.mockResolvedValue({ data: { id: assignmentId, opens_at: original, closes_at: null }, error: null });
+    await saveAssignment(initial, form({ assignment_id: assignmentId, original_opens_at: original, original_closes_at: "", opens_at: "2026-09-12T11:00:00.123", closes_at: "2026-09-12T12:30" }));
+    expect(mocks.update.mock.calls[0][2].opens_at).toBe(original);
+  });
+  it("rejects stale snapshots before obtaining a privileged writer", async () => {
+    mocks.query.mockResolvedValue({ data: { id: assignmentId, opens_at: null, closes_at: "2026-09-12T13:00Z" }, error: null });
+    const result = await saveAssignment(initial, form({ assignment_id: assignmentId, original_opens_at: "", original_closes_at: "" }));
+    expect(result.message).toContain("schedule changed");
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+  it("rejects updates after the owned class becomes inactive or unavailable", async () => {
+    mocks.query.mockResolvedValueOnce({ data: null, error: null });
+    expect((await saveAssignment(initial, form({ assignment_id: assignmentId }))).status).toBe("error");
+    expect(mocks.eq).toHaveBeenCalledWith("is_active", true);
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+  it("reports conditional conflicts without success or revalidation", async () => {
+    mocks.update.mockResolvedValue({ data: null, error: { code: "CONFLICT", message: "The schedule changed. Cancel and reopen the editor before trying again." } });
+    expect((await saveAssignment(initial, form({ assignment_id: assignmentId }))).message).toContain("schedule changed");
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+  it("keeps a confirmed write successful when cache refresh fails, with a saved receipt", async () => {
+    mocks.refresh.mockImplementation(() => { throw new Error("private cache failure"); });
+    const result = await saveAssignment(initial, form({ assignment_id: assignmentId }));
+    expect(result.status).toBe("success");
+    expect(result.message).toContain("Refresh the page");
+    expect(result.message).not.toContain("private");
+    expect(result.savedAssignment?.id).toBe(assignmentId);
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.insert).not.toHaveBeenCalled();
   });
 });
 

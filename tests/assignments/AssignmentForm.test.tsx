@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,7 @@ vi.mock("@/app/admin/assignments/actions", () => ({
 }));
 
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
+import { saveAssignment, type AssignmentFormState } from "@/app/admin/assignments/actions";
 import type { ActivityCatalogEntry } from "@/lib/db/activities";
 
 afterEach(cleanup);
@@ -129,5 +130,61 @@ describe("assignment activity selection", () => {
     expect(
       screen.getByRole("button", { name: "Assign activity" }),
     ).toBeDisabled();
+  });
+});
+
+describe("new assignment save feedback", () => {
+  it("clears selection/dates after success and identifies the activity and class", async () => {
+    vi.mocked(saveAssignment).mockResolvedValueOnce({ status: "success", message: "Activity assigned." });
+    const user = userEvent.setup();
+    render(<AssignmentForm classId="class" className="Chemistry A" activities={activities} />);
+    await user.click(screen.getAllByRole("radio")[0]);
+    fireEvent.change(screen.getByLabelText("Opens at — optional"), { target: { value: "2026-09-12T12:00" } });
+    await user.click(screen.getByRole("button", { name: "Assign activity" }));
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("Lewis Practice — Chemistry A: Activity assigned.");
+    });
+    expect(screen.getByLabelText("Opens at — optional")).toHaveValue("");
+    expect(screen.getByLabelText("Closes at — optional")).toHaveValue("");
+    expect(screen.getAllByRole("radio").every(input => !(input as HTMLInputElement).checked)).toBe(true);
+    expect(screen.getByRole("button", { name: "Assign activity" })).toBeDisabled();
+  });
+  it.each(["returned", "thrown"])("preserves inputs and restores controls after a %s failure", async kind => {
+    if (kind === "returned") vi.mocked(saveAssignment).mockResolvedValueOnce({ status: "error", message: "Could not save." });
+    else vi.mocked(saveAssignment).mockRejectedValueOnce(new Error("private connection details"));
+    const user = userEvent.setup();
+    render(<AssignmentForm classId="class" activities={activities} />);
+    await user.click(screen.getAllByRole("radio")[0]);
+    fireEvent.change(screen.getByLabelText("Opens at — optional"), { target: { value: "2026-09-12T12:00" } });
+    await user.click(screen.getByRole("button", { name: "Assign activity" }));
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("private");
+    expect(screen.getByLabelText("Opens at — optional")).toHaveValue("2026-09-12T12:00");
+    expect(screen.getAllByRole("radio")[0]).toBeChecked();
+    expect(screen.getByRole("button", { name: "Assign activity" })).toBeEnabled();
+  });
+  it("reasserts selection after repeated identical errors and native form resets", async () => {
+    vi.mocked(saveAssignment).mockResolvedValue({ status: "error", message: "Try again." });
+    const user = userEvent.setup();
+    render(<AssignmentForm classId="class" activities={activities} />);
+    await user.click(screen.getAllByRole("radio")[0]);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await user.click(screen.getByRole("button", { name: "Assign activity" }));
+      await screen.findByRole("alert");
+      expect(screen.getAllByRole("radio")[0]).toBeChecked();
+      expect(screen.getByRole("button", { name: "Assign activity" })).toBeEnabled();
+    }
+  });
+  it("freezes selection and dates while pending", async () => {
+    let resolve!: (result: AssignmentFormState) => void;
+    vi.mocked(saveAssignment).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const user = userEvent.setup();
+    render(<AssignmentForm classId="class" activities={activities} />);
+    await user.click(screen.getAllByRole("radio")[0]);
+    await user.click(screen.getByRole("button", { name: "Assign activity" }));
+    expect(screen.getAllByRole("radio").every(input => (input as HTMLInputElement).disabled || Boolean(input.closest("fieldset:disabled")))).toBe(true);
+    expect(screen.getByLabelText("Opens at — optional")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    await act(async () => { resolve({ status: "error", message: "Try again." }); });
+    expect(screen.getByRole("button", { name: "Assign activity" })).toBeEnabled();
   });
 });

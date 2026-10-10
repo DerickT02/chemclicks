@@ -70,6 +70,14 @@ describe("teacher catalog safety states", () => {
     expect(html).not.toContain("New assignment form");
   });
 
+  it("keeps existing date controls available when catalog labels fail to load", async () => {
+    mocks.catalog.mockResolvedValue({ data: null, error: { message: "private catalog error" } });
+    mocks.assignments.mockResolvedValue({ data: [assignment], error: null });
+    const html = await render();
+    expect(html).toContain("Edit dates for Assigned activity");
+    expect(html).not.toContain("New assignment form");
+    expect(html).not.toContain("private catalog error");
+  });
 
   it("allows the assignment form after a confirmed empty assignment-list read", async () => {
     const html = await render();
@@ -85,6 +93,7 @@ describe("teacher catalog safety states", () => {
     const html = await render();
     expect(html).toContain("Activity title");
     expect(html).toContain("New assignments unavailable");
+    expect(html).toContain("Edit dates for Activity title");
     expect(html).toContain(getActivityDefinition(type)?.newAssignmentBlockReason);
   });
 
