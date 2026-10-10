@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import BohrModelsQuiz from "@/components/quiz/bohr/BohrModelsQuiz";
-import { BOHR_QUIZ_KEY, listQuizQuestions } from "@/lib/db/quiz-questions";
+import { BOHR_QUIZ_KEY, listQuizQuestions, type QuizQuestionsResult } from "@/lib/db/quiz-questions";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -20,10 +20,12 @@ export default async function BohrModelQuizPage() {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/login/student");
 
-  const { data: questions, error } = await listQuizQuestions(
-    supabase,
-    BOHR_QUIZ_KEY,
-  );
+  let questionsResult: QuizQuestionsResult;
+  try {
+    questionsResult = await listQuizQuestions(supabase, BOHR_QUIZ_KEY);
+  } catch {
+    questionsResult = { data: null, error: { code: "unavailable", message: LOAD_ERROR_MESSAGE } };
+  }
 
   return (
     <div className="min-h-screen-below-nav bg-background px-4 py-10 md:px-8">
@@ -38,17 +40,8 @@ export default async function BohrModelQuizPage() {
           </p>
         </header>
 
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {LOAD_ERROR_MESSAGE}
-          </p>
-        ) : !questions || questions.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border p-6 text-muted-foreground">
-            No quiz questions are available right now.
-          </p>
-        ) : (
-          <BohrModelsQuiz questions={questions} />
-        )}
+        <BohrModelsQuiz questions={questionsResult.error ? [] : questionsResult.data ?? []}
+          loadError={questionsResult.error ? LOAD_ERROR_MESSAGE : null} />
       </div>
     </div>
   );

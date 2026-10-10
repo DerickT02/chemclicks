@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { isValidElement } from "react";
+import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 vi.mock('@/lib/server/student-assignments', () => ({ getAssignmentAttempts: async () => [] }));
 vi.mock('@/app/(student)/student/assignments/[assignmentId]/AttemptControls', () => ({ default: () => <button>Start exploration</button> }));
 const reader = vi.hoisted(() => vi.fn());
@@ -35,6 +37,22 @@ describe("student assignment pages", () => {
   it("does not render unavailable or other-class assignment IDs", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     await expect(page("other-assignment")).rejects.toThrow("NOT_FOUND");
+  });
+  it("keys the exploration boundary by assignment identity, not a changing deadline", async () => {
+    const boundary = async () => {
+      const tree = await page();
+      const children: unknown[] = tree.props.children.props.children;
+      const node = children.find(child => isValidElement(child) && child.type === AssignmentAccess);
+      if (!isValidElement<{ closesAt: string | null }>(node)) throw new Error("Missing assignment boundary");
+      return node;
+    };
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
+    const initial = await boundary();
+    reader.mockResolvedValue({ status: "ok", assignments: [{ ...assignment, closes_at: "2030-01-01T12:00:00Z" }] });
+    const updated = await boundary();
+    expect(initial.key).toBe(assignment.id);
+    expect(updated.key).toBe(initial.key);
+    expect(updated.props.closesAt).toBe("2030-01-01T12:00:00Z");
   });
   it("renders only the assigned exercise", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });

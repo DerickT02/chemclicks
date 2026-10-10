@@ -16,9 +16,10 @@ vi.mock("@/lib/db/quiz-questions", () => ({
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/bohr/BohrModelsQuiz", () => ({
-  default: ({ questions }: { questions: unknown[] }) => (
-    <p>{`Quiz with ${questions.length} questions`}</p>
-  ),
+  default: ({ questions, loadError }: { questions: unknown[]; loadError?: string | null }) => loadError
+    ? <p role="alert">{loadError}</p>
+    : questions.length === 0 ? <p>No quiz questions are available right now.</p>
+    : <p>{`Quiz with ${questions.length} questions`}</p>,
 }));
 import BohrModelQuizPage from "@/app/(student)/student/quizzes/bohr/page";
 
@@ -68,6 +69,15 @@ describe("Bohr quiz page", () => {
     expect(html).toContain("couldn&#x27;t load the quiz questions");
     expect(html).not.toContain("Quiz with");
     expect(html).not.toContain("permission denied");
+  });
+
+  it("keeps a recoverable quiz boundary and sanitizes thrown question-load failures", async () => {
+    listQuestions.mockRejectedValue(new Error("private query credentials"));
+    const html = renderToStaticMarkup(await BohrModelQuizPage());
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("couldn&#x27;t load the quiz questions");
+    expect(html).not.toContain("private query credentials");
+    expect(html).not.toContain("Quiz with");
   });
 
   it("shows an empty state when there are no active questions", async () => {

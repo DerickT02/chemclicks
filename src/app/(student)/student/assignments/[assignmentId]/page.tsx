@@ -38,7 +38,7 @@ export default async function AssignmentPage({ params }: {
       <div className="mx-auto max-w-5xl space-y-6">
         <Link href="/student" className="text-accent underline">Back to assignments</Link>
         <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
-        <AssignmentAccess key={`${assignment.id}:${assignment.closes_at}`} closesAt={assignment.closes_at}>
+        <AssignmentAccess key={assignment.id} closesAt={assignment.closes_at}>
           {hasActivityContent(type) && (
             <section aria-label="Exploration attempts" className="rounded-xl border border-border bg-card p-6">
               <h2 className="mb-3 text-lg font-semibold">Exploration attempts</h2>

@@ -4,7 +4,7 @@ import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 import LewisQuiz from "@/components/quiz/lewis/LewisQuiz";
 import { getLewisQuizAccess } from "@/lib/assignments/lewis-quiz-access";
 import { LEWIS_QUIZZES, type LewisQuizKind } from "@/lib/assignments/lewis-quizzes";
-import { listQuizQuestions } from "@/lib/db/quiz-questions";
+import { listQuizQuestions, type QuizQuestionsResult } from "@/lib/db/quiz-questions";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type Props = { kind: LewisQuizKind };
@@ -19,10 +19,14 @@ export default async function LewisQuizPage({ kind }: Props) {
   if (access.status === "unauthenticated") redirect("/login/student");
 
   // Client sessions cannot read these rows; load them only after access passes.
-  const { data: questions, error } =
-    access.status === "available"
-      ? await listQuizQuestions(createAdminClient(), quizKey)
-      : { data: null, error: null };
+  let questionsResult: QuizQuestionsResult = { data: null, error: null };
+  if (access.status === "available") {
+    try {
+      questionsResult = await listQuizQuestions(createAdminClient(), quizKey);
+    } catch {
+      questionsResult = { data: null, error: { code: "unavailable", message: LOAD_ERROR_MESSAGE } };
+    }
+  }
 
   return (
     <div className="min-h-screen-below-nav bg-background px-4 py-10 md:px-8">
@@ -60,20 +64,14 @@ export default async function LewisQuizPage({ kind }: Props) {
               Back to assignments
             </Link>
           </div>
-        ) : error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {LOAD_ERROR_MESSAGE}
-          </p>
-        ) : !questions || questions.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border p-6 text-muted-foreground">
-            No quiz questions are available right now.
-          </p>
         ) : (
           <AssignmentAccess
-            key={`${access.assignment.id}:${access.assignment.closes_at}`}
+            key={access.assignment.id}
             closesAt={access.assignment.closes_at}
+            contentType="quiz"
           >
-            <LewisQuiz title={title} questions={questions} />
+            <LewisQuiz title={title} questions={questionsResult.error ? [] : questionsResult.data ?? []}
+              loadError={questionsResult.error ? LOAD_ERROR_MESSAGE : null} />
           </AssignmentAccess>
         )}
       </div>
