@@ -11,10 +11,19 @@ beforeEach(() => {
   const chain = { select: mock.select, eq: mock.eq, maybeSingle: mock.maybeSingle, order: mock.order }
   mock.from.mockReturnValue(chain); mock.select.mockReturnValue(chain); mock.eq.mockReturnValue(chain)
   mock.maybeSingle.mockResolvedValue({ data: { id, name: 'Chemistry' }, error: null })
-  mock.order.mockResolvedValue({ data: [{ id: 'assignment', activities: { title: 'Lewis' } }], error: null })
+  mock.order.mockResolvedValue({
+    data: [
+      { id: 'assignment', archived_at: null, activities: { title: 'Lewis' } },
+      { id: 'old', archived_at: '2026-09-01T12:00:00.000Z', activities: { title: 'Bohr' } },
+    ],
+    error: null,
+  })
 })
 it('scopes the class to the verified teacher before loading its assignments', async () => {
-  expect((await getTeacherClassActivities(id)).assignments).toEqual([{ id: 'assignment', title: 'Lewis' }])
+  expect((await getTeacherClassActivities(id)).assignments).toEqual([
+    { id: 'assignment', title: 'Lewis' },
+    { id: 'old', title: 'Bohr (archived 2026-09-01)' },
+  ])
   expect(mock.eq.mock.calls).toEqual([['id', id], ['teacher_id', 'teacher'], ['class_id', id]])
 })
 it('rejects a foreign or unavailable class before querying assignments', async () => {

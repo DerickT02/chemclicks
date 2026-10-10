@@ -103,6 +103,35 @@ describe("create class form", () => {
     expect(codeInput()).toHaveValue("TAKEN1");
   });
 
+  it("keeps the entered values and shows an accessible error for a duplicate name and section", async () => {
+    const user = userEvent.setup();
+    mock.createClass.mockResolvedValue({
+      ok: false,
+      field: "nameSection",
+      message: "You already have a class with this name and section. Change the name or section and try again.",
+    });
+    render(<CreateClassPage />);
+
+    await user.type(screen.getByLabelText("Class name"), "Chem 3");
+    await user.type(screen.getByLabelText(/Section/), "Room 204");
+    await user.type(codeInput(), "A1B2C3");
+    await user.click(screen.getByRole("button", { name: "Create class" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("already have a class with this name and section");
+    for (const field of [screen.getByLabelText("Class name"), screen.getByLabelText(/Section/)]) {
+      expect(field).toHaveAttribute("aria-invalid", "true");
+      expect(field).toHaveAttribute("aria-describedby", expect.stringContaining("nameSection-error"));
+    }
+    expect(codeInput()).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByLabelText("Class name")).toHaveValue("Chem 3");
+    expect(screen.getByLabelText(/Section/)).toHaveValue("Room 204");
+    expect(codeInput()).toHaveValue("A1B2C3");
+
+    await user.type(screen.getByLabelText(/Section/), "B");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Class name")).not.toHaveAttribute("aria-invalid");
+  });
+
   it("shows a generation failure without clearing other inputs", async () => {
     const user = userEvent.setup();
     mock.generateClassCode.mockResolvedValue({

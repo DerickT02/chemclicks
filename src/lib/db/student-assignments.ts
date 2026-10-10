@@ -47,6 +47,7 @@ export async function getStudentAssignments(): Promise<Result> {
         .from("class_activities")
         .select("id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
         .eq("class_id", classroom.id)
+        .is("archived_at", null)
         .or(`opens_at.is.null,opens_at.lte.${now}`)
         .or(`closes_at.is.null,closes_at.gt.${now}`)
         .order("id")

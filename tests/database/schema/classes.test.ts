@@ -154,4 +154,37 @@ describe('classes table schema', () => {
     })
   })
 
+  // Requires migration 20261009000000_classes_name_section_normalized.sql.
+  describe('UNIQUE index — normalized teacher/name/section (pg error 23505)', () => {
+    it('rejects a case- and spacing-variant of an existing name/section pair', async () => {
+      const teacherId = await fetchExistingTeacherId()
+      const section = `Room ${generateClassCode()}`
+
+      const { data: first } = await insertTestClass(teacherId, { name: 'Norm Chem 3', section })
+      if (first?.id) track.classIds.push(first.id)
+
+      const { data: dup, error } = await insertTestClass(teacherId, {
+        name: '  norm   CHEM 3 ',
+        section: ` ${section.toLowerCase()} `,
+      })
+      if (dup?.id) track.classIds.push(dup.id)
+
+      expect(error?.code).toBe('23505')
+      expect(error?.message).toContain('classes_teacher_name_section')
+    })
+
+    it('allows the same name with a different section', async () => {
+      const teacherId = await fetchExistingTeacherId()
+
+      const { data: c1 } = await insertTestClass(teacherId, { name: 'Norm Chem 4', section: `A ${generateClassCode()}` })
+      if (c1?.id) track.classIds.push(c1.id)
+
+      const { data: c2, error } = await insertTestClass(teacherId, { name: 'Norm Chem 4', section: `B ${generateClassCode()}` })
+      if (c2?.id) track.classIds.push(c2.id)
+
+      expect(error).toBeNull()
+      expect(c2).not.toBeNull()
+    })
+  })
+
 })

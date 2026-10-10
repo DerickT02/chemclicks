@@ -66,7 +66,7 @@ describe("assignment activity selection", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("marks assigned activities and prevents selecting them again", () => {
+  it("hides already-assigned activities from the assign picker", () => {
     render(
       <AssignmentForm
         classId="33333333-3333-4333-8333-333333333333"
@@ -75,9 +75,32 @@ describe("assignment activity selection", () => {
       />,
     );
 
-    expect(screen.getByText("Assigned")).toBeInTheDocument();
-    expect(screen.getAllByRole("radio")[0]).toBeDisabled();
-    expect(screen.getAllByRole("radio")[1]).toBeEnabled();
+    expect(
+      screen.queryByText("Practice ruler measurements to the nearest tenth"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Practice ruler measurements to the nearest hundredth"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("(1 of 2 available)")).toBeInTheDocument();
+    expect(screen.getAllByRole("radio")).toHaveLength(1);
+  });
+
+  it("explains when every catalog activity is already assigned", () => {
+    render(
+      <AssignmentForm
+        classId="33333333-3333-4333-8333-333333333333"
+        activities={activities}
+        assignedActivityIds={activities.map((activity) => activity.id)}
+      />,
+    );
+
+    expect(
+      screen.getByText(/already assigned to this class/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Assign activity" }),
+    ).toBeDisabled();
   });
 
   it("shows an explicit empty state and disables assignment", () => {
