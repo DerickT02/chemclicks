@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/assignments/AssignmentAccess", () => ({ default: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/bohr-models/BohrModelViewer", () => ({ default: () => <p>Bohr exercise</p> }));
 vi.mock("@/components/measurement/GraduatedCylinder", () => ({ default: () => <p>Cylinder exercise</p> }));
-vi.mock("@/components/measurement/PrecisionRuler", () => ({ default: () => <p>Ruler exercise</p> }));
+vi.mock("@/components/measurement/PrecisionRuler", () => ({ default: ({ precision }: { precision: string }) => <p>Ruler exercise: {precision}</p> }));
 vi.mock("@/components/lewis/LewisDotExplorer", () => ({ default: () => <p>Lewis exercise</p> }));
 vi.mock("@/components/lewis/IonicCompoundExplorer", () => ({ default: () => <p>Ionic exercise</p> }));
 vi.mock("@/components/lewis/CovalentBondExplorer", () => ({ default: () => <p>Covalent exercise</p> }));
@@ -61,6 +61,15 @@ describe("student assignment pages", () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     await expect(page("bohr")).rejects.toThrow("NOT_FOUND");
     expect(renderToStaticMarkup(await StudentPage())).not.toContain("/student/assignments/bohr");
+  });
+  it.each(["tenths", "hundredths"])("starts the coarse-to-fine comparison for the %s ruler assignment", async (precision) => {
+    reader.mockResolvedValue({ status: "ok", assignments: [{
+      ...assignment, activity: { ...assignment.activity, type: `measurement_ruler_${precision}` },
+    }] });
+    const html = renderToStaticMarkup(await page());
+    expect(html).toContain("Ruler exercise: tenths");
+    expect(html).toContain("Next");
+    expect(html).not.toContain("Ruler exercise: hundredths");
   });
   it("renders the ionic compound explorer for ionic assignments", async () => {
     const ionic = { ...assignment, id: "ionic", activity: { ...assignment.activity, type: "lewis_structures_ionic" } };
