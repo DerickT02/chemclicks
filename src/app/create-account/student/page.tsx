@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
   AuthCard,
@@ -14,7 +13,6 @@ import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
 import { signupStudent } from "@/app/create-account/student/actions";
 
 export default function StudentCreateAccountPage() {
-  const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [studentID, setStudentID] = useState("");
@@ -25,6 +23,7 @@ export default function StudentCreateAccountPage() {
   const [codeError, setCodeError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [joined, setJoined] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -69,14 +68,23 @@ export default function StudentCreateAccountPage() {
     setLastName(normalizedLastName);
     setStudentID(normalizedStudentID);
     setCode(normalizedCode);
-    router.replace("/?accountCreated=true");
+    setJoined(true);
 
   }
+
+  if (joined) return (
+    <AuthPageLayout>
+      <AuthCard title="You joined the class">
+        <p role="status" className="text-sm text-muted-foreground">Your student account is ready. Sign in with your Student ID and classroom code.</p>
+        <Link href="/login/student" className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground">Sign in as a student</Link>
+      </AuthCard>
+    </AuthPageLayout>
+  );
 
   return (
     <AuthPageLayout>
       <AuthCard
-        title="Create account"
+        title="Join a class"
         footer={
           <AuthFooter className="text-muted-foreground">
             Already have an account?{" "}
@@ -145,7 +153,7 @@ export default function StudentCreateAccountPage() {
             </p>
           ) : null}
           <AuthPrimaryButton type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating account..." : "Create account"}
+            {isSubmitting ? "Joining class…" : "Join class"}
           </AuthPrimaryButton>
         </form>
       </AuthCard>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import DisableClassControl from "@/app/admin/classes/DisableClassControl";
+import CopyClassCode from "@/app/admin/classes/CopyClassCode";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import AssignmentSchedule from "@/app/admin/assignments/AssignmentSchedule";
@@ -17,10 +18,10 @@ type ClassWithStudents = ClassListItem & { students: TeacherRosterStudent[] };
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ classId?: string; classDisabled?: string }>;
+  searchParams: Promise<{ classId?: string; classDisabled?: string; classCreated?: string }>;
 }) {
   const supabase = await createClient();
-  const [{ classId, classDisabled }, { data: userData, error: authError }] = await Promise.all([
+  const [{ classId, classDisabled, classCreated }, { data: userData, error: authError }] = await Promise.all([
     searchParams,
     supabase.auth.getUser(),
   ]);
@@ -94,6 +95,9 @@ export default async function AdminPage({
     <div className="min-h-screen bg-background px-6 py-10 text-foreground md:px-10">
       <div className="mx-auto max-w-6xl">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Classrooms</h1>
+        {classCreated === "1" && selectedClass?.id === classId && (
+          <p role="status" className="mt-3 text-sm text-foreground">Class created. Share its classroom code below.</p>
+        )}
         {classDisabled === "1" && (
           <p role="status" className="mt-3 text-sm text-foreground">
             Class disabled. Student access is blocked; classroom data has been kept.
@@ -191,6 +195,7 @@ export default async function AdminPage({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {rosterLoadFailed ? "Enrollment count unavailable" : `${selectedClass.students.length} ${selectedClass.students.length === 1 ? "student" : "students"} enrolled`}
                 </p>
+                <div className="mt-4"><CopyClassCode key={selectedClass.id} code={selectedClass.class_code} /></div>
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 

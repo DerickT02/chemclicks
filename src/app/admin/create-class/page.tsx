@@ -13,7 +13,6 @@ export default function CreateClassPage() {
   const [classCodeError, setClassCodeError] = useState<string | undefined>();
   const [classNameError, setClassNameError] = useState<string | undefined>();
   const [submitError, setSubmitError] = useState<string | undefined>();
-  const [submitSuccess, setSubmitSuccess] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
 
   function handleClassCodeChange(value: string) {
@@ -28,7 +27,6 @@ export default function CreateClassPage() {
     setClassCodeError(undefined);
     setClassNameError(undefined);
     setSubmitError(undefined);
-    setSubmitSuccess(undefined);
 
     const trimmedName = className.trim();
     if (!trimmedName) {
@@ -41,8 +39,8 @@ export default function CreateClassPage() {
       return;
     }
 
-    startTransition(() => {
-      void (async () => {
+    startTransition(async () => {
+      try {
         const result = await createClass({
           className: trimmedName,
           section,
@@ -58,12 +56,10 @@ export default function CreateClassPage() {
           return;
         }
 
-        setSubmitSuccess("Class created.");
-        setClassName("");
-        setSection("");
-        setClassCode("");
-        router.refresh();
-      })();
+        router.push(`/admin?classId=${encodeURIComponent(result.classId)}&classCreated=1`);
+      } catch {
+        setSubmitError("We could not confirm the class was created. Check your classrooms before trying again.");
+      }
     });
   }
 
@@ -162,9 +158,6 @@ export default function CreateClassPage() {
 
           {submitError ? (
             <p className="text-sm text-destructive" role="alert">{submitError}</p>
-          ) : null}
-          {submitSuccess ? (
-            <p className="text-sm text-accent">{submitSuccess}</p>
           ) : null}
 
           <button
