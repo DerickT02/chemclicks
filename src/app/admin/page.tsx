@@ -3,6 +3,8 @@ import { deleteOwnedClass } from "@/lib/server/classes";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
+import AssignmentScheduleForm from "@/app/admin/assignments/AssignmentScheduleForm";
+import UnassignActivityForm from "@/app/admin/assignments/UnassignActivityForm";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { listActiveClassesForTeacher } from "@/lib/db/classes";
@@ -45,10 +47,6 @@ function statusText(status: ProgressStatus | null): string {
 
 function formatAssignmentTimestamp(value: string): string {
   return `${new Date(value).toISOString().slice(0, 19).replace("T", " ")} UTC`;
-}
-
-function scheduleTimestamp(value: string | null, whenEmpty: string): string {
-  return value ? formatAssignmentTimestamp(value) : whenEmpty;
 }
 
 export default async function AdminPage({
@@ -102,7 +100,11 @@ export default async function AdminPage({
   const { data: classActivitiesData } =
     classIds.length === 0
       ? { data: [] as ClassActivity[] }
-      : await supabase.from("class_activities").select("id, class_id").in("class_id", classIds);
+      : await supabase
+          .from("class_activities")
+          .select("id, class_id")
+          .in("class_id", classIds)
+          .is("archived_at", null);
 
   const classActivityIds = (classActivitiesData ?? []).map((row) => row.id);
   const { data: studentProgressData } =
@@ -297,55 +299,46 @@ export default async function AdminPage({
                           return (
                             <div
                               key={assignment.id}
-                              className="flex items-start justify-between gap-4 rounded-lg border border-border p-4"
+                              className="rounded-lg border border-border p-4"
                             >
-                              <div>
-                                <h4 className="font-medium">
-                                  {activity?.title ?? "Assigned activity"}
-                                </h4>
-                                {activity ? (
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {activity.description}
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <h4 className="font-medium">
+                                    {activity?.title ?? "Assigned activity"}
+                                  </h4>
+                                  {activity ? (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {activity.description}
+                                    </p>
+                                  ) : null}
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    Assigned{" "}
+                                    {formatAssignmentTimestamp(
+                                      assignment.created_at,
+                                    )}
                                   </p>
-                                ) : null}
-                                <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
-                                  <div className="flex flex-wrap gap-x-2">
-                                    <dt className="font-medium text-foreground/80">
-                                      Assigned
-                                    </dt>
-                                    <dd>
-                                      {formatAssignmentTimestamp(
-                                        assignment.created_at,
-                                      )}
-                                    </dd>
-                                  </div>
-                                  <div className="flex flex-wrap gap-x-2">
-                                    <dt className="font-medium text-foreground/80">
-                                      Opens
-                                    </dt>
-                                    <dd>
-                                      {scheduleTimestamp(
-                                        assignment.opens_at,
-                                        "Available immediately",
-                                      )}
-                                    </dd>
-                                  </div>
-                                  <div className="flex flex-wrap gap-x-2">
-                                    <dt className="font-medium text-foreground/80">
-                                      Closes
-                                    </dt>
-                                    <dd>
-                                      {scheduleTimestamp(
-                                        assignment.closes_at,
-                                        "No deadline",
-                                      )}
-                                    </dd>
-                                  </div>
-                                </dl>
+                                </div>
+                                <div className="flex shrink-0 flex-col items-end gap-2">
+                                  <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                    Assigned
+                                  </span>
+                                  <UnassignActivityForm
+                                    classId={selectedClass.id}
+                                    assignmentId={assignment.id}
+                                    activityTitle={
+                                      activity?.title ?? "Assigned activity"
+                                    }
+                                  />
+                                </div>
                               </div>
-                              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                                Assigned
-                              </span>
+                              <AssignmentScheduleForm
+                                key={`${assignment.id}:${assignment.opens_at ?? ""}:${assignment.closes_at ?? ""}`}
+                                classId={selectedClass.id}
+                                assignmentId={assignment.id}
+                                activityId={assignment.activity_id}
+                                initialOpensAt={assignment.opens_at}
+                                initialClosesAt={assignment.closes_at}
+                              />
                             </div>
                           );
                         })

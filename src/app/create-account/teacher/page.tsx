@@ -15,7 +15,6 @@ import {
   getTeacherVerificationMessage,
 } from "@/lib/auth/teacher-email-verification";
 import { validateTeacherSignup } from "@/lib/auth/validate-teacher-signup";
-import { insertTeacher } from "@/lib/db/teachers";
 import { DATABASE_RETRY_MESSAGE, isDuplicateAuthError } from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
@@ -124,17 +123,8 @@ export default function TeacherCreateAccountPage() {
       return;
     }
 
-    const { error: teacherError } = await insertTeacher(supabase, {
-      id: authData.user.id,
-      email: normalizedEmail,
-      display_name: normalizedDisplayName,
-    });
-
-    if (teacherError) {
-      setFormError(teacherError.message || "Could not create teacher profile.");
-      setIsSubmitting(false);
-      return;
-    }
+    // The public.teachers row is created by the on_auth_user_created_teacher
+    // trigger (see migration 20260920000100), using options.data.display_name.
 
     setDisplayName("");
     setEmail(normalizedEmail);

@@ -1,30 +1,73 @@
 'use server';
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTeacherId } from "@/lib/server/teacher";
-import { findClassByCode, insertClass, isDuplicateClassCodeError } from "@/lib/db/classes";
+import {
+  findClassByCode,
+  insertClass,
+  isDuplicateClassCodeError,
+  isDuplicateClassNameSectionError,
+  teacherHasClassNamed,
+} from "@/lib/db/classes";
+import { isValidClassCode, normalizeClassCode, randomClassCode } from "@/lib/classes/class-code";
+import { normalizeClassLabel } from "@/lib/classes/class-name";
 import { DATABASE_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 type CreateClassInput = {
   className: string;
   section: string;
   classCode: string;
+  codeSource?: "manual" | "generated";
 };
 
-const CLASS_CODE_PATTERN = /^[A-Za-z0-9]{6}$/;
+const MAX_CODE_ATTEMPTS = 5;
 const DUPLICATE_CODE_MESSAGE =
   "That class code is already in use. Please choose a different code.";
+const GENERATION_EXHAUSTED_MESSAGE =
+  "Couldn't generate a unique code. Try again or enter one manually.";
+const DUPLICATE_NAME_SECTION_MESSAGE =
+  "You already have a class with this name and section. Change the name or section and try again.";
+
+type UniqueCodeResult = { ok: true; code: string } | { ok: false; message: string };
+
+/**
+ * Picks a random code not used by any class. Must run with the admin client:
+ * the request client only sees the teacher's own classes under RLS.
+ */
+async function findUnusedClassCode(admin: SupabaseClient): Promise<UniqueCodeResult> {
+  for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
+    const code = randomClassCode();
+    const { exists, error } = await findClassByCode(admin, code);
+    if (error) return { ok: false, message: DATABASE_RETRY_MESSAGE };
+    if (!exists) return { ok: true, code };
+  }
+  return { ok: false, message: GENERATION_EXHAUSTED_MESSAGE };
+}
+
+export async function generateClassCode(): Promise<UniqueCodeResult> {
+  try { await requireTeacherId(); } catch {
+    return { ok: false, message: "An approved, verified teacher session is required." };
+  }
+  try {
+    return await findUnusedClassCode(createAdminClient());
+  } catch {
+    return { ok: false, message: DATABASE_RETRY_MESSAGE };
+  }
+}
 
 export async function createClass(input: CreateClassInput): Promise<
-  | { ok: true; classId: string }
-  | { ok: false; message: string; field?: "classCode" }
+  | { ok: true; classId: string; classCode: string }
+  | { ok: false; message: string; field?: "classCode" | "nameSection" }
 > {
-  const name = input.className.trim();
+  const name = typeof input.className === "string" ? normalizeClassLabel(input.className) : "";
   if (!name) return { ok: false, message: "Class name is required." };
 
-  const rawCode = input.classCode.trim();
-  if (!CLASS_CODE_PATTERN.test(rawCode)) {
+  const codeSource = input.codeSource === "generated" ? "generated" : "manual";
+  const rawCode = typeof input.classCode === "string" ? input.classCode : "";
+  let class_code = normalizeClassCode(rawCode);
+  if (!isValidClassCode(class_code)) {
     return {
       ok: false,
       field: "classCode",
@@ -32,8 +75,7 @@ export async function createClass(input: CreateClassInput): Promise<
     };
   }
 
-  const class_code = rawCode.toUpperCase();
-  const section = input.section.trim();
+  const section = typeof input.section === "string" ? normalizeClassLabel(input.section) : "";
 
   const supabase = await createClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -55,19 +97,47 @@ export async function createClass(input: CreateClassInput): Promise<
   try { await requireTeacherId(); } catch {
     return { ok: false, message: "An approved, verified teacher session is required." };
   }
-  const { data, error } = await insertClass(createAdminClient(), {
-    teacher_id: userData.user.id,
+  const admin = createAdminClient();
+
+  const { exists: nameTaken, error: nameLookupError } = await teacherHasClassNamed(
+    admin,
+    userData.user.id,
     name,
     section,
-    class_code,
-  });
-
-  if (error || !data) {
-    if (error && isDuplicateClassCodeError(error)) {
-      return { ok: false, field: "classCode", message: DUPLICATE_CODE_MESSAGE };
-    }
+  );
+  if (nameLookupError) {
     return { ok: false, message: DATABASE_RETRY_MESSAGE };
   }
+  if (nameTaken) {
+    return { ok: false, field: "nameSection", message: DUPLICATE_NAME_SECTION_MESSAGE };
+  }
 
-  return { ok: true, classId: data.id };
+  for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
+    const { data, error } = await insertClass(admin, {
+      teacher_id: userData.user.id,
+      name,
+      section,
+      class_code,
+    });
+
+    if (data && !error) return { ok: true, classId: data.id, classCode: data.class_code };
+
+    if (error && isDuplicateClassNameSectionError(error)) {
+      return { ok: false, field: "nameSection", message: DUPLICATE_NAME_SECTION_MESSAGE };
+    }
+
+    if (!error || !isDuplicateClassCodeError(error)) {
+      return { ok: false, message: DATABASE_RETRY_MESSAGE };
+    }
+    if (codeSource === "manual") {
+      return { ok: false, field: "classCode", message: DUPLICATE_CODE_MESSAGE };
+    }
+
+    // A generated code was taken between generation and insert; pick a fresh one.
+    const next = await findUnusedClassCode(admin);
+    if (!next.ok) return { ok: false, field: "classCode", message: next.message };
+    class_code = next.code;
+  }
+
+  return { ok: false, field: "classCode", message: GENERATION_EXHAUSTED_MESSAGE };
 }

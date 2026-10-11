@@ -65,7 +65,12 @@ export default async function LewisQuizPage({ kind }: Props) {
             key={`${access.assignment.id}:${access.assignment.closes_at}`}
             closesAt={access.assignment.closes_at}
           >
-            <LewisQuiz title={title} questions={questions} />
+          <LewisQuiz
+            title={title}
+            assignmentId={access.assignment.id}
+            quizKey={quizKey}
+            questions={questions}
+          />
           </AssignmentAccess>
         )}
       </div>

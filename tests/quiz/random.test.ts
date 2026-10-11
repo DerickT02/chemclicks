@@ -7,7 +7,7 @@ function makePool(size: number): QuizQuestion[] {
     id: `q-${index + 1}`,
     question: `Question ${index + 1}?`,
     options: [`right-${index + 1}`, "wrong a", "wrong b", "wrong c"],
-    correctIndex: 0,
+    answerOrder: [0, 1, 2, 3],
   }));
 }
 
@@ -32,25 +32,22 @@ describe("pickRandomQuestions", () => {
     expect(JSON.stringify(pool)).toBe(before);
   });
 
-  it("keeps the correct answer attached to its question after shuffling", () => {
+  it("preserves the authored option indexes after shuffling", () => {
     const pool = makePool(30);
 
     for (const drawn of pickRandomQuestions(pool, 30)) {
       const original = pool.find((question) => question.id === drawn.id)!;
-      expect(drawn.options[drawn.correctIndex]).toBe(
-        original.options[original.correctIndex],
-      );
       expect([...drawn.options].sort()).toEqual([...original.options].sort());
+      expect(drawn.answerOrder?.sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
     }
   });
 });
 
 describe("shuffleQuestionOptions", () => {
-  it("returns a valid correct index for the shuffled options", () => {
+  it("returns the authored index for each shuffled option", () => {
     const shuffled = shuffleQuestionOptions(makePool(1)[0]);
 
-    expect(shuffled.correctIndex).toBeGreaterThanOrEqual(0);
-    expect(shuffled.correctIndex).toBeLessThan(shuffled.options.length);
-    expect(shuffled.options[shuffled.correctIndex]).toBe("right-1");
+    expect(shuffled.answerOrder).toHaveLength(shuffled.options.length);
+    expect(shuffled.answerOrder?.sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
   });
 });

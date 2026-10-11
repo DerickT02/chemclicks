@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { submitQuizAction } from "@/app/(student)/student/quizzes/actions";
 import QuizShell from "@/components/quiz/QuizShell";
 import { pickRandomQuestions } from "@/components/quiz/random";
-import type { QuizCompleteResult, QuizQuestion } from "@/components/quiz/types";
+import type {
+  QuizCompleteResult,
+  QuizQuestion,
+  QuizAnswer,
+} from "@/components/quiz/types";
 
 type RandomizedQuizProps = {
   title: string;
@@ -11,6 +16,8 @@ type RandomizedQuizProps = {
   questionsPerAttempt: number;
   passingThresholdPercent?: number;
   onComplete?: (result: QuizCompleteResult) => void;
+  assignmentId?: string;
+  quizKey?: string;
 };
 
 export default function RandomizedQuiz({
@@ -19,11 +26,14 @@ export default function RandomizedQuiz({
   questionsPerAttempt,
   passingThresholdPercent = 80,
   onComplete,
+  assignmentId,
+  quizKey,
 }: RandomizedQuizProps) {
   // Start empty so server and first client render match (no Math.random during SSR).
   const [attemptQuestions, setAttemptQuestions] = useState<QuizQuestion[]>(
     [],
   );
+  const [submissionKey, setSubmissionKey] = useState<string | null>(null);
 
   useEffect(() => {
     // Deferred to satisfy react-hooks/set-state-in-effect.
@@ -46,15 +56,37 @@ export default function RandomizedQuiz({
     );
   }
 
+  async function submitAnswers(answers: QuizAnswer[]): Promise<QuizCompleteResult> {
+    if (!assignmentId || !quizKey) {
+      throw new Error("This quiz is not linked to an assignment.");
+    }
+
+    const key = submissionKey
+      ?? window.crypto.randomUUID?.()
+      ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (!submissionKey) setSubmissionKey(key);
+
+    return submitQuizAction({
+      assignmentId,
+      quizKey,
+      submissionKey: key,
+      answers,
+    });
+  }
+
+  function retryQuiz() {
+    setSubmissionKey(null);
+    setAttemptQuestions(pickRandomQuestions(pool, questionsPerAttempt));
+  }
+
   return (
     <QuizShell
       title={title}
       questions={attemptQuestions}
       passingThresholdPercent={passingThresholdPercent}
       onComplete={onComplete}
-      onRetry={() =>
-        setAttemptQuestions(pickRandomQuestions(pool, questionsPerAttempt))
-      }
+      onSubmit={assignmentId && quizKey ? submitAnswers : undefined}
+      onRetry={retryQuiz}
     />
   );
 }

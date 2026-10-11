@@ -2,31 +2,64 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
-import { createClass } from "./actions";
+import { useRef, useState, useTransition, type FormEvent } from "react";
+import { createClass, generateClassCode } from "./actions";
+
+type CodeSource = "manual" | "generated";
 
 export default function CreateClassPage() {
   const router = useRouter();
   const [className, setClassName] = useState("");
   const [section, setSection] = useState("");
   const [classCode, setClassCode] = useState("");
+  const [codeSource, setCodeSource] = useState<CodeSource>("manual");
+  const [hasGenerated, setHasGenerated] = useState(false);
   const [classCodeError, setClassCodeError] = useState<string | undefined>();
   const [classNameError, setClassNameError] = useState<string | undefined>();
+  const [nameSectionError, setNameSectionError] = useState<string | undefined>();
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [submitSuccess, setSubmitSuccess] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
+  const [isGenerating, startGenerating] = useTransition();
+  const busyRef = useRef(false);
+  const isBusy = isPending || isGenerating;
 
   function handleClassCodeChange(value: string) {
     const next = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase();
     setClassCode(next);
+    setCodeSource("manual");
     if (classCodeError) setClassCodeError(undefined);
     if (submitError) setSubmitError(undefined);
   }
 
+  function handleGenerate() {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setClassCodeError(undefined);
+    setSubmitSuccess(undefined);
+
+    startGenerating(async () => {
+      try {
+        const result = await generateClassCode();
+        if (!result.ok) {
+          setClassCodeError(result.message);
+          return;
+        }
+        setClassCode(result.code);
+        setCodeSource("generated");
+        setHasGenerated(true);
+      } finally {
+        busyRef.current = false;
+      }
+    });
+  }
+
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busyRef.current) return;
     setClassCodeError(undefined);
     setClassNameError(undefined);
+    setNameSectionError(undefined);
     setSubmitError(undefined);
     setSubmitSuccess(undefined);
 
@@ -41,33 +74,45 @@ export default function CreateClassPage() {
       return;
     }
 
-    startTransition(() => {
-      void (async () => {
+    busyRef.current = true;
+    startTransition(async () => {
+      try {
         const result = await createClass({
           className: trimmedName,
           section,
           classCode,
+          codeSource,
         });
 
         if (!result.ok) {
           if (result.field === "classCode") {
             setClassCodeError(result.message);
+          } else if (result.field === "nameSection") {
+            setNameSectionError(result.message);
           } else {
             setSubmitError(result.message);
           }
           return;
         }
 
-        setSubmitSuccess("Class created.");
+        setSubmitSuccess(`Class created with code ${result.classCode}.`);
         setClassName("");
         setSection("");
         setClassCode("");
+        setCodeSource("manual");
+        setHasGenerated(false);
         router.refresh();
-      })();
+      } finally {
+        busyRef.current = false;
+      }
     });
   }
 
   const isCodeComplete = classCode.length === 6;
+  const classNameDescribedBy =
+    [classNameError ? "className-error" : null, nameSectionError ? "nameSection-error" : null]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   return (
     <div className="min-h-screen bg-background p-6 text-foreground md:p-10">
@@ -82,7 +127,7 @@ export default function CreateClassPage() {
         <h1 className="mt-6 text-2xl font-semibold tracking-tight">Add a class</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Choose a display name, section label (optional), and a unique 6-character code
-          students will use to join.
+          students will use to join. Enter your own code or generate one.
         </p>
 
         <form
@@ -104,10 +149,11 @@ export default function CreateClassPage() {
               onChange={(e) => {
                 setClassName(e.target.value);
                 if (classNameError) setClassNameError(undefined);
+                if (nameSectionError) setNameSectionError(undefined);
                 if (submitError) setSubmitError(undefined);
               }}
-              aria-invalid={classNameError ? true : undefined}
-              aria-describedby={classNameError ? "className-error" : undefined}
+              aria-invalid={classNameError || nameSectionError ? true : undefined}
+              aria-describedby={classNameDescribedBy}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
             />
             {classNameError ? (
@@ -129,31 +175,60 @@ export default function CreateClassPage() {
               autoComplete="off"
               placeholder="e.g. Fall 2026 · Room 204"
               value={section}
-              onChange={(e) => setSection(e.target.value)}
+              onChange={(e) => {
+                setSection(e.target.value);
+                if (nameSectionError) setNameSectionError(undefined);
+                if (submitError) setSubmitError(undefined);
+              }}
+              aria-invalid={nameSectionError ? true : undefined}
+              aria-describedby={nameSectionError ? "nameSection-error" : undefined}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
             />
+            {nameSectionError ? (
+              <p id="nameSection-error" className="text-sm text-destructive" role="alert">
+                {nameSectionError}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2">
             <label htmlFor="classCode" className="text-sm font-medium">
               Class code
             </label>
-            <input
-              id="classCode"
-              name="classCode"
-              type="text"
-              inputMode="text"
-              autoComplete="off"
-              maxLength={6}
-              placeholder="e.g. A1B2C3"
-              value={classCode}
-              onChange={(e) => handleClassCodeChange(e.target.value)}
-              aria-invalid={classCodeError ? true : undefined}
-              aria-describedby={classCodeError ? "classCode-error" : undefined}
-              className="rounded-md border border-border bg-background px-3 py-2 font-mono text-sm uppercase tracking-widest outline-none ring-ring focus:ring-2"
-            />
-            <p className="text-xs text-muted-foreground">
-              Six letters or numbers only. Stored in uppercase.
+            <div className="flex gap-2">
+              <input
+                id="classCode"
+                name="classCode"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                maxLength={6}
+                placeholder="e.g. A1B2C3"
+                value={classCode}
+                readOnly={isPending}
+                onChange={(e) => handleClassCodeChange(e.target.value)}
+                aria-invalid={classCodeError ? true : undefined}
+                aria-describedby={
+                  classCodeError ? "classCode-hint classCode-error" : "classCode-hint"
+                }
+                className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm uppercase tracking-widest outline-none ring-ring focus:ring-2"
+              />
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isBusy}
+                className="shrink-0 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isGenerating ? "Generating…" : hasGenerated ? "Regenerate" : "Generate code"}
+              </button>
+            </div>
+            <p id="classCode-hint" className="text-xs text-muted-foreground">
+              Six letters or numbers only. Stored in uppercase. Type your own or generate one.
+            </p>
+            <p className="text-xs text-muted-foreground" aria-live="polite">
+              {codeSource === "generated" && classCode
+                ? `Generated code ${classCode}. You can regenerate or edit it before saving.`
+                : ""}
             </p>
             {classCodeError ? (
               <p id="classCode-error" className="text-sm text-destructive" role="alert">{classCodeError}</p>
@@ -169,7 +244,7 @@ export default function CreateClassPage() {
 
           <button
             type="submit"
-            disabled={!className.trim() || !isCodeComplete || isPending}
+            disabled={!className.trim() || !isCodeComplete || isBusy}
             className="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? "Saving…" : "Create class"}
