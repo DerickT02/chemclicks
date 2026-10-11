@@ -12,6 +12,7 @@ import {
   formatSignedTotalCharge,
   getChargeTotals,
   getFormulaUnitIons,
+  getIsolatedIons,
   getNetCharge,
   getTransferredElectrons,
   isChargeBalanced,
@@ -99,6 +100,16 @@ describe("formula unit ions", () => {
       expect(item.ion).toBe(item.role === "cation" ? compound.cation : compound.anion);
     }
     expect(new Set(ions.map((item) => item.id)).size).toBe(ions.length);
+  });
+
+  it.each(["nacl", "mgo", "caf2", "al2o3"])("%s has one isolated ion of each kind", (id) => {
+    const compound = compoundById(id);
+    const ions = getIsolatedIons(compound);
+
+    expect(ions.map((item) => item.role)).toEqual(["cation", "anion"]);
+    expect(ions[0].ion).toBe(compound.cation);
+    expect(ions[1].ion).toBe(compound.anion);
+    expect(new Set(ions.map((item) => item.id)).size).toBe(2);
   });
 });
 
