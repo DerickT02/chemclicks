@@ -57,12 +57,12 @@ describe("student dashboard work queue", () => {
     expect(output).toContain("Period A");
     for (const text of ["To do (1)", "In progress (1)", "Completed explorations (1)", "Open to start",
       "Resume exploration", "Review exploration", "Exploration completion saved", "This is not a quiz grade",
-      "Opening an activity does not record participation", "Quiz answers and results are not saved or visible to your teacher",
+      "Use Start exploration inside an activity to track your work", "Quiz answers and results are not saved or visible to your teacher",
       "Explore untracked practice", "Refresh assignments"]) expect(output).toContain(text);
     for (const id of ["todo", "resume", "review"]) expect(output).toContain(`href="/student/assignments/${id}"`);
   });
 
-  it("shows upcoming/closed schedule metadata without exercise/quiz links or inferred completion", async () => {
+  it("shows closed history links but no future exercises, quiz links or inferred completion", async () => {
     reader.mockResolvedValue(response([
       assignment("future", { opens_at: "2026-04-02T12:00:00Z", progress: "completed" }),
       assignment("closed", { closes_at: "2026-04-01T12:00:00Z", progress: "completed" }),

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import DisableClassControl from "@/app/admin/classes/DisableClassControl";
 import CopyClassCode from "@/app/admin/classes/CopyClassCode";
+import RefreshAssignments from "@/components/assignments/RefreshAssignments";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import AssignmentSchedule from "@/app/admin/assignments/AssignmentSchedule";
@@ -86,7 +87,7 @@ export default async function AdminPage({
     progressByStudent.set(row.student_id, rows);
   }
   const assignmentIds = assignments.map(assignment => assignment.id);
-  // Request-time Server Component snapshot; client clocks subscribe after hydration.
+  // Request-time status snapshot; dashboard refreshes update it.
   // eslint-disable-next-line react-hooks/purity -- This server-only clock read is not a client render-time side effect.
   const scheduleRenderedAt = Date.now();
 
@@ -279,6 +280,7 @@ export default async function AdminPage({
                 <Link href={`/admin/classes/${selectedClass.id}/attempts`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
                   Activity attempts
                 </Link>
+                <div className="mt-4"><RefreshAssignments label="Refresh classroom" /></div>
                 <div className="mt-7">
                   <h3 className="text-lg font-semibold text-foreground">Enrolled students</h3>
                   <p className="mt-2 text-sm text-muted-foreground">

@@ -14,6 +14,7 @@ vi.mock("@/lib/db/classes", () => ({ listActiveClassesForTeacher: mocks.classes 
 vi.mock("@/lib/db/teacher-dashboard", () => ({ getTeacherRoster: mocks.roster, getClassCurrentProgress: mocks.progress }));
 vi.mock("@/app/admin/assignments/AssignmentForm", () => ({ default: () => <p>New assignment form</p> }));
 vi.mock("@/app/admin/assignments/actions", () => ({ saveAssignment: vi.fn() }));
+vi.mock("@/components/assignments/RefreshAssignments", () => ({ default: ({ label }: { label: string }) => <button>{label}</button> }));
 
 import AdminPage from "@/app/admin/page";
 

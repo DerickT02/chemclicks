@@ -64,12 +64,6 @@ export default async function StudentAssignmentsPage() {
   const hasAvailable = groups.some(group => OPEN_SECTIONS.includes(group.id));
   const allAvailableCompleted = hasAvailable && groups.filter(group => OPEN_SECTIONS.includes(group.id))
     .every(group => group.id === "completed");
-  const futureChanges = result.status === "ok" ? result.assignments.flatMap(assignment =>
-    [assignment.opens_at, assignment.closes_at].flatMap(value => {
-      const time = value === null ? NaN : Date.parse(value);
-      return Number.isFinite(time) && time > result.checkedAt ? [time] : [];
-    })) : [];
-  const nextChangeAt = futureChanges.length ? futureChanges.reduce((earliest, time) => Math.min(earliest, time), Infinity) : null;
 
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
@@ -80,10 +74,8 @@ export default async function StudentAssignmentsPage() {
             <p className="font-medium">{result.context.studentName} · {result.context.className}
               {result.context.section && ` — ${result.context.section}`}</p>
           )}
-          <p className="text-sm text-muted-foreground">Current saved exploration status, not quiz grades. Retrying an exploration moves it back to In progress.</p>
-          <p className="text-sm text-muted-foreground">Opening an activity does not record participation. Use Start exploration inside the activity to begin tracking, then Finish exploration to save completion.</p>
-          <p className="text-sm text-muted-foreground">Quiz answers and results are not saved or visible to your teacher.</p>
-          <RefreshAssignments nextChangeAt={nextChangeAt} checkedAt={result.status === "ok" ? result.checkedAt : undefined} />
+          <p className="text-sm text-muted-foreground">Use Start exploration inside an activity to track your work, then Finish exploration to save it. Quiz answers and results are not saved or visible to your teacher.</p>
+          <RefreshAssignments />
         </header>
         {result.status === "error" ? (
           <p role="alert" className="text-sm text-destructive">{result.message}</p>
