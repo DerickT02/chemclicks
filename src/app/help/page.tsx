@@ -19,7 +19,7 @@ export default function HelpPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">For teachers</h2>
           <p><Link href="/create-account/teacher" className="underline">Create a teacher account</Link>, verify your email, and <Link href="/login/teacher" className="underline">sign in</Link>. Create a class and share its code and Student ID instructions with students.</p>
-          <p>Assign an available activity and enter optional opening/closing times in the time zone shown by the form. Use Edit dates to extend a deadline. Refresh your classroom to see current exploration progress; quiz grades are not recorded.</p>
+          <p>Assign an available activity and enter optional opening/closing times in your device&apos;s local time. Use Edit dates to extend a deadline. Refresh your classroom to see current exploration progress; quiz grades are not recorded.</p>
           <p>Disabling a class blocks student access but keeps its data. There is currently no reactivation control. For account or data requests, contact the person operating your ChemClicks site.</p>
         </section>
         <section id="student-data" className="space-y-3">
