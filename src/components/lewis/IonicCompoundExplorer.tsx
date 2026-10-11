@@ -14,8 +14,10 @@ import {
   getAtomRatio,
   getChargeTotals,
   getFormulaUnitIons,
+  getIsolatedIons,
   getTransferredElectrons,
   ION_VOCABULARY,
+  isChargeBalanced,
   type Ion,
   type IonicCompound,
   type IonRole,
@@ -26,10 +28,26 @@ type DiagramSide = "top" | "right" | "bottom" | "left";
 const SIDES: readonly DiagramSide[] = ["top", "right", "bottom", "left"];
 
 const SIDE_CLASS_NAMES: Record<DiagramSide, string> = {
-  top: "col-start-2 row-start-1 flex items-end justify-center gap-2 pb-1.5",
-  right: "col-start-3 row-start-2 flex flex-col items-start justify-center gap-2 pl-1.5",
-  bottom: "col-start-2 row-start-3 flex items-start justify-center gap-2 pt-1.5",
-  left: "col-start-1 row-start-2 flex flex-col items-end justify-center gap-2 pr-1.5",
+  top: "col-start-2 row-start-1 flex items-end justify-center pb-1.5",
+  right: "col-start-3 row-start-2 flex flex-col items-start justify-center pl-1.5",
+  bottom: "col-start-2 row-start-3 flex items-start justify-center pt-1.5",
+  left: "col-start-1 row-start-2 flex flex-col items-end justify-center pr-1.5",
+};
+
+type TileSize = "md" | "sm";
+
+/**
+ * "md" shrinks to the "sm" size inside a container narrower than 20rem, so the
+ * formation diagram's tile → ion row still fits a phone-width card.
+ */
+const TILE_CLASS_NAMES: Record<TileSize, { tile: string; side: string; dot: string; symbol: string }> = {
+  md: {
+    tile: "w-20 @xs:w-28",
+    side: "gap-1 @xs:gap-2",
+    dot: "h-2 w-2 @xs:h-2.5 @xs:w-2.5",
+    symbol: "text-xl @xs:text-2xl",
+  },
+  sm: { tile: "w-20", side: "gap-1", dot: "h-2 w-2", symbol: "text-xl" },
 };
 
 type PlacedDot = { position: LewisDotPosition; gained: boolean };
@@ -42,23 +60,26 @@ function LewisTile({
   symbol,
   keptElectrons,
   gainedElectrons = 0,
+  size = "md",
 }: {
   symbol: string;
   keptElectrons: number;
   gainedElectrons?: number;
+  size?: TileSize;
 }) {
+  const sizeClassNames = TILE_CLASS_NAMES[size];
   const dots: readonly PlacedDot[] = getLewisDotPositions(
     keptElectrons + gainedElectrons,
   ).map((position, index) => ({ position, gained: index >= keptElectrons }));
 
   return (
-    <div className="grid aspect-square w-28 shrink-0 grid-cols-3 grid-rows-3">
+    <div className={`grid aspect-square shrink-0 grid-cols-3 grid-rows-3 ${sizeClassNames.tile}`}>
       {SIDES.map((side) => (
-        <div key={side} className={SIDE_CLASS_NAMES[side]}>
+        <div key={side} className={`${SIDE_CLASS_NAMES[side]} ${sizeClassNames.side}`}>
           {dotsForSide(dots, side).map((dot) => (
             <span
               key={dot.position}
-              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+              className={`shrink-0 rounded-full ${sizeClassNames.dot} ${
                 dot.gained
                   ? "bg-accent shadow-[0_0_5px_var(--accent)]"
                   : "bg-[#60a5fa] shadow-[0_0_5px_rgba(96,165,250,0.35)]"
@@ -68,7 +89,9 @@ function LewisTile({
         </div>
       ))}
 
-      <span className="col-start-2 row-start-2 flex items-center justify-center text-2xl font-bold text-foreground">
+      <span
+        className={`col-start-2 row-start-2 flex items-center justify-center font-bold text-foreground ${sizeClassNames.symbol}`}
+      >
         {symbol}
       </span>
     </div>
@@ -85,21 +108,30 @@ function IonSymbol({ ion }: { ion: Ion }) {
 }
 
 /** An ion after electron transfer: its Lewis tile in brackets with the charge attached. */
-function BracketedIon({ ion, role }: { ion: Ion; role: IonRole }) {
+function BracketedIon({
+  ion,
+  role,
+  size = "md",
+}: {
+  ion: Ion;
+  role: IonRole;
+  size?: TileSize;
+}) {
   const isCation = role === "cation";
 
   return (
     <>
-      <div
-        aria-hidden="true"
-        className="relative shrink-0 rounded-sm border-x-2 border-muted-foreground/60 px-1"
-      >
-        <LewisTile
-          symbol={ion.symbol}
-          keptElectrons={isCation ? 0 : ion.valenceElectrons}
-          gainedElectrons={isCation ? 0 : Math.abs(ion.charge)}
-        />
-        <span className="absolute left-full -top-2 ml-1 text-sm font-semibold text-foreground">
+      {/* The charge label sits in the flow, not absolutely, so it takes up room and never spills past its container. */}
+      <div aria-hidden="true" className="flex shrink-0 items-start">
+        <div className="rounded-sm border-x-2 border-muted-foreground/60 px-1">
+          <LewisTile
+            symbol={ion.symbol}
+            keptElectrons={isCation ? 0 : ion.valenceElectrons}
+            gainedElectrons={isCation ? 0 : Math.abs(ion.charge)}
+            size={size}
+          />
+        </div>
+        <span className="-mt-2 ml-0.5 text-sm font-semibold text-foreground">
           {formatChargeLabel(ion.charge)}
         </span>
       </div>
@@ -108,23 +140,99 @@ function BracketedIon({ ion, role }: { ion: Ion; role: IonRole }) {
   );
 }
 
-function CombinedCompound({ compound }: { compound: IonicCompound }) {
+function ComparisonPanel({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+}) {
+  const titleId = useId();
+
   return (
-    <div className="flex w-full flex-col items-center gap-3">
-      <p className="text-xs font-medium text-muted-foreground">
-        Combined compound: one formula unit of {compound.formula}
-      </p>
-      <ul
-        aria-label={`Ions in one formula unit of ${compound.name.toLowerCase()}`}
-        className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4"
-      >
-        {getFormulaUnitIons(compound).map(({ id, role, ion }) => (
-          <li key={id} className="flex">
-            <BracketedIon ion={ion} role={role} />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <section
+      aria-labelledby={titleId}
+      className="flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-muted/50 p-4"
+    >
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{eyebrow}</p>
+        <h3 id={titleId} className="text-sm font-semibold text-foreground">
+          {title}
+        </h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** The ions on their own beside the same ions combined into one neutral formula unit. */
+function IonComparison({ compound }: { compound: IonicCompound }) {
+  const headingId = useId();
+  const { cation, anion } = compound;
+  const name = compound.name.toLowerCase();
+  const { net } = getChargeTotals(compound);
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="rounded-xl border border-border bg-card p-5 sm:p-6 lg:col-span-2"
+    >
+      <h2 id={headingId} className="text-sm font-semibold text-muted-foreground">
+        Isolated Ions vs. Combined Compound
+      </h2>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <ComparisonPanel eyebrow="Before combining" title="Isolated ions">
+          <ul
+            aria-label={`Isolated ions in ${name}`}
+            className="flex flex-wrap items-start justify-center gap-x-8 gap-y-4"
+          >
+            {getIsolatedIons(compound).map(({ id, role, ion }) => (
+              <li key={id} className="flex flex-col items-center gap-2">
+                <div className="flex">
+                  <BracketedIon ion={ion} role={role} size="sm" />
+                </div>
+                <span aria-hidden="true" className="text-center text-xs font-medium text-muted-foreground">
+                  {ion.ionName} ion · charge {formatChargeValue(ion.charge)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Each ion carries its own charge, so neither one is neutral by itself.
+          </p>
+        </ComparisonPanel>
+
+        <ComparisonPanel eyebrow="After combining" title="Combined neutral compound">
+          <p className="text-xs font-medium text-muted-foreground">
+            One formula unit of {compound.formula}
+          </p>
+          <ul
+            aria-label={`Ions in one formula unit of ${name}`}
+            className="flex flex-wrap items-start justify-center gap-x-4 gap-y-3 rounded-xl border-2 border-dashed border-accent/40 p-3"
+          >
+            {getFormulaUnitIons(compound).map(({ id, role, ion }) => (
+              <li key={id} className="flex">
+                <BracketedIon ion={ion} role={role} size="sm" />
+              </li>
+            ))}
+          </ul>
+          <div className="space-y-1 text-center text-xs text-muted-foreground">
+            <p>
+              Ion ratio {cation.symbol} : {anion.symbol} ={" "}
+              {getAtomRatio(compound).replace(":", " : ")}
+            </p>
+            <p>Charge balance {describeChargeBalance(compound)}</p>
+            <p aria-live="polite" className="text-sm font-semibold text-accent">
+              {compound.formula} net charge {formatSignedTotalCharge(net)} —{" "}
+              {isChargeBalanced(compound) ? "electrically neutral" : "not neutral"}
+            </p>
+          </div>
+        </ComparisonPanel>
+      </div>
+    </section>
   );
 }
 
@@ -139,7 +247,7 @@ function IonColumn({ ion, role }: { ion: Ion; role: IonRole }) {
         {isCation ? "Cation (metal)" : "Anion (nonmetal)"}
       </p>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <LewisTile symbol={ion.symbol} keptElectrons={ion.valenceElectrons} />
 
         <span aria-hidden="true" className="text-xl text-muted-foreground">
@@ -321,8 +429,6 @@ export default function IonicCompoundExplorer() {
             {formatIonSymbol(anion)} → {compound.formula}
           </p>
 
-          <CombinedCompound compound={compound} />
-
           <figcaption
             id={descriptionId}
             aria-live="polite"
@@ -332,6 +438,8 @@ export default function IonicCompoundExplorer() {
           </figcaption>
         </figure>
       </section>
+
+      <IonComparison compound={compound} />
     </div>
   );
 }

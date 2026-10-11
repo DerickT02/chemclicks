@@ -179,6 +179,14 @@ export function getFormulaUnitIons(compound: IonicCompound): readonly FormulaUni
   return ordered;
 }
 
+/** One ion of each kind, cation first, as they exist before combining. */
+export function getIsolatedIons(compound: IonicCompound): readonly FormulaUnitIon[] {
+  return [
+    { id: "cation", role: "cation", ion: compound.cation },
+    { id: "anion", role: "anion", ion: compound.anion },
+  ];
+}
+
 export function getNetCharge(compound: IonicCompound): number {
   return (
     compound.cation.count * compound.cation.charge +
