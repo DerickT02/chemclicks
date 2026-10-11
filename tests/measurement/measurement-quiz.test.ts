@@ -22,7 +22,7 @@ import {
 } from "../../src/lib/measurement/quiz";
 
 const READINGS: Record<InstrumentId, readonly number[]> = {
-  ruler: [4.37, 11.62, 2.85, 7.18, 9.21],
+  ruler: [4.37, 6.62, 2.85, 7.18, 9.21],
   cylinder: [23.4, 41.7, 8.6, 31.1, 17.2],
 };
 
@@ -226,7 +226,7 @@ describe("quizReducer", () => {
     const second = run(INITIAL_QUIZ_STATE, start("ruler"), ...answer("4.37"), { type: "next" });
 
     expect(asQuestion(run(second, ...answer("4.37"))).result?.status).toBe("incorrect");
-    expect(asQuestion(run(second, ...answer("11.62"))).result?.status).toBe("correct");
+    expect(asQuestion(run(second, ...answer("6.62"))).result?.status).toBe("correct");
   });
 
   it("shows results after the last question", () => {
