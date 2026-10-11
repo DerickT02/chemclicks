@@ -50,26 +50,18 @@ async function readStudentAssignments(onlyAvailable: boolean): Promise<Result> {
     if (!classroom) return { status: "unauthenticated" };
 
     const now = new Date().toISOString();
-    const assignments: StudentAssignment[] = [];
-    const pageSize = 100;
-    for (let offset = 0; ; offset += pageSize) {
-      let query = supabase
-        .from("class_activities")
-        .select("id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
-        .eq("class_id", classroom.id);
-      if (onlyAvailable) {
-        query = query
-          .or(`opens_at.is.null,opens_at.lte.${now}`)
-          .or(`closes_at.is.null,closes_at.gt.${now}`);
-      }
-      const { data, error } = await query
-        .order("id")
-        .range(offset, offset + pageSize - 1)
-        .returns<StudentAssignment[]>();
-      if (error) throw error;
-      assignments.push(...(data ?? []));
-      if (!data || data.length < pageSize) break;
+    let query = supabase
+      .from("class_activities")
+      .select("id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
+      .eq("class_id", classroom.id);
+    if (onlyAvailable) {
+      query = query
+        .or(`opens_at.is.null,opens_at.lte.${now}`)
+        .or(`closes_at.is.null,closes_at.gt.${now}`);
     }
+    const { data, error } = await query.order("id").returns<StudentAssignment[]>();
+    if (error) throw error;
+    const assignments = data ?? [];
 
     // Recheck after querying, in case a deadline passed during the request.
     const checkedAt = Date.now();

@@ -11,7 +11,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
       const builder: Record<string, (...args: unknown[]) => unknown> = {};
-      for (const method of ["select", "eq", "or", "order", "range"]) {
+      for (const method of ["select", "eq", "or", "order"]) {
         builder[method] = (...args: unknown[]) => {
           mocks.calls.push({ table, method, args });
           return builder;
