@@ -44,11 +44,14 @@ describe("student assignment pages", () => {
     expect(html).not.toContain("Ionic exercise");
     expect(html).not.toContain("Covalent exercise");
   });
-  it.each(["tenths", "hundredths"])("uses %s precision for the matching ruler assignment", async (precision) => {
+  it.each(["tenths", "hundredths"])("starts the coarse-to-fine comparison for the %s ruler assignment", async (precision) => {
     reader.mockResolvedValue({ status: "ok", assignments: [{
       ...assignment, activity: { ...assignment.activity, type: `measurement_ruler_${precision}` },
     }] });
-    expect(renderToStaticMarkup(await page())).toContain(`Ruler exercise: ${precision}`);
+    const html = renderToStaticMarkup(await page());
+    expect(html).toContain("Ruler exercise: tenths");
+    expect(html).toContain("Next");
+    expect(html).not.toContain("Ruler exercise: hundredths");
   });
   it("renders the ionic compound explorer for ionic assignments", async () => {
     const ionic = { ...assignment, id: "ionic", activity: { ...assignment.activity, type: "lewis_structures_ionic" } };

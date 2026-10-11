@@ -4,8 +4,7 @@ import AttemptControls from './AttemptControls';
 import { notFound, redirect } from "next/navigation";
 import { getStudentAssignments } from "@/lib/db/student-assignments";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
-import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
-import PrecisionRuler from "@/components/measurement/PrecisionRuler";
+import MeasurementComparison from "@/components/measurement/MeasurementComparison";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
@@ -54,9 +53,9 @@ export default async function AssignmentPage({ params }: {
             {type === "lewis_diagram" && <LewisDotExplorer />}
             {type === "lewis_structures_ionic" && <IonicCompoundExplorer />}
             {type === "lewis_structures_covalent" && <CovalentBondExplorer />}
-            {type === "measurement_graduated_cylinder" && <GraduatedCylinder />}
+            {type === "measurement_graduated_cylinder" && <MeasurementComparison instrument="cylinder" />}
             {(type === "measurement_ruler_tenths" || type === "measurement_ruler_hundredths") && (
-              <PrecisionRuler precision={type === "measurement_ruler_tenths" ? "tenths" : "hundredths"} />
+              <MeasurementComparison instrument="ruler" />
             )}
             {!hasActivityContent(type) && (
               <p className="text-muted-foreground">This activity’s exercise is not available yet.</p>
