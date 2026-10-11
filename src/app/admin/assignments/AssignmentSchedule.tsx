@@ -1,13 +1,11 @@
 "use client";
 
-import { useActionState, useCallback, useState, useSyncExternalStore } from "react";
+import { useActionState, useState } from "react";
 import { saveAssignment, type AssignmentFormState } from "@/app/admin/assignments/actions";
 import type { ClassActivity } from "@/lib/db/class_activities";
 import type { AvailabilityWindow } from "@/lib/assignments/availability";
-import { scheduleStatus } from "@/lib/assignments/schedule";
-import { occurrenceForInstant, parseZonedInput, toZonedInput, type TimeOccurrence } from "@/lib/datetime/time-zone";
+import { localInputToInstant, scheduleChangeInterruptsWork, scheduleStatus, toLocalInput, toUtcInput } from "@/lib/assignments/schedule";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
-import TimeZoneBoundary from "@/components/datetime/TimeZoneBoundary";
 import ScheduleDateField from "@/components/assignments/ScheduleDateField";
 
 type Assignment = Pick<ClassActivity, "id" | "activity_id" | "opens_at" | "closes_at">;
@@ -15,26 +13,6 @@ type Props = { classId: string; className: string; activityTitle: string; assign
 type EditorState = AssignmentFormState & { responseVersion: number };
 const initialState: EditorState = { status: "idle", message: "", responseVersion: 0 };
 const keyOf = (window: AvailabilityWindow) => JSON.stringify([window.opens_at, window.closes_at]);
-
-function useScheduleStatus(window: AvailabilityWindow, renderedAt: number) {
-  const { opens_at, closes_at } = window;
-  const subscribe = useCallback((notify: () => void) => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const check = () => {
-      clearTimeout(timer);
-      notify();
-      const now = Date.now();
-      const future = [opens_at, closes_at].filter(value => value !== null)
-        .map(value => Date.parse(value)).filter(value => Number.isFinite(value) && value > now);
-      if (future.length) timer = setTimeout(check, Math.min(Math.min(...future) - now, 2_147_483_647));
-    };
-    check();
-    const interval = setInterval(check, 30_000);
-    globalThis.window.addEventListener("focus", check);
-    return () => { clearTimeout(timer); clearInterval(interval); globalThis.window.removeEventListener("focus", check); };
-  }, [opens_at, closes_at]);
-  return useSyncExternalStore(subscribe, () => scheduleStatus(window, Date.now()), () => scheduleStatus(window, renderedAt));
-}
 
 function Dates({ window }: { window: AvailabilityWindow }) {
   return (
@@ -52,11 +30,11 @@ function Dates({ window }: { window: AvailabilityWindow }) {
 
 export default function AssignmentSchedule({ classId, className, activityTitle, assignment, renderedAt }: Props) {
   const serverKey = keyOf(assignment);
-  const [receipt, setReceipt] = useState<{ base: Assignment; window: AvailabilityWindow; message: string } | null>(null);
+  const [receipt, setReceipt] = useState<{ base: Assignment; window: AvailabilityWindow; message: string; checkedAt: number } | null>(null);
   // A confirmed write bridges a failed refresh; genuinely new server props take precedence.
   const window = receipt && receipt.base === assignment ? receipt.window : assignment;
   const [editing, setEditing] = useState<{ window: AvailabilityWindow; serverAssignment: Assignment } | null>(null);
-  const status = useScheduleStatus(window, renderedAt);
+  const status = scheduleStatus(window, receipt?.base === assignment ? receipt.checkedAt : renderedAt);
   const receiptIsCurrent = receipt && (receipt.base === assignment || keyOf(receipt.window) === serverKey);
 
   return (
@@ -70,7 +48,7 @@ export default function AssignmentSchedule({ classId, className, activityTitle, 
           onCancel={() => setEditing(null)}
           onSaved={(result) => {
             const saved = result.savedAssignment;
-            if (saved) setReceipt({ base: editing.serverAssignment, window: saved, message: `${activityTitle} — ${className}: ${result.message}` });
+            if (saved) setReceipt({ base: editing.serverAssignment, window: saved, message: `${activityTitle} — ${className}: ${result.message}`, checkedAt: Date.now() });
             setEditing(null);
           }} />
       ) : (
@@ -90,41 +68,44 @@ type EditorProps = {
   onCancel: () => void; onSaved: (result: AssignmentFormState) => void;
 };
 
-function DateEditor(props: EditorProps) {
-  return <TimeZoneBoundary>{zone => <LocalDateEditor {...props} timeZone={zone} />}</TimeZoneBoundary>;
-}
-
-function LocalDateEditor({ classId, activityTitle, assignment, original, stale, onCancel, onSaved, timeZone }: EditorProps & { timeZone: string }) {
-  const [opensAt, setOpensAt] = useState(toZonedInput(original.opens_at, timeZone));
-  const [closesAt, setClosesAt] = useState(toZonedInput(original.closes_at, timeZone));
-  const [openOccurrence, setOpenOccurrence] = useState<TimeOccurrence>(occurrenceForInstant(original.opens_at, timeZone));
-  const [closeOccurrence, setCloseOccurrence] = useState<TimeOccurrence>(occurrenceForInstant(original.closes_at, timeZone));
-  const [reviewing, setReviewing] = useState(false);
-  const [validation, setValidation] = useState("");
-  const changed = opensAt !== toZonedInput(original.opens_at, timeZone) || closesAt !== toZonedInput(original.closes_at, timeZone)
-    || openOccurrence !== occurrenceForInstant(original.opens_at, timeZone) || closeOccurrence !== occurrenceForInstant(original.closes_at, timeZone);
+function DateEditor({ classId, activityTitle, assignment, original, stale, onCancel, onSaved }: EditorProps) {
+  const initialOpens = toLocalInput(original.opens_at);
+  const initialCloses = toLocalInput(original.closes_at);
+  const [opensAt, setOpensAt] = useState(initialOpens);
+  const [closesAt, setClosesAt] = useState(initialCloses);
+  const [confirming, setConfirming] = useState(false);
+  const changed = opensAt !== initialOpens || closesAt !== initialCloses;
   const [state, action, pending] = useActionState(async (previous: EditorState, data: FormData): Promise<EditorState> => {
     const responseVersion = previous.responseVersion + 1;
-    if (!reviewing || stale) return { status: "error", message: "Review the current schedule before saving.", responseVersion };
+    if (stale) return { status: "error", message: "The schedule changed. Cancel and reopen the editor.", responseVersion };
+    try {
+      // An untouched field keeps its stored instant; the minute-precision input cannot represent its seconds.
+      const next = {
+        opens_at: opensAt === initialOpens ? original.opens_at : localInputToInstant(opensAt),
+        closes_at: closesAt === initialCloses ? original.closes_at : localInputToInstant(closesAt),
+      };
+      if (next.opens_at && next.closes_at && Date.parse(next.opens_at) >= Date.parse(next.closes_at)) {
+        return { status: "error", message: "The opening date must be earlier than the closing date.", responseVersion };
+      }
+      if (!confirming && scheduleChangeInterruptsWork(original, next, Date.now())) {
+        setConfirming(true);
+        return { ...initialState, responseVersion };
+      }
+      data.set("opens_at", next.opens_at === null ? "" : toUtcInput(next.opens_at));
+      data.set("closes_at", next.closes_at === null ? "" : toUtcInput(next.closes_at));
+    } catch {
+      return { status: "error", message: "Enter valid opening and closing dates.", responseVersion };
+    }
     let result: AssignmentFormState;
     try { result = await saveAssignment(previous, data); }
     catch { result = { status: "error", message: "We could not confirm the dates were saved. Refresh the page before trying again." }; }
+    if (result.requiresConfirmation) {
+      setConfirming(true);
+      return { ...initialState, responseVersion };
+    }
     if (result.status === "success" && result.savedAssignment) onSaved(result);
     return { ...result, responseVersion };
   }, initialState);
-
-  const review = () => {
-    try {
-      const opens = parseZonedInput(opensAt, timeZone, openOccurrence);
-      const closes = parseZonedInput(closesAt, timeZone, closeOccurrence);
-      if (opens && closes && opens >= closes) {
-        setValidation("The opening date must be earlier than the closing date.");
-        return;
-      }
-      setValidation("");
-      setReviewing(true);
-    } catch (error) { setValidation(error instanceof Error ? error.message : "Enter valid opening and closing dates."); }
-  };
 
   return (
     <form action={action} aria-label={`Edit dates for ${activityTitle}`} aria-busy={pending} className="space-y-3 rounded-lg border border-border p-4">
@@ -133,29 +114,18 @@ function LocalDateEditor({ classId, activityTitle, assignment, original, stale, 
       <input type="hidden" name="assignment_id" value={assignment.id} />
       <input type="hidden" name="original_opens_at" value={original.opens_at ?? ""} />
       <input type="hidden" name="original_closes_at" value={original.closes_at ?? ""} />
-      <input type="hidden" name="confirm_schedule_change" value={reviewing ? "true" : ""} />
-      <input type="hidden" name="schedule_time_zone" value={timeZone} />
+      <input type="hidden" name="confirm_schedule_change" value={confirming ? "true" : ""} />
       <p className="text-sm font-medium">Edit dates: {activityTitle}</p>
-      <p className="text-sm text-muted-foreground">Enter schedule times in {timeZone}. Each date uses its daylight-saving offset. Blank opening means immediate availability; blank closing means no deadline.</p>
+      <p className="text-sm text-muted-foreground">Times use this device&apos;s time zone. Blank opening means immediate availability; blank closing means no deadline.</p>
       <fieldset disabled={pending} className="grid gap-3 sm:grid-cols-2">
-        <ScheduleDateField key={`opens-${state.responseVersion}`} name="opens_at" value={opensAt} zone={timeZone} occurrence={openOccurrence} readOnly={reviewing} showZoneInLabel
-          onChange={setOpensAt} onOccurrence={setOpenOccurrence} />
-        <ScheduleDateField key={`closes-${state.responseVersion}`} name="closes_at" value={closesAt} zone={timeZone} occurrence={closeOccurrence} readOnly={reviewing} showZoneInLabel
-          onChange={setClosesAt} onOccurrence={setCloseOccurrence} />
+        <ScheduleDateField key={`opens-${state.responseVersion}`} name="opens_at" value={opensAt} readOnly={confirming} onChange={setOpensAt} />
+        <ScheduleDateField key={`closes-${state.responseVersion}`} name="closes_at" value={closesAt} readOnly={confirming} onChange={setClosesAt} />
       </fieldset>
       {stale && <p role="alert" className="text-sm text-destructive">The schedule changed. Cancel and reopen the editor before trying again.</p>}
-      {validation && <p role="alert" className="text-sm text-destructive">{validation}</p>}
-      {reviewing && (
-        <div className="space-y-2 text-sm">
-          <p>Confirm these dates for {activityTitle}? Changes can immediately close, reopen, or interrupt currently open work. Existing exploration attempts will be kept. Closing permits no further submissions.</p>
-          <Dates window={{ opens_at: parseZonedInput(opensAt, timeZone, openOccurrence), closes_at: parseZonedInput(closesAt, timeZone, closeOccurrence) }} />
-        </div>
-      )}
+      {confirming && <p role="alert" className="text-sm">These dates will make this activity unavailable immediately. Confirm to stop further submissions. Existing exploration attempts will be kept.</p>}
       <div className="flex flex-wrap gap-3">
-        {reviewing ? <>
-          <button type="submit" disabled={pending || stale} className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground disabled:opacity-50">{pending ? "Saving…" : "Confirm save dates"}</button>
-          <button type="button" disabled={pending} onClick={() => setReviewing(false)} className="rounded-md border border-border px-3 py-2 text-sm">Back to dates</button>
-        </> : <button type="button" disabled={!changed || stale} onClick={review} className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground disabled:opacity-50">Review changes</button>}
+        <button type="submit" disabled={!changed || pending || stale} className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground disabled:opacity-50">{pending ? "Saving…" : confirming ? "Confirm save dates" : "Save dates"}</button>
+        {confirming && <button type="button" disabled={pending} onClick={() => setConfirming(false)} className="rounded-md border border-border px-3 py-2 text-sm">Back to dates</button>}
         <button type="button" disabled={pending} onClick={onCancel} className="rounded-md border border-border px-3 py-2 text-sm">Cancel</button>
       </div>
       {state.message && <p role={state.status === "error" ? "alert" : "status"} className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{state.message}</p>}

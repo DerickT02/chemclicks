@@ -41,7 +41,7 @@ describe("assignment revalidation and deadline UX", () => {
     const closesAt = iso(10_000);
     const submit = vi.fn();
     render(<AssignmentAccess closesAt={closesAt} contentType="quiz"><button onClick={submit}>Submit answer</button></AssignmentAccess>);
-    expect(screen.getByTitle(`Exact UTC: ${closesAt}`)).toHaveAttribute("datetime", closesAt);
+    expect(screen.getByTitle("2030-01-01 12:00:10 UTC")).toHaveAttribute("datetime", closesAt);
     expect(screen.getByText(/No further work can be submitted/)).toBeInTheDocument();
     await advance(9_999);
     expect(screen.getByRole("button", { name: "Submit answer" })).toBeInTheDocument();

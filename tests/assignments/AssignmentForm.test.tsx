@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+process.env.TZ = "America/Los_Angeles";
 
 import "@testing-library/jest-dom/vitest";
 
@@ -6,7 +7,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/components/datetime/useViewerTimeZone", () => ({ useViewerTimeZone: () => "UTC" }));
 vi.mock("@/app/admin/assignments/actions", () => ({
   saveAssignment: vi.fn(),
 }));

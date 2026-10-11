@@ -111,12 +111,21 @@ describe("teacher assignment action", () => {
 });
 
 describe("schedule editing safeguards", () => {
-  it("requires explicit confirmation before any update reads or writes", async () => {
+  it("saves ordinary date edits without an extra confirmation step", async () => {
+    mocks.query.mockResolvedValue({ data: { id: assignmentId, opens_at: null, closes_at: null }, error: null });
     const data = form({ assignment_id: assignmentId });
     data.delete("confirm_schedule_change");
-    expect((await saveAssignment(initial, data)).message).toContain("confirm saving");
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect((await saveAssignment(initial, data)).status).toBe("success");
+    expect(mocks.update).toHaveBeenCalledOnce();
+  });
+  it("requires confirmation on the server when an edit immediately closes open work", async () => {
+    mocks.query.mockResolvedValue({ data: { id: assignmentId, opens_at: null, closes_at: null }, error: null });
+    const data = form({ assignment_id: assignmentId, closes_at: "2000-01-01T12:00" });
+    data.delete("confirm_schedule_change");
+    expect((await saveAssignment(initial, data)).message).toContain("Confirm saving");
     expect(mocks.admin).not.toHaveBeenCalled();
+    data.set("confirm_schedule_change", "true");
+    expect((await saveAssignment(initial, data)).status).toBe("success");
   });
   it("sends the expected window and relationship context to the conditional writer", async () => {
     mocks.query.mockResolvedValue({ data: { id: assignmentId, opens_at: null, closes_at: null }, error: null });
@@ -163,38 +172,16 @@ describe("schedule editing safeguards", () => {
   });
 });
 
-describe("local-time action validation", () => {
-  it("converts a named-zone wall time on the server and ignores supplied UTC/offset claims", async () => {
-    const result = await saveAssignment(initial, form({ schedule_time_zone: "America/New_York", closes_at: "2026-09-12T15:00", closes_at_utc: "2026-09-12T00:00Z", timezone_offset: "0" }));
-    expect(result.status).toBe("success");
-    expect(mocks.insert).toHaveBeenCalledWith(mocks.writer, {
-      class_id: classId, activity_id: activityId, opens_at: null, closes_at: "2026-09-12T19:00:00.000Z",
-    });
-  });
+describe("date validation", () => {
   it.each([
-    { schedule_time_zone: "unknown", opens_at: "" },
-    { schedule_time_zone: "", opens_at: "" },
-    { schedule_time_zone: "America/New_York", opens_at: "2026-03-08T02:30" },
-    { schedule_time_zone: "America/New_York", opens_at: "2026-11-01T01:30" },
-    { schedule_time_zone: "America/New_York", opens_at: "2026-11-01T01:30", opens_at_occurrence: "guess" },
-  ])("rejects invalid zones, gaps, and undisambiguated folds before database access: %j", async values => {
+    { opens_at: "not a date" },
+    { opens_at: "2026-02-30T10:00" },
+    { closes_at: "2026-09-12T15:00Z" },
+  ])("rejects unparseable dates before database access: %j", async values => {
     const result = await saveAssignment(initial, form(values));
-    expect(result.status).toBe("error");
+    expect(result).toEqual({ status: "error", message: "Enter valid opening and closing dates." });
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.admin).not.toHaveBeenCalled();
-  });
-  it("checks opening/closing order in UTC even across a repeated local hour", async () => {
-    const result = await saveAssignment(initial, form({ schedule_time_zone: "America/New_York",
-      opens_at: "2026-11-01T01:45", opens_at_occurrence: "earlier",
-      closes_at: "2026-11-01T01:15", closes_at_occurrence: "later" }));
-    expect(result.status).toBe("success");
-    expect(mocks.insert.mock.calls[0][1]).toMatchObject({ opens_at: "2026-11-01T05:45:00.000Z", closes_at: "2026-11-01T06:15:00.000Z" });
-  });
-  it("rejects reversed absolute times despite increasing wall-clock numbers", async () => {
-    expect((await saveAssignment(initial, form({ schedule_time_zone: "America/New_York",
-      opens_at: "2026-11-01T01:15", opens_at_occurrence: "later",
-      closes_at: "2026-11-01T01:45", closes_at_occurrence: "earlier" }))).status).toBe("error");
-    expect(mocks.create).not.toHaveBeenCalled();
   });
 });
 

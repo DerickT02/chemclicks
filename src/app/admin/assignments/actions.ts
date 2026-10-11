@@ -6,13 +6,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { insertClassActivity, updateClassActivity } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
-import { parseUtcInput } from "@/lib/assignments/schedule";
-import { parseZonedInput } from "@/lib/datetime/time-zone";
+import { parseUtcInput, scheduleChangeInterruptsWork } from "@/lib/assignments/schedule";
 import type { ClassActivity } from "@/lib/db/class_activities";
 
 export type AssignmentFormState = {
   status: "idle" | "success" | "error";
   message: string;
+  requiresConfirmation?: boolean;
   savedAssignment?: Pick<ClassActivity, "id" | "class_id" | "activity_id" | "opens_at" | "closes_at">;
 };
 
@@ -40,21 +40,10 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
   }
 
   try {
-    const parse = (name: string) => formData.has("schedule_time_zone")
-      ? parseZonedInput(readString(formData, name), readString(formData, "schedule_time_zone"), readString(formData, `${name}_occurrence`))
-      : parseUtcInput(readString(formData, name)); // Existing direct callers retain their explicit UTC contract.
-    opensAt = parse("opens_at");
-    closesAt = parse("closes_at");
-  } catch (error) {
-    const safeMessages = [
-      "Select a valid time zone.", "Select a valid time occurrence.",
-      "This local time does not exist because the clocks change. Choose another time.",
-      "This local time occurs twice. Choose the first or second occurrence.",
-    ];
-    return {
-      status: "error",
-      message: error instanceof Error && safeMessages.includes(error.message) ? error.message : "Enter valid opening and closing dates.",
-    };
+    opensAt = parseUtcInput(readString(formData, "opens_at"));
+    closesAt = parseUtcInput(readString(formData, "closes_at"));
+  } catch {
+    return { status: "error", message: "Enter valid opening and closing dates." };
   }
 
   if (opensAt && closesAt && opensAt >= closesAt) {
@@ -62,10 +51,6 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
        status: "error",
        message: "The opening date must be earlier than the closing date.",
      };
-   }
-
-   if (assignmentId && readString(formData, "confirm_schedule_change") !== "true") {
-     return { status: "error", message: "Review the schedule change and confirm saving." };
    }
 
    let savedAssignment: AssignmentFormState["savedAssignment"];
@@ -118,6 +103,10 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
            return { status: "error", message: "The schedule changed. Refresh the page, then reopen the editor before trying again." };
          }
          expected = { class_id: classId, activity_id: activityId, opens_at: assignment.opens_at, closes_at: assignment.closes_at };
+       }
+       if (scheduleChangeInterruptsWork(assignment, { opens_at: opensAt, closes_at: closesAt }, Date.now())
+         && readString(formData, "confirm_schedule_change") !== "true") {
+         return { status: "error", message: "These dates interrupt currently open work. Confirm saving before continuing.", requiresConfirmation: true };
        }
        // Preserve original sub-millisecond precision when an input's instant is unchanged.
        if (opensAt !== null && assignment.opens_at && Date.parse(opensAt) === Date.parse(assignment.opens_at)) opensAt = assignment.opens_at;
