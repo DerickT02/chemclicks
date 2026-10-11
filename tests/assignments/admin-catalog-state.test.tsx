@@ -86,7 +86,7 @@ describe("teacher catalog safety states", () => {
   });
 
   it.each([
-    "bohr_model_intro", "bohr_model_stability", "measurement_ruler_tenths", "measurement_ruler_hundredths",
+    "bohr_model_intro", "bohr_model_stability", "measurement_ruler_hundredths",
   ])("labels existing %s assignments with their support restriction", async (type) => {
     mocks.catalog.mockResolvedValue({ data: [{ ...activity, type }], error: null });
     mocks.assignments.mockResolvedValue({ data: [assignment], error: null });

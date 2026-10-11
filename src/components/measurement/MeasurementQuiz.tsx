@@ -79,6 +79,7 @@ function Panel({ heading, focusHeading, action, children }: PanelProps) {
         </h2>
         {action}
       </div>
+      <p className="mt-2 text-sm text-muted-foreground">Untracked practice — answers and results are not saved or visible to your teacher.</p>
       {children}
     </section>
   );

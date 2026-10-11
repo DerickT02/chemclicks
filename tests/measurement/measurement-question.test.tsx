@@ -15,7 +15,7 @@ function rulerQuestion(overrides: Partial<QuestionState> = {}): QuestionState {
   return {
     phase: "question",
     instrument: "ruler",
-    readings: [4.37, 11.62, 2.85, 7.18, 9.21],
+    readings: [4.3, 6.6, 2.8, 7.1, 9.2],
     questionIndex: 0,
     answer: "",
     result: null,
@@ -73,10 +73,10 @@ describe("MeasurementQuestion", () => {
     const html = render(rulerQuestion());
 
     expect(html).toContain("Ruler question 1 of 5");
-    expect(html).toContain("0–15 cm, marked every 0.1 cm");
+    expect(html).toContain("0–10 cm, marked every 0.1 cm");
     expect(html).toContain("centimeters (cm)");
-    expect(html).toContain("the nearest 0.01 cm (2 decimal places)");
-    expect(html).toContain("±0.02 cm");
+    expect(html).toContain("the nearest 0.1 cm (1 decimal place)");
+    expect(html).toContain("±0.1 cm");
     expect(html).toContain("<title>Ruler with measurement cursor</title>");
   });
 
@@ -100,7 +100,7 @@ describe("MeasurementQuestion", () => {
 
   it("draws each instrument locked at the current question's reading", () => {
     expect(drawnPaths(render(rulerQuestion({ questionIndex: 1 })))).toEqual(
-      drawnPaths(renderToStaticMarkup(<PrecisionRuler lockedValue={11.62} />)),
+      drawnPaths(renderToStaticMarkup(<PrecisionRuler lockedValue={6.6} />)),
     );
     expect(drawnPaths(render(cylinderQuestion({ questionIndex: 1 })))).toEqual(
       drawnPaths(renderToStaticMarkup(<GraduatedCylinder lockedValue={41.7} />)),
@@ -109,10 +109,11 @@ describe("MeasurementQuestion", () => {
 
   it("reveals the reading neither on screen nor to assistive tech", () => {
     for (const [html, reading] of [
-      [render(rulerQuestion()), "4.37"],
+      [render(rulerQuestion()), "4.3"],
       [render(cylinderQuestion()), "23.4"],
     ]) {
-      expect(html).not.toContain(reading);
+      // SVG coordinates necessarily encode position; only text/ARIA must hide the answer.
+      expect(html.replace(/<[^>]*>/g, " ")).not.toContain(reading);
       expect(html).not.toContain('role="slider"');
       expect(html).not.toContain("aria-value");
       expect(html).toContain('role="img"');
@@ -135,7 +136,7 @@ describe("MeasurementQuestion", () => {
   });
 
   it("flags an invalid answer and offers no way to advance", () => {
-    const result = evaluateAnswer("abc", 4.37, RULER_SPEC);
+    const result = evaluateAnswer("abc", 4.3, RULER_SPEC);
     const html = render(rulerQuestion({ answer: "abc", result, attempt: 1 }));
 
     expect(html).toContain('aria-invalid="true"');
@@ -146,14 +147,14 @@ describe("MeasurementQuestion", () => {
   });
 
   it("shows correct feedback and a way to continue", () => {
-    const result = evaluateAnswer("4.37", 4.37, RULER_SPEC);
+    const result = evaluateAnswer("4.3", 4.3, RULER_SPEC);
     const html = render(
-      rulerQuestion({ answer: "4.37", result, attempt: 1, firstTryCorrect: true, score: 1 }),
+      rulerQuestion({ answer: "4.3", result, attempt: 1, firstTryCorrect: true, score: 1 }),
     );
 
     expect(html).toContain("Correct");
     expect(html).not.toContain("Incorrect");
-    expect(html).toContain("The reading is 4.37 cm.");
+    expect(html).toContain("The reading is 4.3 cm.");
     expect(html).toContain("Next question");
     expect(html).toContain("readOnly");
     expect(html).not.toContain("Check answer");
@@ -161,8 +162,8 @@ describe("MeasurementQuestion", () => {
   });
 
   it("tells the student a correct retry doesn't change their score", () => {
-    const result = evaluateAnswer("4.37", 4.37, RULER_SPEC);
-    const html = render(rulerQuestion({ answer: "4.37", result, attempt: 2, firstTryCorrect: false }));
+    const result = evaluateAnswer("4.3", 4.3, RULER_SPEC);
+    const html = render(rulerQuestion({ answer: "4.3", result, attempt: 2, firstTryCorrect: false }));
 
     expect(html).toContain("Correct");
     expect(html).toContain("Only your first answer is scored, so this one doesn&#x27;t change your score.");

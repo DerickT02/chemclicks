@@ -235,7 +235,6 @@ npm run start
 |-------|-------------|
 | Ruler simulation | Build an interactive ruler with tick marks from 0 to 10 and a draggable cursor |
 | Tenths-place measurement | Display live ruler measurements rounded to the tenths place |
-| Hundredths-place measurement | Add a finer ruler mode for measurements rounded to the hundredths place |
 | Graduated cylinder simulation | Build a vertical graduated cylinder with a draggable water level |
 | Meniscus visualization | Display a curved meniscus and volume readout in milliliters |
 | Measurement quiz | Add a quiz where students estimate measurements using rulers and graduated cylinders |

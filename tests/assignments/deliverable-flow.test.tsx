@@ -38,6 +38,7 @@ vi.mock("@/components/lewis/LewisDotExplorer", () => ({ default: () => <p>Explor
 vi.mock("@/components/lewis/CovalentBondExplorer", () => ({ default: () => <p>Explorer: covalent</p> }));
 vi.mock("@/components/lewis/IonicCompoundExplorer", () => ({ default: () => <p>Explorer: ionic</p> }));
 vi.mock("@/components/measurement/GraduatedCylinder", () => ({ default: () => <p>Explorer: cylinder</p> }));
+vi.mock("@/components/measurement/PrecisionRuler", () => ({ default: () => <p>Explorer: ruler</p> }));
 
 import { saveAssignment } from "@/app/admin/assignments/actions";
 import AssignmentPage from "@/app/(student)/student/assignments/[assignmentId]/page";

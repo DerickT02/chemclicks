@@ -9,9 +9,9 @@ import type { ActivityType } from "@/lib/db/activities";
 const entries = Object.entries(ACTIVITY_REGISTRY);
 
 describe("shared activity support contract", () => {
-  it("enables only deliverable Lewis and cylinder explorations for new assignments", () => {
+  it("enables deliverable Lewis, tenths ruler and cylinder explorations", () => {
     expect(entries.filter(([type]) => canAssignActivity(type)).map(([type]) => type)).toEqual([
-      "lewis_diagram", "lewis_structures_covalent", "lewis_structures_ionic", "measurement_graduated_cylinder",
+      "lewis_diagram", "lewis_structures_covalent", "lewis_structures_ionic", "measurement_ruler_tenths", "measurement_graduated_cylinder",
     ]);
     for (const [type, definition] of entries) {
       expect(definition.title).not.toBe("");
@@ -27,11 +27,11 @@ describe("shared activity support contract", () => {
     }
   });
 
-  it("does not revoke existing ruler content/participation while new assignments are paused", () => {
-    for (const type of ["measurement_ruler_tenths", "measurement_ruler_hundredths"]) {
-      expect(hasActivityContent(type)).toBe(true);
-      expect(canAssignActivity(type)).toBe(false);
-    }
+  it("offers only the tenths ruler, with no hundredths exercise or compatibility mode", () => {
+    expect(hasActivityContent("measurement_ruler_tenths")).toBe(true);
+    expect(canAssignActivity("measurement_ruler_tenths")).toBe(true);
+    expect(hasActivityContent("measurement_ruler_hundredths")).toBe(false);
+    expect(canAssignActivity("measurement_ruler_hundredths")).toBe(false);
     expect(getActivityDefinition("measurement_ruler_hundredths")?.showInCatalog).toBe(false);
   });
 

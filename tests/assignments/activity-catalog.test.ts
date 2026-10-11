@@ -57,12 +57,12 @@ describe("activity catalog retrieval", () => {
     expect(result.data).toEqual([
       {
         ...activities[0],
-        description: "Ruler exploration; the 0.1 cm reporting update is pending",
+        description: "Read a 0–10 cm ruler to the nearest 0.1 cm",
         category: "Measurement",
       },
       {
         ...activities[1],
-        description: "Retired ruler offering; use the single tenths experience after its precision update",
+        description: "Retired offering; use the tenths ruler",
         category: "Measurement",
       },
     ]);

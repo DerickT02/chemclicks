@@ -16,7 +16,6 @@ export type ActivityDefinition = {
 };
 
 const BOHR_BLOCK_REASON = "Bohr models are available in untracked practice, but the assigned exploration experience is not supported yet.";
-const RULER_BLOCK_REASON = "New ruler assignments are paused until the ruler reports measurements to 0.1 cm consistently. Untracked practice remains available.";
 const UNKNOWN_BLOCK_REASON = "This activity is not supported for new assignments.";
 
 /** Application support only; deployed RPC compatibility still requires a separate audit. */
@@ -73,21 +72,20 @@ export const ACTIVITY_REGISTRY: Readonly<Record<ActivityType, ActivityDefinition
   },
   measurement_ruler_tenths: {
     title: "Ruler — Tenths",
-    description: "Ruler exploration; the 0.1 cm reporting update is pending",
+    description: "Read a 0–10 cm ruler to the nearest 0.1 cm",
     category: "Measurement",
     explorer: "ruler",
     practicePath: "/student/labs/measurement",
     quiz: "measurement",
-    newAssignmentBlockReason: RULER_BLOCK_REASON,
+    newAssignmentBlockReason: null,
     showInCatalog: true,
   },
   measurement_ruler_hundredths: {
     title: "Ruler — Hundredths (retired)",
-    description: "Retired ruler offering; use the single tenths experience after its precision update",
+    description: "Retired offering; use the tenths ruler",
     category: "Measurement",
-    // Do not change existing attempt access in this catalog-only slice. Removal
-    // of the old content/type is part of P1-04, not a new compatibility mode.
-    explorer: "ruler",
+    // Retain only a label for old database rows; there is no hundredths exercise.
+    explorer: null,
     practicePath: null,
     quiz: null,
     newAssignmentBlockReason: "The separate hundredths ruler offering is retired and cannot be newly assigned.",

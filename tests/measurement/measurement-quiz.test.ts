@@ -22,7 +22,7 @@ import {
 } from "../../src/lib/measurement/quiz";
 
 const READINGS: Record<InstrumentId, readonly number[]> = {
-  ruler: [4.37, 11.62, 2.85, 7.18, 9.21],
+  ruler: [4.3, 6.6, 2.8, 7.1, 9.2],
   cylinder: [23.4, 41.7, 8.6, 31.1, 17.2],
 };
 
@@ -167,7 +167,7 @@ describe("quizReducer", () => {
   });
 
   it("scores a correct first answer and carries the score to the next question", () => {
-    const question = asQuestion(run(INITIAL_QUIZ_STATE, start("ruler"), ...answer("4.37")));
+    const question = asQuestion(run(INITIAL_QUIZ_STATE, start("ruler"), ...answer("4.3")));
 
     expect(question.result?.status).toBe("correct");
     expect(question).toMatchObject({ firstTryCorrect: true, score: 1 });
@@ -202,7 +202,7 @@ describe("quizReducer", () => {
 
   it("does not use up the first try on blank or malformed input", () => {
     const question = asQuestion(
-      run(INITIAL_QUIZ_STATE, start("ruler"), ...answer(""), ...answer("4.37cm"), ...answer("4.37")),
+      run(INITIAL_QUIZ_STATE, start("ruler"), ...answer(""), ...answer("4.3cm"), ...answer("4.3")),
     );
 
     expect(question.result?.status).toBe("correct");
@@ -217,16 +217,16 @@ describe("quizReducer", () => {
   });
 
   it("keeps a correct result, and its score, when submitted again", () => {
-    const correct = run(INITIAL_QUIZ_STATE, start("ruler"), ...answer("4.37"));
+    const correct = run(INITIAL_QUIZ_STATE, start("ruler"), ...answer("4.3"));
 
     expect(quizReducer(correct, { type: "submit" })).toBe(correct);
   });
 
   it("grades each question against the reading the instrument is locked at", () => {
-    const second = run(INITIAL_QUIZ_STATE, start("ruler"), ...answer("4.37"), { type: "next" });
+    const second = run(INITIAL_QUIZ_STATE, start("ruler"), ...answer("4.3"), { type: "next" });
 
-    expect(asQuestion(run(second, ...answer("4.37"))).result?.status).toBe("incorrect");
-    expect(asQuestion(run(second, ...answer("11.62"))).result?.status).toBe("correct");
+    expect(asQuestion(run(second, ...answer("4.3"))).result?.status).toBe("incorrect");
+    expect(asQuestion(run(second, ...answer("6.6"))).result?.status).toBe("correct");
   });
 
   it("shows results after the last question", () => {

@@ -13,8 +13,8 @@ export const STEP_CM = RULER_SPEC.step;
 export const DEFAULT_CM = RULER_SPEC.defaultReading;
 
 const SPAN_CM = RULER_MAX_CM - RULER_MIN_CM;
-const SCALE_LEFT_X = 40;
-const SCALE_RIGHT_X = 560;
+const SCALE_LEFT_X = 24;
+const SCALE_RIGHT_X = 336;
 const SCALE_WIDTH = SCALE_RIGHT_X - SCALE_LEFT_X;
 const BASELINE_Y = 60;
 const BAR_HEIGHT = 34;
@@ -24,16 +24,6 @@ const GRADUATIONS_CM = Array.from({ length: SPAN_CM * 10 + 1 }, (_, index) =>
   Number((RULER_MIN_CM + index / 10).toFixed(1)),
 );
 const SCALE_CM = GRADUATIONS_CM.filter(Number.isInteger);
-
-// Home and End move by the whole span, which always overshoots so the clamp in quantizeCm lands them on the correct end.
-const KEY_DELTAS_CM: Record<string, number> = {
-  ArrowLeft: -STEP_CM,
-  ArrowDown: -STEP_CM,
-  ArrowRight: STEP_CM,
-  ArrowUp: STEP_CM,
-  Home: -SPAN_CM,
-  End: SPAN_CM,
-};
 
 export function quantizeCm(cm: number): number {
   return quantizeReading(cm, RULER_SPEC);
@@ -58,7 +48,7 @@ type Props = {
 export default function PrecisionRuler({ lockedValue }: Props) {
   const [movableCm, setValueCm] = useState(DEFAULT_CM);
   const isLocked = lockedValue !== undefined;
-  const valueCm = lockedValue ?? movableCm;
+  const valueCm = quantizeCm(lockedValue ?? movableCm);
 
   function setFromPointer(event: PointerEvent<SVGRectElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -70,6 +60,7 @@ export default function PrecisionRuler({ lockedValue }: Props) {
 
   function handlePointerDown(event: PointerEvent<SVGRectElement>) {
     event.preventDefault();
+    event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     setFromPointer(event);
   }
@@ -82,29 +73,36 @@ export default function PrecisionRuler({ lockedValue }: Props) {
 
   function stopDragging(event: PointerEvent<SVGRectElement>) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      if (event.type === "pointerup") setFromPointer(event);
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
   }
 
   function handleKeyDown(event: KeyboardEvent<SVGRectElement>) {
-    const delta = KEY_DELTAS_CM[event.key];
+    // Home and End overshoot so quantization clamps to the exact endpoints.
+    const deltas: Record<string, number> = {
+      ArrowLeft: -STEP_CM,
+      ArrowDown: -STEP_CM,
+      ArrowRight: STEP_CM,
+      ArrowUp: STEP_CM,
+      Home: -SPAN_CM,
+      End: SPAN_CM,
+    };
+    const delta = deltas[event.key];
     if (delta === undefined) return;
 
     event.preventDefault();
-    setValueCm((current) => quantizeCm(current + delta));
+    setValueCm(quantizeCm(valueCm + delta));
   }
 
   const cursorX = cmToX(valueCm);
   const formattedValue = formatCm(valueCm);
-  const labelX = Math.min(
-    SCALE_RIGHT_X - LABEL_WIDTH / 2,
-    Math.max(SCALE_LEFT_X + LABEL_WIDTH / 2, cursorX),
-  );
 
   return (
     <div className="flex justify-center py-2">
+      {/* Leave room for a centered badge at either endpoint. */}
       <svg
-        viewBox="0 0 600 150"
+        viewBox="-24 0 408 150"
         className="h-auto w-full max-w-3xl overflow-visible select-none"
         role={isLocked ? "img" : undefined}
       >
@@ -150,18 +148,18 @@ export default function PrecisionRuler({ lockedValue }: Props) {
               y={BAR_BOTTOM_Y + 18}
               textAnchor="middle"
               fill="var(--muted-foreground)"
-              className="font-mono text-[12px]"
+              className="font-mono text-[16px]"
             >
               {cm}
             </text>
           ))}
 
           <text
-            x={SCALE_RIGHT_X + 12}
-            y={BAR_BOTTOM_Y + 18}
-            textAnchor="start"
+            x={SCALE_RIGHT_X}
+            y={BAR_BOTTOM_Y + 40}
+            textAnchor="end"
             fill="var(--muted-foreground)"
-            className="font-mono text-[12px]"
+            className="font-mono text-[16px]"
           >
             cm
           </text>
@@ -182,7 +180,7 @@ export default function PrecisionRuler({ lockedValue }: Props) {
           />
 
           {!isLocked && (
-            <g transform={`translate(${labelX - LABEL_WIDTH / 2} ${BASELINE_Y - 46})`}>
+            <g transform={`translate(${cursorX - LABEL_WIDTH / 2} ${BASELINE_Y - 46})`}>
               <rect
                 width={LABEL_WIDTH}
                 height="28"
@@ -196,7 +194,7 @@ export default function PrecisionRuler({ lockedValue }: Props) {
                 y="18.5"
                 textAnchor="middle"
                 fill="var(--accent)"
-                className="font-mono text-[13px] font-semibold"
+                className="font-mono text-[16px] font-semibold"
               >
                 {formattedValue} cm
               </text>

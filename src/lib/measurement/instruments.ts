@@ -9,8 +9,8 @@ export type InstrumentSpec = {
   /** Spacing of the smallest printed marks on the scale. */
   graduation: number;
   /**
-   * Resolution of the simulated reading. A scale is read by estimating one
-   * digit past its smallest graduation, so this is a tenth of `graduation`.
+   * Resolution of the simulated reading. The ruler reports printed tenths;
+   * the cylinder estimates one digit past its smallest graduation.
    */
   step: number;
   /** Decimal places a reading is reported to; matches `step`. */
@@ -23,11 +23,10 @@ export type InstrumentSpec = {
 /*
  * Answer tolerance
  *
- * The estimated digit (one past the smallest graduation) is the uncertain one
- * in any scale reading. An answer is marked correct when it is within ±2 in
- * that estimated digit, i.e. one fifth of a graduation, of the reading:
+ * Ruler answers use tenths only, with one printed tick of tolerance.
+ * Cylinder answers retain their existing estimated-digit tolerance:
  *
- *   ruler               marks every 0.1 cm, report to 0.01 cm, accept ±0.02 cm
+ *   ruler               marks every 0.1 cm, report to 0.1 cm, accept ±0.1 cm
  *   graduated cylinder  marks every 1 mL,   report to 0.1 mL,  accept ±0.2 mL
  *
  * Answers must also be written to exactly `decimals` places, because the number
@@ -39,12 +38,12 @@ export const RULER_SPEC: InstrumentSpec = {
   unit: "cm",
   unitName: "centimeters",
   min: 0,
-  max: 15,
+  max: 10,
   graduation: 0.1,
-  step: 0.01,
-  decimals: 2,
-  tolerance: 0.02,
-  defaultReading: 7.5,
+  step: 0.1,
+  decimals: 1,
+  tolerance: 0.1,
+  defaultReading: 5,
 };
 
 export const CYLINDER_SPEC: InstrumentSpec = {
@@ -86,5 +85,5 @@ export function describeDecimalPlaces(decimals: number): string {
 
 /** A sample answer with the right number of decimal places for this instrument. */
 export function exampleAnswer(spec: InstrumentSpec): string {
-  return (12.3456).toFixed(spec.decimals);
+  return Math.min(12.3456, (spec.min + spec.max) / 2).toFixed(spec.decimals);
 }

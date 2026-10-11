@@ -52,7 +52,7 @@ describe("teacher assignment action", () => {
     expect(mocks.insert).not.toHaveBeenCalled();
   });
   it.each([
-    "bohr_model_intro", "bohr_model_stability", "measurement_ruler_tenths", "measurement_ruler_hundredths", "future_activity", "constructor",
+    "bohr_model_intro", "bohr_model_stability", "measurement_ruler_hundredths", "future_activity", "constructor",
   ])("rejects new unsupported %s assignments using stored metadata before privileged writes", async (type) => {
     mocks.query.mockResolvedValueOnce({ data: { id: classId }, error: null })
       .mockResolvedValueOnce({ data: { id: activityId, type }, error: null });

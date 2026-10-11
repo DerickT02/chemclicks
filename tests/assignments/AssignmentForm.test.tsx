@@ -82,7 +82,7 @@ describe("assignment activity selection", () => {
     expect(screen.getAllByRole("radio")[1]).toBeEnabled();
   });
 
-  it("disables Bohr and pending ruler assignments with reasons and hides the retired ruler choice", async () => {
+  it("disables Bohr, enables the tenths ruler and hides the retired ruler choice", async () => {
     const user = userEvent.setup();
     const unavailable: ActivityCatalogEntry[] = [
       { ...activities[0], id: "bohr-intro", title: "Bohr intro", type: "bohr_model_intro" },
@@ -95,13 +95,14 @@ describe("assignment activity selection", () => {
     expect(radios).toHaveLength(3);
     expect(screen.queryByText("Retired ruler")).not.toBeInTheDocument();
     expect(screen.getAllByText(/assigned exploration experience is not supported/)).toHaveLength(2);
-    expect(screen.getByText(/paused until the ruler reports measurements to 0.1 cm/)).toBeInTheDocument();
-    for (const radio of radios) {
+    for (const radio of radios.slice(0, 2)) {
       expect(radio).toBeDisabled();
       await user.click(radio);
       expect(radio).not.toBeChecked();
     }
-    expect(screen.getByRole("button", { name: "Assign activity" })).toBeDisabled();
+    await user.click(radios[2]);
+    expect(radios[2]).toBeChecked();
+    expect(screen.getByRole("button", { name: "Assign activity" })).toBeEnabled();
   });
 
   it.each(["unsupported", "assigned", "removed"])("invalidates a selected activity when it becomes %s", async (change) => {
