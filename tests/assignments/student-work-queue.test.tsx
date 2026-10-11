@@ -72,11 +72,12 @@ describe("student dashboard work queue", () => {
     expect(output).toContain("Closed (1)");
     expect(output).toContain("No activities are available right now");
     expect(output).toContain("Not open yet");
-    expect(output).toContain("Saved status and attempt history are not available here yet");
+    expect(output).toContain("You can still view your saved exploration history");
+    expect(output).toContain('href="/student/assignments/closed/history"');
     expect(output).toContain('dateTime="2026-04-02T12:00:00Z"');
     expect(output).not.toContain("Completed explorations");
     expect(output).not.toContain("Exploration completion saved");
-    expect(output).not.toContain('href="/student/assignments/');
+    expect(output).not.toContain('href="/student/assignments/future');
     expect(output).not.toContain('href="/student/quizzes/');
     expect(output).not.toContain("Take quiz");
   });

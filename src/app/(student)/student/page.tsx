@@ -33,7 +33,10 @@ function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; 
       {section === "completed" && <p className="text-sm">Exploration completion saved. This is not a quiz grade.</p>}
       {section === "unknown" && <p className="text-sm text-muted-foreground">Progress unavailable. Open the activity to check your saved attempts.</p>}
       {section === "upcoming" && <p className="text-sm text-muted-foreground">Not open yet. Check back when this activity opens.</p>}
-      {section === "closed" && <p className="text-sm text-muted-foreground">Closed — no further work can be submitted. Saved status and attempt history are not available here yet.</p>}
+      {section === "closed" && <>
+        <p className="text-sm text-muted-foreground">Closed — no further work can be submitted. You can still view your saved exploration history.</p>
+        <Link href={`/student/assignments/${assignment.id}/history`} prefetch={false} className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold">View saved history<span className="sr-only">: {assignment.activity.title}</span></Link>
+      </>}
       {section === "invalid" && <p className="text-sm text-muted-foreground">The schedule could not be confirmed. Refresh assignments or ask your teacher.</p>}
       {!hasActivityContent(assignment.activity.type) && (
         <p className="text-sm text-muted-foreground">Exercise not available yet. {getNewAssignmentBlockReason(assignment.activity.type)}</p>

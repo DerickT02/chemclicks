@@ -3,11 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { isValidElement } from "react";
 import type { StudentAssignment } from "@/lib/db/student-assignments";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
-vi.mock('@/lib/server/student-assignments', () => ({ getAssignmentAttempts: async () => [] }));
-vi.mock('@/app/(student)/student/assignments/[assignmentId]/AttemptControls', () => ({ default: () => <button>Start exploration</button> }));
+const attempts = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/server/student-assignments', () => ({ getAssignmentAttempts: attempts }));
+vi.mock('@/app/(student)/student/assignments/[assignmentId]/AttemptControls', () => ({ default: ({ attemptId, completed }: { attemptId?: string; completed: boolean }) => <button>{!attemptId ? 'Start exploration' : completed ? 'Start a new exploration' : 'Finish exploration'}</button> }));
 const reader = vi.hoisted(() => vi.fn());
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignments: reader }));
+vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignments: reader, getStudentAssignmentSchedules: reader }));
 vi.mock("@/lib/server/student-work-queue", () => ({ getStudentWorkQueue: async () => {
   const result = await reader();
   return result.status === "ok" ? {
@@ -35,7 +36,7 @@ const assignment = {
   id: "assignment-a", opens_at: null, closes_at: null,
   activity: { id: "activity-a", title: "Cylinder", type: "measurement_graduated_cylinder", order_index: 1 },
 };
-beforeEach(() => reader.mockReset());
+beforeEach(() => { reader.mockReset(); attempts.mockReset().mockResolvedValue([]); });
 const page = (id = assignment.id) => AssignmentPage({ params: Promise.resolve({ assignmentId: id }) });
 
 describe("student assignment pages", () => {
@@ -63,6 +64,35 @@ describe("student assignment pages", () => {
     expect(initial.key).toBe(assignment.id);
     expect(updated.key).toBe(initial.key);
     expect(updated.props.closesAt).toBe("2030-01-01T12:00:00Z");
+  });
+  it("places Start before the exercise and collapses saved history afterward", async () => {
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
+    const html = renderToStaticMarkup(await page());
+    expect(html.indexOf("Start exploration</button>")).toBeLessThan(html.indexOf("Cylinder exercise"));
+    expect(html.indexOf("Saved exploration history")).toBeGreaterThan(html.indexOf("Cylinder exercise"));
+    expect(html).toContain("<details");
+    expect(html).toContain("Opening the page alone does not save completion");
+  });
+  it("places Finish after the exercise and confirms existing saved completion without automatically retrying", async () => {
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
+    const record = { id: "attempt", attempt_number: 1, status: "in_progress", started_at: "2026-01-01T00:00Z", completed_at: null };
+    attempts.mockResolvedValue([record]);
+    let html = renderToStaticMarkup(await page());
+    expect(html.indexOf("Finish exploration</button>")).toBeGreaterThan(html.indexOf("Cylinder exercise"));
+    attempts.mockResolvedValue([{ ...record, status: "completed", completed_at: "2026-01-01T01:00Z" }]);
+    html = renderToStaticMarkup(await page());
+    expect(html).toContain("Completion saved.");
+    expect(html).toContain("Start a new exploration");
+    expect(html).not.toContain("Finish exploration</button>");
+  });
+  it("redirects closed work to read-only history and does not expose future exercises", async () => {
+    reader.mockResolvedValue({ status: "ok", assignments: [{ ...assignment, closes_at: "2000-01-01T00:00Z" }] });
+    await expect(page()).rejects.toThrow(`REDIRECT:/student/assignments/${assignment.id}/history`);
+    reader.mockResolvedValue({ status: "ok", assignments: [{ ...assignment, opens_at: "9999-01-01T00:00Z" }] });
+    const html = renderToStaticMarkup(await page());
+    expect(html).toContain("not available right now");
+    expect(html).not.toContain("Cylinder exercise");
+    expect(attempts).not.toHaveBeenCalled();
   });
   it("renders only the assigned exercise", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
