@@ -6,6 +6,7 @@ const LINKS = [
   { label: "How it works", href: "/#how-it-works" },
   { label: "Student sign in", href: "/login/student" },
   { label: "Teacher sign in", href: "/login/teacher" },
+  { label: "Help & student data", href: "/help" },
 ];
 
 export default function Footer() {
