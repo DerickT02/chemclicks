@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useState, type PointerEvent } from "react";
-import { CYLINDER_SPEC, quantizeReading } from "@/lib/measurement/instruments";
+import { useId, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { CYLINDER_SPEC, formatReading, quantizeReading } from "@/lib/measurement/instruments";
 
 const CAPACITY_ML = CYLINDER_SPEC.max;
 const DEFAULT_ML = CYLINDER_SPEC.defaultReading;
@@ -9,7 +9,12 @@ const SCALE_TOP_Y = 46;
 const SCALE_BOTTOM_Y = 390;
 const SCALE_HEIGHT = SCALE_BOTTOM_Y - SCALE_TOP_Y;
 const SCALE_ML = [0, 10, 20, 30, 40, 50];
-const GRADUATIONS_ML = Array.from({ length: CAPACITY_ML + 1 }, (_, index) => index);
+export type CylinderPrecision = "whole" | "tenths";
+
+const CYLINDER_SPECS = {
+  whole: { ...CYLINDER_SPEC, graduation: 10, step: 1, decimals: 0 },
+  tenths: CYLINDER_SPEC,
+};
 const CYLINDER_PATH =
   "M 105 30 L 105 390 Q 105 400 115 400 L 195 400 Q 205 400 205 390 L 205 30";
 
@@ -18,6 +23,11 @@ function volumeToY(ml: number): number {
 }
 
 type Props = {
+  precision?: CylinderPrecision;
+  /** Shared physical level; display rounding must not move the water. */
+  value?: number;
+  onValueChange?: (value: number) => void;
+  sliderLabel?: string;
   /**
    * Pin the water at this volume, in milliliters, for a question. The student
    * can't move it, and neither the readout nor assistive tech reveals the value.
@@ -25,10 +35,23 @@ type Props = {
   lockedValue?: number;
 };
 
-export default function GraduatedCylinder({ lockedValue }: Props) {
+export default function GraduatedCylinder({
+  lockedValue, precision = "tenths", value, onValueChange, sliderLabel = "Water volume",
+}: Props) {
   const [movableMl, setVolumeMl] = useState(DEFAULT_ML);
   const isLocked = lockedValue !== undefined;
-  const volumeMl = lockedValue ?? movableMl;
+  const spec = CYLINDER_SPECS[precision];
+  const motionSpec = value !== undefined ? CYLINDER_SPEC : spec;
+  const volumeMl = quantizeReading(lockedValue ?? value ?? movableMl, motionSpec);
+  const graduations = Array.from({ length: CAPACITY_ML / spec.graduation + 1 }, (_, index) =>
+    index * spec.graduation,
+  );
+
+  function updateVolume(ml: number) {
+    const next = quantizeReading(ml, motionSpec);
+    setVolumeMl(next);
+    onValueChange?.(next);
+  }
 
   const idPrefix = useId().replaceAll(":", "");
   const glassGradientId = `${idPrefix}-glass`;
@@ -41,11 +64,12 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
     if (rect.height === 0) return;
 
     const position = 1 - (event.clientY - rect.top) / rect.height;
-    setVolumeMl(quantizeReading(position * CAPACITY_ML, CYLINDER_SPEC));
+    updateVolume(position * CAPACITY_ML);
   }
 
   function handlePointerDown(event: PointerEvent<SVGRectElement>) {
     event.preventDefault();
+    event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     setFromPointer(event);
   }
@@ -58,16 +82,32 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
 
   function stopDragging(event: PointerEvent<SVGRectElement>) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      if (event.type === "pointerup") setFromPointer(event);
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+  }
+
+  function handleKeyDown(event: KeyboardEvent<SVGRectElement>) {
+    const deltas: Record<string, number> = {
+      ArrowLeft: -spec.step,
+      ArrowDown: -spec.step,
+      ArrowRight: spec.step,
+      ArrowUp: spec.step,
+      Home: -CAPACITY_ML,
+      End: CAPACITY_ML,
+    };
+    const delta = deltas[event.key];
+    if (delta === undefined) return;
+    event.preventDefault();
+    updateVolume(volumeMl + delta);
   }
 
   const meniscusY = volumeToY(volumeMl);
   const meniscusEdgeY = meniscusY - 5;
   const meniscusPath = `M 106 ${meniscusEdgeY} Q 155 ${meniscusY + 5} 204 ${meniscusEdgeY}`;
   const waterPath = `${meniscusPath} L 204 400 L 106 400 Z`;
-  const labelY = Math.min(397, Math.max(38, meniscusY - 14));
-  const formattedVolume = volumeMl.toFixed(1);
+  const labelY = meniscusY - 14;
+  const formattedVolume = formatReading(volumeMl, spec);
 
   return (
     <div className="flex justify-center py-2">
@@ -81,6 +121,9 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
             ? "Graduated cylinder holding water"
             : "Graduated cylinder with adjustable water volume"}
         </title>
+        <desc>
+          Read the volume at the bottom of the meniscus, indicated by the arrow and horizontal guide line.
+        </desc>
         <defs>
           <linearGradient id={glassGradientId} x1="0" x2="1">
             <stop offset="0" stopColor="#cbd5e1" stopOpacity="0.28" />
@@ -142,7 +185,7 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
         )}
 
         <g aria-hidden="true">
-          {GRADUATIONS_ML.map((ml) => {
+          {graduations.map((ml) => {
             const isMajor = ml % 10 === 0;
             const isHalf = ml % 5 === 0;
             const tickLength = isMajor ? 29 : isHalf ? 21 : 12;
@@ -217,12 +260,30 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
           strokeWidth="1"
         />
 
+        {/* The curve's center is its lowest point and the level used to read the scale. */}
+        {volumeMl > 0 && (
+          <g aria-hidden="true" pointerEvents="none">
+            <line
+              x1="106"
+              x2="218"
+              y1={meniscusY}
+              y2={meniscusY}
+              stroke="var(--accent)"
+              strokeWidth="2"
+            />
+            <path
+              d={`M 218 ${meniscusY - 7} L 218 ${meniscusY + 7} L 206 ${meniscusY} Z`}
+              fill="var(--accent)"
+            />
+          </g>
+        )}
+
         {/* A locked cylinder is a question, so neither the badge nor a slider may give away the volume. */}
         {!isLocked && (
           <>
-            <g transform={`translate(218 ${labelY})`} aria-hidden="true">
+            <g transform={`translate(234 ${labelY})`} aria-hidden="true">
               <rect
-                width="100"
+                width="84"
                 height="28"
                 rx="14"
                 fill="var(--card)"
@@ -230,11 +291,11 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
                 strokeOpacity="0.55"
               />
               <text
-                x="50"
+                x="42"
                 y="18.5"
                 textAnchor="middle"
                 fill="var(--accent)"
-                className="font-mono text-[13px] font-semibold"
+                className="font-mono text-[16px] font-semibold"
               >
                 {formattedVolume} mL
               </text>
@@ -252,7 +313,7 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
               className="cursor-ns-resize touch-none outline-none focus:stroke-[var(--ring)]"
               role="slider"
               tabIndex={0}
-              aria-label="Water volume"
+              aria-label={sliderLabel}
               aria-valuemin={0}
               aria-valuemax={CAPACITY_ML}
               aria-valuenow={volumeMl}
@@ -262,6 +323,7 @@ export default function GraduatedCylinder({ lockedValue }: Props) {
               onPointerMove={handlePointerMove}
               onPointerUp={stopDragging}
               onPointerCancel={stopDragging}
+              onKeyDown={handleKeyDown}
             />
           </>
         )}

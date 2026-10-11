@@ -6,7 +6,7 @@ import { INSTRUMENTS, type InstrumentId } from "@/lib/measurement/instruments";
  * instrument's step, so the cursor is drawn exactly where the answer is graded.
  */
 export const QUESTION_POOL: Record<InstrumentId, readonly number[]> = {
-  ruler: [1.46, 2.85, 3.72, 4.37, 5.93, 7.18, 8.64, 9.21, 10.55, 11.62, 12.09, 13.78],
+  ruler: [0.55, 1.46, 2.09, 2.85, 3.72, 4.37, 5.93, 6.62, 7.18, 7.78, 8.64, 9.21],
   cylinder: [6.3, 8.6, 12.7, 17.2, 19.5, 23.4, 28.8, 31.1, 36.6, 41.7, 44.3, 47.9],
 };
 

@@ -15,7 +15,7 @@ function rulerQuestion(overrides: Partial<QuestionState> = {}): QuestionState {
   return {
     phase: "question",
     instrument: "ruler",
-    readings: [4.37, 11.62, 2.85, 7.18, 9.21],
+    readings: [4.37, 6.62, 2.85, 7.18, 9.21],
     questionIndex: 0,
     answer: "",
     result: null,
@@ -73,7 +73,7 @@ describe("MeasurementQuestion", () => {
     const html = render(rulerQuestion());
 
     expect(html).toContain("Ruler question 1 of 5");
-    expect(html).toContain("0–15 cm, marked every 0.1 cm");
+    expect(html).toContain("0–10 cm, marked every 0.1 cm");
     expect(html).toContain("centimeters (cm)");
     expect(html).toContain("the nearest 0.01 cm (2 decimal places)");
     expect(html).toContain("±0.02 cm");
@@ -100,7 +100,7 @@ describe("MeasurementQuestion", () => {
 
   it("draws each instrument locked at the current question's reading", () => {
     expect(drawnPaths(render(rulerQuestion({ questionIndex: 1 })))).toEqual(
-      drawnPaths(renderToStaticMarkup(<PrecisionRuler lockedValue={11.62} />)),
+      drawnPaths(renderToStaticMarkup(<PrecisionRuler lockedValue={6.62} />)),
     );
     expect(drawnPaths(render(cylinderQuestion({ questionIndex: 1 })))).toEqual(
       drawnPaths(renderToStaticMarkup(<GraduatedCylinder lockedValue={41.7} />)),
