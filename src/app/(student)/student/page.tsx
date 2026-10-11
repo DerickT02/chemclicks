@@ -74,7 +74,7 @@ export default async function StudentAssignmentsPage() {
             <p className="font-medium">{result.context.studentName} · {result.context.className}
               {result.context.section && ` — ${result.context.section}`}</p>
           )}
-          <p className="text-sm text-muted-foreground">Use Start exploration inside an activity to track your work, then Finish exploration to save it. Quiz answers and results are not saved or visible to your teacher.</p>
+          <p className="text-sm text-muted-foreground">Use Start exploration inside an activity to track your work, then Finish exploration to save it. Scores from assigned quizzes you finish are saved for your teacher.</p>
           <RefreshAssignments />
         </header>
         {result.status === "error" ? (

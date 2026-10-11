@@ -68,7 +68,7 @@ describe("assignment activity selection", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("marks assigned activities and prevents selecting them again", () => {
+  it("hides already-assigned activities from the assign picker", () => {
     render(
       <AssignmentForm
         classId="33333333-3333-4333-8333-333333333333"
@@ -77,23 +77,46 @@ describe("assignment activity selection", () => {
       />,
     );
 
-    expect(screen.getByText("Assigned")).toBeInTheDocument();
-    expect(screen.getAllByRole("radio")[0]).toBeDisabled();
-    expect(screen.getAllByRole("radio")[1]).toBeEnabled();
+    expect(
+      screen.queryByText("Explore valence electrons with Lewis dot diagrams"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Explore ionic compounds and charge balance"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("(1 of 2 available)")).toBeInTheDocument();
+    expect(screen.getAllByRole("radio")).toHaveLength(1);
   });
 
-  it("disables Bohr, enables the tenths ruler and hides the retired ruler choice", async () => {
+  it("explains when every catalog activity is already assigned", () => {
+    render(
+      <AssignmentForm
+        classId="33333333-3333-4333-8333-333333333333"
+        activities={activities}
+        assignedActivityIds={activities.map((activity) => activity.id)}
+      />,
+    );
+
+    expect(
+      screen.getByText(/already assigned to this class/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Assign activity" }),
+    ).toBeDisabled();
+  });
+
+  it("disables Bohr and enables both ruler precisions", async () => {
     const user = userEvent.setup();
     const unavailable: ActivityCatalogEntry[] = [
       { ...activities[0], id: "bohr-intro", title: "Bohr intro", type: "bohr_model_intro" },
       { ...activities[0], id: "bohr-stability", title: "Bohr stability", type: "bohr_model_stability" },
       { ...activities[0], id: "tenths", title: "Tenths ruler", type: "measurement_ruler_tenths" },
-      { ...activities[0], id: "hundredths", title: "Retired ruler", type: "measurement_ruler_hundredths" },
+      { ...activities[0], id: "hundredths", title: "Hundredths ruler", type: "measurement_ruler_hundredths" },
     ];
     render(<AssignmentForm classId="class" activities={unavailable} />);
     const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(3);
-    expect(screen.queryByText("Retired ruler")).not.toBeInTheDocument();
+    expect(radios).toHaveLength(4);
+    expect(radios[3]).toBeEnabled();
     expect(screen.getAllByText(/assigned exploration experience is not supported/)).toHaveLength(2);
     for (const radio of radios.slice(0, 2)) {
       expect(radio).toBeDisabled();

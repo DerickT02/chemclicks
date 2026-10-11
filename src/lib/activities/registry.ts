@@ -81,15 +81,14 @@ export const ACTIVITY_REGISTRY: Readonly<Record<ActivityType, ActivityDefinition
     showInCatalog: true,
   },
   measurement_ruler_hundredths: {
-    title: "Ruler — Hundredths (retired)",
-    description: "Retired offering; use the tenths ruler",
+    title: "Ruler — Hundredths",
+    description: "Read a 0–10 cm ruler to the nearest 0.01 cm",
     category: "Measurement",
-    // Retain only a label for old database rows; there is no hundredths exercise.
-    explorer: null,
-    practicePath: null,
-    quiz: null,
-    newAssignmentBlockReason: "The separate hundredths ruler offering is retired and cannot be newly assigned.",
-    showInCatalog: false,
+    explorer: "ruler",
+    practicePath: "/student/labs/measurement",
+    quiz: "measurement",
+    newAssignmentBlockReason: null,
+    showInCatalog: true,
   },
   measurement_graduated_cylinder: {
     title: "Graduated Cylinder",

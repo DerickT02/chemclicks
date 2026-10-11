@@ -34,10 +34,10 @@ export default function AssignmentForm({
   const [activityId, setActivityId] = useState("");
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
-  const selectedActivity = activities.find((activity) => activity.id === activityId);
-  const selectionIsAssignable = Boolean(selectedActivity
-    && canAssignActivity(selectedActivity.type)
-    && !assignedActivityIds.includes(selectedActivity.id));
+  // Assigned activities are managed from the assigned list, not offered again here.
+  const availableActivities = activities.filter((activity) => !assignedActivityIds.includes(activity.id));
+  const selectedActivity = availableActivities.find((activity) => activity.id === activityId);
+  const selectionIsAssignable = Boolean(selectedActivity && canAssignActivity(selectedActivity.type));
   const [state, action, pending] = useActionState(async (previous: ClientFormState, data: FormData): Promise<ClientFormState> => {
     const responseVersion = previous.responseVersion + 1;
     try {
@@ -70,8 +70,8 @@ export default function AssignmentForm({
         {/* Reassert controlled radios after React's native form reset, including repeat errors. */}
         <ActivityCatalog
           key={state.responseVersion}
-          activities={activities}
-          assignedActivityIds={assignedActivityIds}
+          activities={availableActivities}
+          totalCatalogCount={activities.length}
           selectedActivityId={selectionIsAssignable ? activityId : ""}
           onSelect={setActivityId}
         />

@@ -8,6 +8,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 // Isolate our deadline timers from Next Link's idle prefetch scheduling.
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 const router = { refresh: mocks.refresh };
+// Client-component tests should not execute the Next.js server action module.
+vi.mock("@/app/(student)/student/quizzes/actions", () => ({ submitQuizAction: vi.fn() }));
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 import RandomizedQuiz from "@/components/quiz/RandomizedQuiz";
 import type { QuizQuestion } from "@/components/quiz/types";
@@ -19,8 +21,8 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 const advance = async (milliseconds: number) => act(async () => { vi.advanceTimersByTime(milliseconds); });
 
 const questions: QuizQuestion[] = [
-  { id: "q1", question: "First question?", options: ["First right", "First wrong"], correctIndex: 0 },
-  { id: "q2", question: "Second question?", options: ["Second right", "Second wrong"], correctIndex: 0 },
+  { id: "q1", question: "First question?", options: ["First right", "First wrong"] },
+  { id: "q2", question: "Second question?", options: ["Second right", "Second wrong"] },
 ];
 
 describe("assignment revalidation and deadline UX", () => {
@@ -48,7 +50,7 @@ describe("assignment revalidation and deadline UX", () => {
     await advance(1);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("This quiz is closed");
-    expect(screen.getByRole("status")).toHaveTextContent("not saved or visible to your teacher");
+    expect(screen.getByRole("status")).toHaveTextContent("An unfinished quiz is not saved");
     expect(screen.getByRole("link", { name: "Return to assignments" })).toHaveAttribute("href", "/student");
     expect(submit).not.toHaveBeenCalled();
     expect(mocks.refresh).toHaveBeenCalled();
@@ -127,7 +129,7 @@ describe("assignment revalidation and deadline UX", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     closesAt = iso(150_000);
     fireEvent(window, new Event("focus"));
-    expect(screen.getByRole("status")).toHaveTextContent("Correct!");
+    expect(screen.getByRole("status")).toHaveTextContent("Answer recorded");
     fireEvent.click(screen.getByRole("button", { name: "Next question" }));
     expect(screen.getByText("Second question?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: "Second right" }));
@@ -137,7 +139,7 @@ describe("assignment revalidation and deadline UX", () => {
     await advance(30_000);
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Quiz answers and results are not saved");
+    expect(screen.getByRole("status")).toHaveTextContent("Quizzes you already finished remain saved");
     expect(onComplete).not.toHaveBeenCalled();
   });
 });

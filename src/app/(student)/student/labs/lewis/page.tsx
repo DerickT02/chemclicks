@@ -82,7 +82,7 @@ export default async function LewisDotDiagramsPage() {
         <section className="mt-10" aria-labelledby="lewis-quizzes">
           <h2 id="lewis-quizzes" className="text-xl font-semibold text-foreground">Check your understanding</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Quizzes are available while the matching class lesson is open. Quiz results are not saved or visible to your teacher.
+            Quizzes are available while the matching class lesson is open. Your score is saved for your teacher when you finish.
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {quizzes.map(({ title, path, access }) => (

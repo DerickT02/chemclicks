@@ -62,7 +62,7 @@ export default function AssignmentAccess({ closesAt, children, contentType = "ex
           : "This assignment is no longer available. You cannot save further exploration attempts."}</p>
         <p className="text-sm text-muted-foreground">
           {contentType === "quiz"
-            ? "Quiz answers and results are not saved or visible to your teacher."
+            ? "Quizzes you already finished remain saved. An unfinished quiz is not saved."
             : "Previously saved exploration attempts are retained. An unconfirmed save should not be treated as completed."}
         </p>
         <Link href="/student" className="text-foreground underline">Return to assignments</Link>

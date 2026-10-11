@@ -1,5 +1,5 @@
 export const UNIT_TEST_DIRECTORIES = [
-  'auth', 'assignments', 'bohr', 'chemistry', 'measurement', 'quiz', 'routes', 'testing', 'ui',
+  'auth', 'assignments', 'bohr', 'chemistry', 'classes', 'measurement', 'quiz', 'routes', 'testing', 'ui',
 ] as const
 
 export const UNIT_TEST_ENV = {

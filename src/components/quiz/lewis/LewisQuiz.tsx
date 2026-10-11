@@ -8,6 +8,8 @@ const LEWIS_QUESTIONS_PER_ATTEMPT = 12;
 
 type LewisQuizProps = {
   title: string;
+  assignmentId?: string;
+  quizKey?: string;
   /** The full question pool, loaded from the database by the page. */
   questions: QuizQuestion[];
   loadError?: string | null;
@@ -16,6 +18,8 @@ type LewisQuizProps = {
 
 export default function LewisQuiz({
   title,
+  assignmentId,
+  quizKey,
   questions,
   loadError,
   onComplete,
@@ -27,6 +31,8 @@ export default function LewisQuiz({
       questionsPerAttempt={LEWIS_QUESTIONS_PER_ATTEMPT}
       passingThresholdPercent={80}
       loadError={loadError}
+      assignmentId={assignmentId}
+      quizKey={quizKey}
       onComplete={onComplete}
     />
   );

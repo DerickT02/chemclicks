@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 function setup(width = 312) {
-  const result = render(<PrecisionRuler />);
+  const result = render(<PrecisionRuler precision="tenths" />);
   const slider = screen.getByRole("slider");
   let captured = false;
   Object.assign(slider, {
@@ -108,30 +108,31 @@ describe("tenths ruler interaction", () => {
     expectReading(slider, "10.0");
   });
 
-  it("defaults to tenths and clamps locked cursors without revealing readings", () => {
+  it("retains hundredths mode and clamps locked cursors without revealing readings", () => {
     const { rerender, container } = render(<PrecisionRuler />);
     const slider = screen.getByRole("slider");
     fireEvent.keyDown(slider, { key: "ArrowRight" });
-    expectReading(slider, "5.1");
+    expectReading(slider, "5.01");
     rerender(<PrecisionRuler lockedValue={12} />);
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
-    expect(screen.queryByText("10.0 cm")).not.toBeInTheDocument();
+    expect(screen.queryByText("10.00 cm")).not.toBeInTheDocument();
     expect(container.querySelector("path")).toHaveAttribute("d", "M 329 46 L 343 46 L 336 58 Z");
   });
 });
 
 describe("ruler scale", () => {
-  it("labels every whole centimeter from 0 to 10 and prints 101 linear tenths ticks", () => {
-    const { container } = render(<PrecisionRuler />);
+  it.each(["tenths", "hundredths"] as const)("prints the correct marks for %s readings", (precision) => {
+    const { container } = render(<PrecisionRuler precision={precision} />);
+    const isCoarse = precision === "tenths";
     const groups = container.querySelectorAll('g[aria-hidden="true"]');
     const ticks = groups[0].querySelectorAll("line");
-    expect(ticks).toHaveLength(101);
+    expect(ticks).toHaveLength(isCoarse ? 11 : 101);
     expect([...groups[0].querySelectorAll("text")].map((label) => label.textContent))
       .toEqual([...Array.from({ length: 11 }, (_, index) => String(index)), "cm"]);
     ticks.forEach((tick, index) => {
-      expect(Number(tick.getAttribute("x1"))).toBeCloseTo(24 + index * 3.12);
+      expect(Number(tick.getAttribute("x1"))).toBeCloseTo(24 + index * (isCoarse ? 31.2 : 3.12));
       expect(tick.getAttribute("x2")).toBe(tick.getAttribute("x1"));
-      expect(tick.getAttribute("y2")).toBe(index % 10 === 0 ? "90" : index % 5 === 0 ? "80" : "72");
+      expect(tick.getAttribute("y2")).toBe(isCoarse || index % 10 === 0 ? "90" : index % 5 === 0 ? "80" : "72");
     });
     expect(screen.getByRole("slider")).toHaveAttribute("aria-valuemin", "0");
     expect(screen.getByRole("slider")).toHaveAttribute("aria-valuemax", "10");

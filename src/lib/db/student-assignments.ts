@@ -53,7 +53,8 @@ async function readStudentAssignments(onlyAvailable: boolean): Promise<Result> {
     let query = supabase
       .from("class_activities")
       .select("id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
-      .eq("class_id", classroom.id);
+      .eq("class_id", classroom.id)
+      .is("archived_at", null);
     if (onlyAvailable) {
       query = query
         .or(`opens_at.is.null,opens_at.lte.${now}`)

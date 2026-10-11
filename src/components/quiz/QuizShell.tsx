@@ -1,8 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
 import Link from "next/link";
-import type { QuizShellProps } from "./types";
+import { useId, useRef, useState } from "react";
+import type {
+  QuizAnswer,
+  QuizCompleteResult,
+  QuizShellProps,
+} from "./types";
 
 const primaryButtonClassName =
   "inline-flex items-center justify-center rounded-xl bg-accent px-6 py-3 text-base font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -15,14 +19,24 @@ export default function QuizShell({
   questions,
   passingThresholdPercent = 80,
   onComplete,
+  onSubmit,
   onRetry,
 }: QuizShellProps) {
   const groupId = useId();
+  // A ref, not state: state updates aren't visible to a second click handler
+  // that fires before React re-renders, so a rapid double-click on Submit
+  // could run this function twice and append the same question's answer
+  // twice. A ref is mutated synchronously, so the second call sees it
+  // immediately regardless of render timing.
+  const isSubmittingRef = useRef(false);
   const [index, setIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [answers, setAnswers] = useState<QuizAnswer[]>([]);
+  const [serverResult, setServerResult] = useState<QuizCompleteResult | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (questions.length === 0) {
     return (
@@ -39,43 +53,69 @@ export default function QuizShell({
 
   const current = questions[index];
   const total = questions.length;
-  const percent = total === 0 ? 0 : Math.round((score / total) * 100);
-  const passed = percent >= passingThresholdPercent;
-  const isCorrect =
-    selectedIndex !== null && selectedIndex === current.correctIndex;
 
   function resetQuiz() {
     onRetry?.();
     setIndex(0);
     setSelectedIndex(null);
     setSubmitted(false);
-    setScore(0);
     setFinished(false);
+    setAnswers([]);
+    setServerResult(null);
+    setSubmissionError(null);
+    setSubmitting(false);
   }
 
-  function handleSubmit() {
-    if (selectedIndex === null || submitted) return;
+  async function saveFinalResult(finalAnswers: QuizAnswer[]) {
+    if (!onSubmit) return;
 
-    const correct = selectedIndex === current.correctIndex;
-    const nextScore = score + (correct ? 1 : 0);
-    setScore(nextScore);
-    setSubmitted(true);
-
-    if (index === total - 1) {
-      const finalPercent = Math.round((nextScore / total) * 100);
-      onComplete?.({
-        score: nextScore,
-        total,
-        percent: finalPercent,
-        passed: finalPercent >= passingThresholdPercent,
-      });
+    setSubmitting(true);
+    setSubmissionError(null);
+    try {
+      const result = await onSubmit(finalAnswers);
+      setServerResult(result);
+      onComplete?.(result);
+    } catch (error) {
+      setSubmissionError(
+        error instanceof Error
+          ? error.message
+          : "The quiz could not be saved. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  function handleNext() {
+  async function handleSubmit() {
+    if (selectedIndex === null || submitted || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
+    try {
+      const answer: QuizAnswer = {
+        questionId: current.id,
+        selectedIndex: current.answerOrder?.[selectedIndex] ?? selectedIndex,
+      };
+      const nextAnswers = [...answers, answer];
+      setAnswers(nextAnswers);
+      setSubmitted(true);
+
+      if (index === total - 1) {
+        await saveFinalResult(nextAnswers);
+      }
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
+  async function handleNext() {
     if (!submitted) return;
 
     if (index >= total - 1) {
+      if (submitting) return;
+      if (onSubmit && !serverResult) {
+        if (submissionError) await saveFinalResult(answers);
+        return;
+      }
       setFinished(true);
       return;
     }
@@ -86,6 +126,22 @@ export default function QuizShell({
   }
 
   if (finished) {
+    if (!serverResult) {
+      return (
+        <article className="rounded-2xl border border-border bg-card p-8 md:p-10">
+          <h2 className="text-2xl font-semibold text-foreground md:text-3xl">
+            {title}
+          </h2>
+          <p className="mt-6 text-lg text-destructive" role="alert">
+            The server did not return a quiz result. Please try again.
+          </p>
+          <button type="button" onClick={resetQuiz} className={primaryButtonClassName}>
+            Try again
+          </button>
+        </article>
+      );
+    }
+    const result = serverResult;
     return (
       <article className="rounded-2xl border border-border bg-card p-8 md:p-10">
         <h2 className="text-2xl font-semibold text-foreground md:text-3xl">
@@ -95,32 +151,51 @@ export default function QuizShell({
           Section Quiz — Complete
         </p>
         <p className="mt-3 text-lg text-muted-foreground md:text-xl">
-          Score: {score} / {total} ({percent}%)
+          Score: {result.score} / {result.total} ({result.percent}%)
         </p>
         <p
           className={`mt-3 text-lg font-semibold md:text-xl ${
-            passed ? "text-accent" : "text-destructive"
+            result.passed ? "text-accent" : "text-destructive"
           }`}
           role="status"
         >
-          {passed
+          {result.passed
             ? `Passed — you needed ${passingThresholdPercent}% or higher.`
             : `Not passed — you need at least ${passingThresholdPercent}% to pass.`}
         </p>
-        <p className="mt-4 text-sm text-muted-foreground">
-          Quiz results are not saved or visible to your teacher.
-        </p>
+        {!result.attemptId && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Quiz results are not saved or visible to your teacher.
+          </p>
+        )}
         <div className="mt-8 flex flex-wrap gap-4">
           <button
             type="button"
             onClick={resetQuiz}
-            className={passed ? secondaryButtonClassName : primaryButtonClassName}
+            className={result.passed ? secondaryButtonClassName : primaryButtonClassName}
           >
             Try again
           </button>
-          <Link href="/student" className={passed ? primaryButtonClassName : secondaryButtonClassName}>
+          {result.passed && result.nextDestination && (
+            <Link
+              href={result.nextDestination}
+              className={primaryButtonClassName}
+            >
+              Continue to next section
+            </Link>
+          )}
+          <Link
+            href="/student"
+            className={result.passed && !result.nextDestination ? primaryButtonClassName : secondaryButtonClassName}
+          >
             Back to assignments
           </Link>
+          {result.passed && result.attemptId && !result.nextDestination && (
+            <p className="text-sm text-muted-foreground">
+              Your passing result is saved. No next assigned section is
+              currently available.
+            </p>
+          )}
         </div>
       </article>
     );
@@ -146,19 +221,9 @@ export default function QuizShell({
           {current.options.map((option, optionIndex) => {
             const optionId = `${groupId}-option-${index}-${optionIndex}`;
             const selected = selectedIndex === optionIndex;
-            const showResult = submitted && selected;
-            const showCorrectAnswer =
-              submitted && optionIndex === current.correctIndex;
-
             let optionStateClass =
               "border-border bg-background hover:border-ring/60";
-            if (showCorrectAnswer) {
-              optionStateClass =
-                "border-accent bg-accent/10 text-foreground";
-            } else if (showResult && !isCorrect) {
-              optionStateClass =
-                "border-destructive bg-destructive/10 text-foreground";
-            } else if (selected && !submitted) {
+            if (selected && !submitted) {
               optionStateClass = "border-ring bg-muted";
             }
 
@@ -189,14 +254,16 @@ export default function QuizShell({
 
       {submitted && (
         <p
-          className={`mt-6 text-base font-medium md:text-lg ${
-            isCorrect ? "text-accent" : "text-destructive"
-          }`}
+          className="mt-6 text-base font-medium text-muted-foreground md:text-lg"
           role="status"
         >
-          {isCorrect
-            ? "Correct!"
-            : `Incorrect. The correct answer is: ${current.options[current.correctIndex]}`}
+          Answer recorded. Continue to the next question.
+        </p>
+      )}
+
+      {submissionError && (
+        <p className="mt-6 text-base font-medium text-destructive" role="alert">
+          {submissionError}
         </p>
       )}
 
@@ -214,9 +281,16 @@ export default function QuizShell({
           <button
             type="button"
             onClick={handleNext}
+            disabled={submitting || (index >= total - 1 && Boolean(onSubmit) && !serverResult && !submissionError)}
             className={primaryButtonClassName}
           >
-            {index >= total - 1 ? "See results" : "Next question"}
+            {submitting
+              ? "Saving…"
+              : submissionError && index >= total - 1
+                ? "Retry save"
+                : index >= total - 1
+                  ? "See results"
+                  : "Next question"}
           </button>
         )}
       </div>

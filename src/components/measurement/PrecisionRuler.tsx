@@ -20,17 +20,21 @@ const BASELINE_Y = 60;
 const BAR_HEIGHT = 34;
 const BAR_BOTTOM_Y = BASELINE_Y + BAR_HEIGHT;
 const LABEL_WIDTH = 84;
-const GRADUATIONS_CM = Array.from({ length: SPAN_CM * 10 + 1 }, (_, index) =>
-  Number((RULER_MIN_CM + index / 10).toFixed(1)),
-);
-const SCALE_CM = GRADUATIONS_CM.filter(Number.isInteger);
+const SCALE_CM = Array.from({ length: SPAN_CM + 1 }, (_, index) => RULER_MIN_CM + index);
 
-export function quantizeCm(cm: number): number {
-  return quantizeReading(cm, RULER_SPEC);
+export type RulerPrecision = "tenths" | "hundredths";
+
+const RULER_SPECS = {
+  tenths: { ...RULER_SPEC, graduation: 1, step: 0.1, decimals: 1 },
+  hundredths: RULER_SPEC,
+};
+
+export function quantizeCm(cm: number, precision: RulerPrecision = "hundredths"): number {
+  return quantizeReading(cm, RULER_SPECS[precision]);
 }
 
-export function formatCm(cm: number): string {
-  return formatReading(cm, RULER_SPEC);
+export function formatCm(cm: number, precision: RulerPrecision = "hundredths"): string {
+  return formatReading(cm, RULER_SPECS[precision]);
 }
 
 function cmToX(cm: number): number {
@@ -38,6 +42,11 @@ function cmToX(cm: number): number {
 }
 
 type Props = {
+  precision?: RulerPrecision;
+  /** Shared physical position; display rounding must not move the cursor. */
+  value?: number;
+  onValueChange?: (value: number) => void;
+  sliderLabel?: string;
   /**
    * Pin the cursor at this reading, in centimeters, for a question. The student
    * can't move it, and neither the readout nor assistive tech reveals the value.
@@ -45,17 +54,31 @@ type Props = {
   lockedValue?: number;
 };
 
-export default function PrecisionRuler({ lockedValue }: Props) {
+export default function PrecisionRuler({
+  lockedValue, precision = "hundredths", value, onValueChange, sliderLabel = "Measured length",
+}: Props) {
   const [movableCm, setValueCm] = useState(DEFAULT_CM);
   const isLocked = lockedValue !== undefined;
-  const valueCm = quantizeCm(lockedValue ?? movableCm);
+  const motionPrecision = value !== undefined ? "hundredths" : precision;
+  const valueCm = quantizeCm(lockedValue ?? value ?? movableCm, motionPrecision);
+  const spec = RULER_SPECS[precision];
+  const step = spec.step;
+  const graduations = Array.from({ length: SPAN_CM / spec.graduation + 1 }, (_, index) =>
+    Number((RULER_MIN_CM + index * spec.graduation).toFixed(1)),
+  );
+
+  function updateValue(cm: number) {
+    const next = quantizeCm(cm, motionPrecision);
+    setValueCm(next);
+    onValueChange?.(next);
+  }
 
   function setFromPointer(event: PointerEvent<SVGRectElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width === 0) return;
 
     const position = (event.clientX - rect.left) / rect.width;
-    setValueCm(quantizeCm(RULER_MIN_CM + position * SPAN_CM));
+    updateValue(RULER_MIN_CM + position * SPAN_CM);
   }
 
   function handlePointerDown(event: PointerEvent<SVGRectElement>) {
@@ -81,10 +104,10 @@ export default function PrecisionRuler({ lockedValue }: Props) {
   function handleKeyDown(event: KeyboardEvent<SVGRectElement>) {
     // Home and End overshoot so quantization clamps to the exact endpoints.
     const deltas: Record<string, number> = {
-      ArrowLeft: -STEP_CM,
-      ArrowDown: -STEP_CM,
-      ArrowRight: STEP_CM,
-      ArrowUp: STEP_CM,
+      ArrowLeft: -step,
+      ArrowDown: -step,
+      ArrowRight: step,
+      ArrowUp: step,
       Home: -SPAN_CM,
       End: SPAN_CM,
     };
@@ -92,11 +115,11 @@ export default function PrecisionRuler({ lockedValue }: Props) {
     if (delta === undefined) return;
 
     event.preventDefault();
-    setValueCm(quantizeCm(valueCm + delta));
+    updateValue(valueCm + delta);
   }
 
   const cursorX = cmToX(valueCm);
-  const formattedValue = formatCm(valueCm);
+  const formattedValue = formatCm(valueCm, precision);
 
   return (
     <div className="flex justify-center py-2">
@@ -122,7 +145,7 @@ export default function PrecisionRuler({ lockedValue }: Props) {
         />
 
         <g aria-hidden="true">
-          {GRADUATIONS_CM.map((cm) => {
+          {graduations.map((cm) => {
             const isMajor = Number.isInteger(cm);
             const isHalf = Math.round(cm * 10) % 5 === 0;
             const x = cmToX(cm);
@@ -216,7 +239,7 @@ export default function PrecisionRuler({ lockedValue }: Props) {
             className="cursor-ew-resize touch-none outline-none focus:stroke-[var(--ring)]"
             role="slider"
             tabIndex={0}
-            aria-label="Measured length"
+            aria-label={sliderLabel}
             aria-valuemin={RULER_MIN_CM}
             aria-valuemax={RULER_MAX_CM}
             aria-valuenow={valueCm}

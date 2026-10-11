@@ -11,14 +11,18 @@ vi.mock("@/components/quiz/random", async importOriginal => {
 });
 import RandomizedQuiz from "@/components/quiz/RandomizedQuiz";
 import { pickRandomQuestions } from "@/components/quiz/random";
+import { submitQuizAction } from "@/app/(student)/student/quizzes/actions";
 import type { QuizQuestion } from "@/components/quiz/types";
 
 const draw = vi.mocked(pickRandomQuestions);
+const submit = vi.mocked(submitQuizAction);
+const linked = { assignmentId: "assignment", quizKey: "quiz" };
 function pool(prefix = "Original", count = 2): QuizQuestion[] {
-  return Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${i}`, question: `${prefix} question ${i + 1}?`, options: [`${prefix} right ${i + 1}`, `${prefix} wrong ${i + 1}`], correctIndex: 0 }));
+  return Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${i}`, question: `${prefix} question ${i + 1}?`, options: [`${prefix} right ${i + 1}`, `${prefix} wrong ${i + 1}`] }));
 }
 beforeEach(() => {
   draw.mockClear();
+  submit.mockReset();
   vi.spyOn(Math, "random").mockReturnValue(0.999);
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -26,7 +30,8 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 async function answer(user: ReturnType<typeof userEvent.setup>, label: string) {
   await user.click(screen.getByRole("radio", { name: label }));
   await user.click(screen.getByRole("button", { name: "Submit" }));
-  await user.click(screen.queryByRole("button", { name: "Next question" }) ?? screen.getByRole("button", { name: "See results" }));
+  // The last answer is saved first, so its results button appears asynchronously.
+  await user.click(await screen.findByRole("button", { name: /^(Next question|See results)$/ }));
 }
 
 describe("attempt question snapshots", () => {
@@ -45,25 +50,32 @@ describe("attempt question snapshots", () => {
     await screen.findByText("Original question 1?");
     expect(draw).toHaveBeenCalledTimes(1);
   });
-  it("preserves questions, options, selection, score and feedback across fresh and changed server pools", async () => {
+  it("preserves questions, options, selection and the saved result across fresh and changed server pools", async () => {
     const user = userEvent.setup();
     const onComplete = vi.fn();
+    const failed = { score: 1, total: 2, percent: 50, passed: false, attemptId: "attempt-1", attemptNumber: 1, nextDestination: null };
+    const passed = { score: 1, total: 1, percent: 100, passed: true, attemptId: "attempt-2", attemptNumber: 2, nextDestination: null };
+    submit.mockResolvedValueOnce(failed).mockResolvedValueOnce(passed);
     const original = pool();
-    const view = render(<RandomizedQuiz title="Quiz" pool={original} questionsPerAttempt={2} onComplete={onComplete} />);
+    const view = render(<RandomizedQuiz title="Quiz" pool={original} questionsPerAttempt={2} onComplete={onComplete} {...linked} />);
     await screen.findByText("Original question 1?");
     await user.click(screen.getByRole("radio", { name: "Original right 1" }));
     const options = screen.getAllByRole("radio").map(node => node.outerHTML);
-    view.rerender(<RandomizedQuiz title="Quiz" pool={pool()} questionsPerAttempt={2} onComplete={onComplete} />);
+    view.rerender(<RandomizedQuiz title="Quiz" pool={pool()} questionsPerAttempt={2} onComplete={onComplete} {...linked} />);
     expect(screen.getAllByRole("radio").map(node => node.outerHTML)).toEqual(options);
     expect(screen.getByRole("radio", { name: "Original right 1" })).toBeChecked();
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    view.rerender(<RandomizedQuiz title="Quiz" pool={pool("Updated", 1)} questionsPerAttempt={1} passingThresholdPercent={20} onComplete={onComplete} />);
-    expect(screen.getByRole("status")).toHaveTextContent("Correct!");
+    view.rerender(<RandomizedQuiz title="Quiz" pool={pool("Updated", 1)} questionsPerAttempt={1} passingThresholdPercent={20} onComplete={onComplete} {...linked} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Answer recorded");
     expect(screen.getByRole("radio", { name: "Original right 1" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Next question" }));
     expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
     await answer(user, "Original wrong 2");
-    expect(onComplete).toHaveBeenCalledExactlyOnceWith({ score: 1, total: 2, percent: 50, passed: false });
+    // Answers are reported by authored index, whatever order the options were shown in.
+    expect(submit).toHaveBeenCalledExactlyOnceWith({ ...linked, submissionKey: expect.any(String), answers: [
+      { questionId: "Original-0", selectedIndex: 0 }, { questionId: "Original-1", selectedIndex: 1 },
+    ] });
+    expect(onComplete).toHaveBeenCalledExactlyOnceWith(failed);
     expect(screen.getByText("Score: 1 / 2 (50%)")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("at least 80%");
     expect(draw).toHaveBeenCalledTimes(1);
@@ -73,7 +85,9 @@ describe("attempt question snapshots", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(draw).toHaveBeenCalledTimes(2);
     await answer(user, "Updated right 1");
-    expect(onComplete).toHaveBeenLastCalledWith({ score: 1, total: 1, percent: 100, passed: true });
+    expect(onComplete).toHaveBeenLastCalledWith(passed);
+    // A retry is a new attempt, so it must not reuse the first submission's idempotency key.
+    expect(submit.mock.calls[1][0].submissionKey).not.toBe(submit.mock.calls[0][0].submissionKey);
   });
   it("keeps the snapshot independent of in-place source mutations", async () => {
     const original = pool();
@@ -81,7 +95,6 @@ describe("attempt question snapshots", () => {
     await screen.findByText("Original question 1?");
     original[0].question = "Mutated question";
     original[0].options[0] = "Mutated option";
-    original[0].correctIndex = 1;
     view.rerender(<RandomizedQuiz title="Quiz" pool={original} questionsPerAttempt={2} />);
     expect(screen.getByText("Original question 1?")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Original right 1" })).toBeInTheDocument();

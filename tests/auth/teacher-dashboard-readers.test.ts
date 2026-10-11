@@ -11,7 +11,7 @@ const privateError = { code: "42501", message: "private database details" };
 function clientFor(result: { data: unknown; error: unknown }) {
   const calls: Call[] = [];
   const query: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "order"]) {
+  for (const method of ["select", "eq", "is", "in", "order"]) {
     query[method] = (...args: unknown[]) => { calls.push({ method, args }); return query; };
   }
   query.returns = async () => result;
@@ -48,6 +48,7 @@ describe("dashboard reads", () => {
     expect(await getClassActivities(mock.client, classId)).toEqual({ data: [], error: null });
     expect(mock.from).toHaveBeenCalledWith("class_activities");
     expect(callsTo(mock.calls, "eq")).toEqual([["class_id", classId]]);
+    expect(callsTo(mock.calls, "is")).toEqual([["archived_at", null]]);
   });
   it("does not query assignment metadata for invalid class IDs", async () => {
     const mock = clientFor({ data: [], error: null });

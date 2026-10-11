@@ -35,7 +35,7 @@ export default async function LewisQuizPage({ kind }: Props) {
           <Link href="/student" className="text-sm text-foreground underline">Back to assignments</Link>
           <h1 className="text-3xl font-semibold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground">
-            Check your understanding. Quiz results are not saved or visible to your teacher.
+            Check your understanding. Your score is saved for your teacher when you finish.
           </p>
         </header>
 
@@ -57,7 +57,7 @@ export default async function LewisQuizPage({ kind }: Props) {
               {access.status === "scheduled"
                 ? `Your ${lessonTitle} lesson is scheduled. Return when the assignment opens.`
                 : access.status === "closed"
-                ? `Your ${lessonTitle} lesson is no longer open. Further quiz answers are unavailable; quiz results are not saved.`
+                ? `Your ${lessonTitle} lesson is no longer open. Further quiz answers are unavailable; quizzes you already finished remain saved.`
                 : `Your teacher must assign the ${lessonTitle} lesson to your class before you can take this quiz.`}
             </p>
             <Link href="/student" className="text-accent underline">
@@ -70,8 +70,13 @@ export default async function LewisQuizPage({ kind }: Props) {
             closesAt={access.assignment.closes_at}
             contentType="quiz"
           >
-            <LewisQuiz title={title} questions={questionsResult.error ? [] : questionsResult.data ?? []}
-              loadError={questionsResult.error ? LOAD_ERROR_MESSAGE : null} />
+            <LewisQuiz
+              title={title}
+              assignmentId={access.assignment.id}
+              quizKey={quizKey}
+              questions={questionsResult.error ? [] : questionsResult.data ?? []}
+              loadError={questionsResult.error ? LOAD_ERROR_MESSAGE : null}
+            />
           </AssignmentAccess>
         )}
       </div>

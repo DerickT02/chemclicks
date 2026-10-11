@@ -5,13 +5,15 @@ import RefreshAssignments from "@/components/assignments/RefreshAssignments";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentForm from "@/app/admin/assignments/AssignmentForm";
 import AssignmentSchedule from "@/app/admin/assignments/AssignmentSchedule";
+import UnassignActivityForm from "@/app/admin/assignments/UnassignActivityForm";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { listActiveClassesForTeacher, type ClassListItem } from "@/lib/db/classes";
-import { getTeacherRoster, getClassCurrentProgress, type TeacherRosterStudent, type TeacherProgressRow } from "@/lib/db/teacher-dashboard";
-import { summarizeCurrentExplorations } from "@/lib/assignments/exploration-progress";
+import { getTeacherRoster, type TeacherRosterStudent } from "@/lib/db/teacher-dashboard";
+import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
+import { LessonProgressList } from "@/app/admin/LessonProgressList";
 
 
 type ClassWithStudents = ClassListItem & { students: TeacherRosterStudent[] };
@@ -61,11 +63,20 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
-  const [catalogResult, assignmentsResult] = await Promise.all([
+  const [catalogResult, assignmentsResult, lessonProgressResult] = await Promise.all([
     listActivityCatalog(supabase),
     selectedClass
       ? getClassActivities(supabase, selectedClass.id)
       : Promise.resolve({ data: [], error: null }),
+    selectedClass
+      ? getTeacherClassLessonProgress(selectedClass.id).then(
+          (data) => ({ data, error: null as string | null }),
+          (error: unknown) => ({
+            data: null,
+            error: error instanceof Error ? error.message : "Unknown error",
+          }),
+        )
+      : Promise.resolve({ data: null, error: null as string | null }),
   ]);
 
   const activities = catalogResult.data ?? [];
@@ -75,18 +86,8 @@ export default async function AdminPage({
   );
   const catalogLoadFailed = Boolean(catalogResult.error) || catalogResult.data === null;
   const assignmentsLoadFailed = Boolean(assignmentsResult.error) || assignmentsResult.data === null;
-  const progressResult = selectedClass && !rosterLoadFailed && !assignmentsLoadFailed
-    && selectedClass.students.length > 0 && assignments.length > 0
-    ? await getClassCurrentProgress(supabase, selectedClass.id)
-    : { data: [], error: null };
-  const progressLoadFailed = assignmentsLoadFailed || Boolean(progressResult.error) || progressResult.data === null;
-  const progressByStudent = new Map<string, TeacherProgressRow[]>();
-  for (const row of progressResult.data ?? []) {
-    const rows = progressByStudent.get(row.student_id) ?? [];
-    rows.push(row);
-    progressByStudent.set(row.student_id, rows);
-  }
-  const assignmentIds = assignments.map(assignment => assignment.id);
+  const lessonProgressLoadFailed = Boolean(lessonProgressResult.error);
+  const lessonProgressStudents = lessonProgressResult.data?.students ?? [];
   // Request-time status snapshot; dashboard refreshes update it.
   // eslint-disable-next-line react-hooks/purity -- This server-only clock read is not a client render-time side effect.
   const scheduleRenderedAt = Date.now();
@@ -238,39 +239,50 @@ export default async function AdminPage({
                           return (
                             <div
                               key={assignment.id}
-                              className="flex items-start justify-between gap-4 rounded-lg border border-border p-4"
+                              className="rounded-lg border border-border p-4"
                             >
-                              <div className="min-w-0 flex-1">
-                                <h4 className="font-medium">
-                                  {activity?.title ?? "Assigned activity"}
-                                </h4>
-                                {activity ? (
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {activity.description}
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-medium">
+                                    {activity?.title ?? "Assigned activity"}
+                                  </h4>
+                                  {activity ? (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {activity.description}
                                   </p>
-                                ) : null}
-                                {blockReason ? (
-                                  <p className="mt-2 text-xs text-muted-foreground">
-                                    New assignments unavailable: {blockReason}
-                                  </p>
-                                ) : null}
-                                <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
-                                  <div className="flex flex-wrap gap-x-2">
-                                    <dt className="font-medium text-foreground/80">
-                                      Assigned
-                                    </dt>
-                                    <dd>
-                                      <LocalizedTimestamp value={assignment.created_at} />
-                                    </dd>
-                                  </div>
-                                </dl>
-                                <AssignmentSchedule
-                                  classId={selectedClass.id}
-                                  className={selectedClass.name}
-                                  activityTitle={activity?.title ?? "Assigned activity"}
-                                  assignment={assignment}
-                                  renderedAt={scheduleRenderedAt}
-                                />
+                                  ) : null}
+                                  {blockReason ? (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                      New assignments unavailable: {blockReason}
+                                    </p>
+                                  ) : null}
+                                  <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
+                                    <div className="flex flex-wrap gap-x-2">
+                                      <dt className="font-medium text-foreground/80">
+                                        Assigned
+                                      </dt>
+                                      <dd>
+                                        <LocalizedTimestamp value={assignment.created_at} />
+                                      </dd>
+                                    </div>
+                                  </dl>
+                                  <AssignmentSchedule
+                                    classId={selectedClass.id}
+                                    className={selectedClass.name}
+                                    activityTitle={activity?.title ?? "Assigned activity"}
+                                    assignment={assignment}
+                                    renderedAt={scheduleRenderedAt}
+                                  />
+                                </div>
+                                <div className="shrink-0">
+                                  <UnassignActivityForm
+                                    classId={selectedClass.id}
+                                    assignmentId={assignment.id}
+                                    activityTitle={
+                                      activity?.title ?? "Assigned activity"
+                                    }
+                                  />
+                                </div>
                               </div>
                             </div>
                           );
@@ -282,69 +294,16 @@ export default async function AdminPage({
                 </Link>
                 <div className="mt-4"><RefreshAssignments label="Refresh classroom" /></div>
                 <div className="mt-7">
-                  <h3 className="text-lg font-semibold text-foreground">Enrolled students</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Current exploration status, not quiz grades or ever-completed history. Retrying can move
-                    completed work back to in progress; earlier saved attempts remain in Activity attempts.
-                  </p>
-                  {!rosterLoadFailed && progressLoadFailed && (
-                    <p role="alert" className="mt-3 text-sm text-destructive">
-                      Exploration progress could not be loaded. Please refresh the page.
-                    </p>
-                  )}
-                  <div className="mt-4 space-y-4">
-                    {rosterLoadFailed ? (
+                  <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
+                  <div className="mt-4">
+                    {lessonProgressLoadFailed ? (
                       <p role="alert" className="text-sm text-destructive">
-                        Enrollment data could not be loaded. Please refresh the page.
-                      </p>
-                    ) : selectedClass.students.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                        No students in this class yet.
+                        Student progress could not be loaded. Please refresh the page.
                       </p>
                     ) : (
-                      selectedClass.students.map((student) => {
-                        const summary = progressLoadFailed ? null : summarizeCurrentExplorations(
-                          assignmentIds, progressByStudent.get(student.id) ?? [],
-                        );
-
-                        return (
-                          <div key={student.id} className="space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-medium text-foreground">
-                                  {student.first_name} {student.last_name}
-                                </p>
-                                {summary === null ? (
-                                  <p role="alert" className="text-xs text-destructive">Progress unavailable.</p>
-                                ) : summary.assigned === 0 ? (
-                                  <p className="text-xs text-muted-foreground">No activities assigned.</p>
-                                ) : (
-                                  <>
-                                    <p className="text-xs text-muted-foreground">
-                                      {summary.completed} of {summary.assigned} assigned activities currently completed
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {summary.inProgress} in progress · {summary.notStarted} not started
-                                    </p>
-                                  </>
-                                )}
-                              </div>
-                              {summary && summary.percent !== null && (
-                                <p className="text-xs text-muted-foreground">{summary.percent}%</p>
-                              )}
-                            </div>
-
-                            {summary && summary.percent !== null && (
-                              <div role="progressbar" aria-label={`${student.first_name} ${student.last_name}: current exploration completion`}
-                                aria-valuemin={0} aria-valuemax={100} aria-valuenow={summary.percent}
-                                aria-valuetext={`${summary.completed} of ${summary.assigned} assigned activities currently completed`}
-                                className="h-2 rounded-full bg-muted">
-                                <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${summary.percent}%` }} />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
+                      <div className="max-h-[480px] overflow-y-auto rounded-lg border border-border p-4">
+                        <LessonProgressList students={lessonProgressStudents} />
+                      </div>
                     )}
                   </div>
                 </div>

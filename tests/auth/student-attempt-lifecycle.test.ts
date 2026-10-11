@@ -55,7 +55,7 @@ describe('attempt lifecycle boundary', () => {
   })
   it('only offers existing explorations with matching precision', () => {
     expect(isSupportedExploration('lewis_diagram')).toBe(true)
-    expect(isSupportedExploration('measurement_ruler_hundredths')).toBe(false)
+    expect(isSupportedExploration('measurement_ruler_hundredths')).toBe(true)
     expect(isSupportedExploration('measurement_graduated_cylinder')).toBe(true)
     expect(isSupportedExploration('measurement_ruler_tenths')).toBe(true)
     expect(isSupportedExploration('lewis_structures_ionic')).toBe(true)

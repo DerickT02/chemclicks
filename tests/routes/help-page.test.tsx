@@ -7,11 +7,12 @@ import Help from "@/app/help/page";
 afterEach(cleanup);
 
 describe("classroom help page", () => {
-  it("provides truthful help/data information, without promising quiz reporting or an invented retention policy", () => {
+  it("provides truthful help/data information, including saved quiz scores, without an invented retention policy", () => {
     render(<Help />);
     expect(screen.getByRole("heading", { name: "What information is stored" })).toBeInTheDocument();
     expect(screen.getByText(/not a school-approved retention policy/)).toBeInTheDocument();
-    expect(screen.getByText(/Practice labs and quiz answers\/results are not saved/)).toBeInTheDocument();
+    expect(screen.getByText(/Practice labs are not saved for your teacher/)).toBeInTheDocument();
+    expect(screen.getByText(/assigned quiz attempts with their scores and pass results/)).toBeInTheDocument();
     expect(screen.getByText(/Disabling a class does not erase/)).toBeInTheDocument();
   });
 });

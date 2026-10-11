@@ -7,11 +7,10 @@ import { DATABASE_RETRY_MESSAGE, SESSION_RETRY_MESSAGE } from "@/lib/errors/user
 
 const mocks = vi.hoisted(() => ({
   loginStudent: vi.fn(), createClient: vi.fn(), signIn: vi.fn(),
-  signUp: vi.fn(), teacherLookup: vi.fn(), signOut: vi.fn(), insertTeacher: vi.fn(), push: vi.fn(),
+  signUp: vi.fn(), teacherLookup: vi.fn(), signOut: vi.fn(), push: vi.fn(),
 }));
 vi.mock("@/app/login/student/actions", () => ({ loginStudent: mocks.loginStudent }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: mocks.createClient }));
-vi.mock("@/lib/db/teachers", () => ({ insertTeacher: mocks.insertTeacher }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
   useSearchParams: () => new URLSearchParams(),
@@ -30,7 +29,6 @@ beforeEach(() => {
   mocks.signIn.mockResolvedValue({ data: { user: { id: "teacher" } }, error: null });
   mocks.teacherLookup.mockResolvedValue({ data: { id: "teacher" }, error: null });
   mocks.signUp.mockResolvedValue({ data: { user: { id: "teacher", identities: [{}] } }, error: null });
-  mocks.insertTeacher.mockResolvedValue({ error: null });
   mocks.signOut.mockResolvedValue({ error: null });
 });
 afterEach(cleanup);
@@ -92,10 +90,10 @@ describe("teacher login form", () => {
     expect(mocks.push).toHaveBeenCalledWith("/admin");
   });
 
-  it("does not promise password recovery or administrator approval", async () => {
+  it("offers password recovery without promising administrator approval", async () => {
     mocks.teacherLookup.mockResolvedValue({ data: null, error: null });
     render(<TeacherLoginPage />);
-    expect(screen.queryByText("Forgot password?")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Forgot password?" })).toBeEnabled();
     await fillTeacherLogin();
     expect(await screen.findByRole("alert")).toHaveTextContent("does not have a teacher profile");
     expect(screen.getByRole("alert")).not.toHaveTextContent("administrator");
@@ -105,11 +103,11 @@ describe("teacher login form", () => {
 });
 
 describe("teacher signup form", () => {
-  it.each(["configuration", "signup", "profile creation"])("recovers pending state after a thrown %s failure", async (failure) => {
+  // The teachers row comes from a database trigger, so sign-up makes no profile insert.
+  it.each(["configuration", "signup"])("recovers pending state after a thrown %s failure", async (failure) => {
     const error = new Error("private configuration details");
     if (failure === "configuration") mocks.createClient.mockImplementation(() => { throw error; });
-    else if (failure === "signup") mocks.signUp.mockRejectedValue(error);
-    else mocks.insertTeacher.mockRejectedValue(error);
+    else mocks.signUp.mockRejectedValue(error);
     render(<TeacherCreateAccountPage />);
     await fillTeacherSignup();
     expect(await screen.findByRole("alert")).toHaveTextContent(DATABASE_RETRY_MESSAGE);

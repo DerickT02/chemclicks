@@ -1,21 +1,23 @@
 import Link from "next/link";
 import AttemptHistory from "@/components/assignments/AttemptHistory";
+import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getAssignmentAttempts } from '@/lib/server/student-assignments';
 import AttemptControls from './AttemptControls';
 import { notFound, redirect } from "next/navigation";
 import { getStudentAssignmentSchedules } from "@/lib/db/student-assignments";
 import { scheduleStatus } from "@/lib/assignments/schedule";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
-import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
-import PrecisionRuler from "@/components/measurement/PrecisionRuler";
+import MeasurementComparison from "@/components/measurement/MeasurementComparison";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
 import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
+import MeasurementQuiz from "@/components/measurement/MeasurementQuiz";
 
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
+import { measurementQuizModeForActivity } from "@/lib/measurement/modes";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +46,12 @@ export default async function AssignmentPage({ params }: {
   const definition = getActivityDefinition(type);
   const explorer = definition?.explorer;
   const quizKind = lewisQuizForLesson(type);
+  const measurementQuizMode = measurementQuizModeForActivity(type);
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
-  const latest = attempts[0];
+  // Quiz attempts share the table; exploration rows carry no quiz key.
+  const explorationAttempts = attempts.filter((attempt) => !attempt.quiz_key);
+  const measurementAttempts = attempts.filter((attempt) => attempt.instrument !== null && attempt.instrument !== undefined);
+  const latest = explorationAttempts[0];
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -65,8 +71,8 @@ export default async function AssignmentPage({ params }: {
             {explorer === "lewis-diagram" && <LewisDotExplorer />}
             {explorer === "ionic" && <IonicCompoundExplorer />}
             {explorer === "covalent" && <CovalentBondExplorer />}
-            {explorer === "cylinder" && <GraduatedCylinder />}
-            {explorer === "ruler" && <PrecisionRuler />}
+            {explorer === "cylinder" && <MeasurementComparison instrument="cylinder" />}
+            {explorer === "ruler" && <MeasurementComparison instrument="ruler" />}
             {!hasActivityContent(type) && (
               <div className="space-y-2 text-muted-foreground" role="status">
                 <p>This activity’s exercise is not available yet.</p>
@@ -78,7 +84,41 @@ export default async function AssignmentPage({ params }: {
             <p className="text-sm">Finished exploring? Save your participation below, then return to assignments or take an available quiz.</p>
             <AttemptControls key={latest.id} assignmentId={assignmentId} attemptId={latest.id} completed={false} />
           </section>}
-          {hasActivityContent(type) && <AttemptHistory attempts={attempts} />}
+          {hasActivityContent(type) && <AttemptHistory attempts={explorationAttempts} />}
+          {measurementQuizMode && (
+            <>
+              <section aria-label="Measurement quiz history" className="rounded-xl border border-border bg-card p-6">
+                <h2 className="text-xl font-semibold">Measurement quiz history</h2>
+                {measurementAttempts.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">No quiz attempts yet.</p>
+                ) : (
+                  <ol className="mt-4 space-y-3">
+                    {measurementAttempts.map((attempt) => (
+                      <li key={attempt.id} className="rounded-lg border border-border bg-muted p-3 text-sm">
+                        <p className="font-medium">
+                          {`${attempt.instrument === "cylinder" ? "Graduated cylinder" : "Ruler"} · ${attempt.precision_mode === "hundredths" ? "hundredths" : "tenths"} · Attempt ${attempt.attempt_number}`}
+                        </p>
+                        {attempt.status === "completed" ? (
+                          <p className="mt-1">
+                            {`${attempt.score ?? 0} of ${attempt.question_total ?? 0} correct · ${attempt.passed ? "Passed" : "Not passed"}`}
+                            {attempt.completed_at && (
+                              <> · completed <LocalizedTimestamp value={attempt.completed_at} /></>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="mt-1">In progress</p>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+              <section className="rounded-xl border border-border bg-card p-6">
+                <h2 className="mb-4 text-xl font-semibold">Measurement quiz</h2>
+                <MeasurementQuiz assignmentId={assignmentId} mode={measurementQuizMode.key} />
+              </section>
+            </>
+          )}
         </AssignmentAccess>
         {quizKind && <LewisQuizCard kind={quizKind} assignments={result.assignments} />}
       </div>

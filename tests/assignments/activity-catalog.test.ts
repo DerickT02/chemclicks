@@ -62,7 +62,7 @@ describe("activity catalog retrieval", () => {
       },
       {
         ...activities[1],
-        description: "Retired offering; use the tenths ruler",
+        description: "Read a 0–10 cm ruler to the nearest 0.01 cm",
         category: "Measurement",
       },
     ]);

@@ -32,7 +32,7 @@ describe("authorized closed-history reads", () => {
     expect(mocks.eq).toHaveBeenCalledWith("student_id", "student");
     expect(mocks.eq).toHaveBeenCalledWith("class_activity_id", "own");
     expect(mocks.eq).toHaveBeenCalledWith("progress_id", "own-progress");
-    expect(mocks.select).toHaveBeenCalledWith("id, attempt_number, status, started_at, completed_at");
+    expect(mocks.select).toHaveBeenCalledWith("*");
     expect(mocks.page).toHaveBeenCalledTimes(1);
   });
   it.each(["foreign", "future", "invalid", "inactive", "error"])("denies %s history before privileged reads", async kind => {

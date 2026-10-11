@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { submitQuizAction } from "@/app/(student)/student/quizzes/actions";
 import QuizShell from "@/components/quiz/QuizShell";
 import { pickRandomQuestions } from "@/components/quiz/random";
-import type { QuizCompleteResult, QuizQuestion } from "@/components/quiz/types";
+import type {
+  QuizCompleteResult,
+  QuizQuestion,
+  QuizAnswer,
+} from "@/components/quiz/types";
 
 type RandomizedQuizProps = {
   title: string;
@@ -13,6 +18,8 @@ type RandomizedQuizProps = {
   passingThresholdPercent?: number;
   loadError?: string | null;
   onComplete?: (result: QuizCompleteResult) => void;
+  assignmentId?: string;
+  quizKey?: string;
 };
 
 type AttemptSnapshot = {
@@ -27,10 +34,13 @@ export default function RandomizedQuiz({
   passingThresholdPercent = 80,
   loadError = null,
   onComplete,
+  assignmentId,
+  quizKey,
 }: RandomizedQuizProps) {
   // No randomness during SSR/hydration. Once drawn, this snapshot belongs to
   // the attempt, not the latest server response. Only an explicit retry clears it.
   const [attempt, setAttempt] = useState<AttemptSnapshot | null>(null);
+  const [submissionKey, setSubmissionKey] = useState<string | null>(null);
   const validCount = Number.isInteger(questionsPerAttempt) && questionsPerAttempt > 0;
 
   useEffect(() => {
@@ -43,6 +53,29 @@ export default function RandomizedQuiz({
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [attempt, pool, questionsPerAttempt, passingThresholdPercent, loadError, validCount]);
+
+  async function submitAnswers(answers: QuizAnswer[]): Promise<QuizCompleteResult> {
+    if (!assignmentId || !quizKey) {
+      throw new Error("This quiz is not linked to an assignment.");
+    }
+
+    const key = submissionKey
+      ?? window.crypto.randomUUID?.()
+      ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (!submissionKey) setSubmissionKey(key);
+
+    return submitQuizAction({
+      assignmentId,
+      quizKey,
+      submissionKey: key,
+      answers,
+    });
+  }
+
+  function retryQuiz() {
+    setSubmissionKey(null);
+    setAttempt(null);
+  }
 
   if (attempt) {
     return (
@@ -58,7 +91,8 @@ export default function RandomizedQuiz({
           questions={attempt.questions}
           passingThresholdPercent={attempt.passingThresholdPercent}
           onComplete={onComplete}
-          onRetry={() => setAttempt(null)}
+          onSubmit={assignmentId && quizKey ? submitAnswers : undefined}
+          onRetry={retryQuiz}
         />
       </>
     );

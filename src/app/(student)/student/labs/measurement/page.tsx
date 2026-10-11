@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
-import PrecisionRuler from "@/components/measurement/PrecisionRuler";
+import MeasurementComparison from "@/components/measurement/MeasurementComparison";
 
 export const metadata: Metadata = {
   title: "Measurement Lab | ChemClicks",
-  description: "Practice graduated-cylinder readings and a tenths-only 0–10 cm ruler.",
+  description: "Compare ruler and graduated cylinder scales to explore measurement precision.",
 };
 
 // Activities must be opened through a class assignment with server access checks.
@@ -29,20 +28,13 @@ export default function MeasurementLabPage() {
         </header>
 
         <article className="rounded-xl border border-border bg-card p-6">
-          <h2 className="font-semibold text-foreground">Graduated Cylinder</h2>
-          <p className="mt-2 mb-6 text-sm text-muted-foreground">
-            Read at the bottom of the meniscus. Drag to set the water level.
-          </p>
-          <GraduatedCylinder />
+          <h2 className="mb-4 font-semibold text-foreground">Ruler</h2>
+          <MeasurementComparison instrument="ruler" />
         </article>
 
         <article className="rounded-xl border border-border bg-card p-6">
-          <h2 className="font-semibold text-foreground">Ruler — Tenths</h2>
-          <p className="mt-2 mb-6 text-sm text-muted-foreground">
-            Drag the cursor, or focus it and use the arrow keys, to read the 0–10 cm ruler
-            to the nearest tenth of a centimeter (0.1 cm).
-          </p>
-          <PrecisionRuler />
+          <h2 className="mb-4 font-semibold text-foreground">Graduated Cylinder</h2>
+          <MeasurementComparison instrument="cylinder" />
         </article>
       </div>
     </div>

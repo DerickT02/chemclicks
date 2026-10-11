@@ -36,7 +36,6 @@ const question = {
   id: "lewis-n2-bond",
   question: "How many bonds?",
   options: ["Single", "Triple"],
-  correctIndex: 1,
 };
 
 beforeEach(() => {
@@ -76,7 +75,7 @@ describe.each([
 
     expect(listQuestions).toHaveBeenCalledWith(expect.anything(), quizKey);
     expect(html).toContain(`${title} with 3 questions`);
-    expect(html).toContain("Quiz results are not saved or visible to your teacher.");
+    expect(html).toContain("Your score is saved for your teacher when you finish.");
     expect(html).toContain('href="/student"');
     expect(html).not.toContain("before moving on");
     expect(html).not.toContain('role="alert"');

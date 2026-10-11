@@ -57,7 +57,7 @@ describe("student dashboard work queue", () => {
     expect(output).toContain("Period A");
     for (const text of ["To do (1)", "In progress (1)", "Completed explorations (1)", "Open to start",
       "Resume exploration", "Review exploration", "Exploration completion saved", "This is not a quiz grade",
-      "Use Start exploration inside an activity to track your work", "Quiz answers and results are not saved or visible to your teacher",
+      "Use Start exploration inside an activity to track your work", "Scores from assigned quizzes you finish are saved for your teacher",
       "Explore untracked practice", "Refresh assignments"]) expect(output).toContain(text);
     for (const id of ["todo", "resume", "review"]) expect(output).toContain(`href="/student/assignments/${id}"`);
   });

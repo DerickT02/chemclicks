@@ -18,7 +18,8 @@ export default async function AssignmentHistoryPage({ params }: { params: Promis
   // eslint-disable-next-line react-hooks/purity -- Request-time Server Component availability check.
   const status = scheduleStatus(assignment, Date.now());
   const readable = status === "Open" || status === "Closed";
-  const attempts = readable ? await getAssignmentAttempts(assignmentId) : [];
+  // Quiz attempts share the table; this page lists exploration participation only.
+  const attempts = (readable ? await getAssignmentAttempts(assignmentId) : []).filter(attempt => !attempt.quiz_key);
   const completed = attempts.some(attempt => attempt.status === "completed");
 
   return (

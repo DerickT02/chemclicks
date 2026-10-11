@@ -9,6 +9,8 @@ import MeasurementQuestionsPage from "../../src/app/(student)/student/labs/measu
 
 import LewisLabPage from "@/app/(student)/student/labs/lewis/page";
 
+// The measurement quiz imports its assignment server actions; unit tests never run them.
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/assignments/lewis-quiz-access", () => ({
   getLewisQuizAccess: async () => ({ status: "available" }),
 }));
@@ -59,7 +61,7 @@ describe("route page behavior", () => {
     expect(html).toContain('href="/student/quizzes/ionic"');
     expect(html).not.toContain('href="/student/quizzes/lewis"');
     expect(html).toContain("Untracked practice");
-    expect(html).toContain("Quiz results are not saved or visible to your teacher.");
+    expect(html).toContain("Your score is saved for your teacher when you finish.");
   });
 
   it("links the measurement lab to its practice questions", () => {
@@ -67,6 +69,15 @@ describe("route page behavior", () => {
 
     expect(html).toContain('href="/student/labs/measurement/questions"');
     expect(html).toContain("Practice measurement questions");
+  });
+
+  it("offers only the tenths ruler in the measurement lab", () => {
+    const html = renderToStaticMarkup(<MeasurementLabPage />);
+
+    expect(html).toContain("Ruler — Tenths");
+    expect(html).toContain("nearest tenth of a centimeter");
+    expect(html).toContain('aria-valuetext="5.0 centimeters"');
+    expect(html.toLowerCase()).not.toContain("hundredth");
   });
 
   it("renders the measurement questions page with the instrument chooser", () => {

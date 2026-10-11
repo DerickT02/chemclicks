@@ -46,7 +46,7 @@ function toQuizQuestion(row: QuizQuestionRow): QuizQuestion | null {
     id: row.question_key,
     question: row.question,
     options: row.options,
-    correctIndex: row.correct_index,
+    answerOrder: row.options.map((_, index) => index),
   };
 }
 

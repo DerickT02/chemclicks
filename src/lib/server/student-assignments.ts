@@ -7,8 +7,8 @@ import type { StudentAttempt } from '@/lib/db/student_attempts'
 
 export type ExplorationAttempt = Pick<StudentAttempt, 'id' | 'attempt_number' | 'status' | 'started_at' | 'completed_at'>
 
-/** Own saved exploration history, including closed work; never returns exercise content or permits writes. */
-export async function getAssignmentAttempts(assignmentId: string): Promise<ExplorationAttempt[]> {
+/** Own saved exploration and quiz attempts, including closed work; never returns exercise content or permits writes. */
+export async function getAssignmentAttempts(assignmentId: string): Promise<StudentAttempt[]> {
   const session = await getStudentSession()
   if (!session) throw new Error('Please sign in as a student.')
   const assignments = await getStudentAssignmentSchedules()
@@ -20,9 +20,9 @@ export async function getAssignmentAttempts(assignmentId: string): Promise<Explo
   if (error) throw new Error('Progress could not be loaded.')
   if (!progress) return []
   const { data, error: attemptError } = await client.from('student_attempts')
-    .select('id, attempt_number, status, started_at, completed_at')
+    .select('*')
     .eq('progress_id', progress.id).order('attempt_number', { ascending: false })
-    .returns<ExplorationAttempt[]>()
+    .returns<StudentAttempt[]>()
   if (attemptError || data === null) throw new Error('Attempts could not be loaded.')
   return data
 }

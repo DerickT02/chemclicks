@@ -47,7 +47,7 @@ describe("bounded classroom onboarding", () => {
     render(<CreateClass />); field("Class name", "Chemistry A"); field("Class code", "abc123");
     fireEvent.click(screen.getByRole("button", { name: "Create class" }));
     await vi.waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/admin?classId=class-id&classCreated=1"));
-    expect(mocks.create).toHaveBeenCalledWith({ className: "Chemistry A", section: "", classCode: "ABC123" });
+    expect(mocks.create).toHaveBeenCalledWith({ className: "Chemistry A", section: "", classCode: "ABC123", codeSource: "manual" });
   });
   it("locks repeat creation while pending and preserves a draft after transport failure", async () => {
     let reject!: (reason: Error) => void;

@@ -9,6 +9,7 @@ export type ClassActivity = {
   closes_at: string | null    // ISO 8601 timestamp, optional
   passing_threshold: number   // 1–100, defaults to 70
   created_at: string          // ISO 8601 timestamp, auto-set
+  archived_at: string | null  // When set, hidden from students and assign catalog
 }
 
 export type InsertClassActivity = Pick<ClassActivity, 'class_id' | 'activity_id'> &
@@ -17,7 +18,8 @@ Partial<Pick<ClassActivity, 'opens_at' | 'closes_at'>>
 export type UpdateClassActivity = Partial<Pick<ClassActivity, 'opens_at' | 'closes_at'>>
 
 
-const assignmentFields = 'id, class_id, activity_id, opens_at, closes_at, passing_threshold, created_at'
+const assignmentFields =
+  'id, class_id, activity_id, opens_at, closes_at, passing_threshold, created_at, archived_at'
 
 type AssignmentError = {
   code: string
@@ -63,6 +65,7 @@ export async function getClassActivities(supabase: SupabaseClient,classId: strin
     .from('class_activities')
     .select(assignmentFields)
     .eq('class_id', classId)
+    .is('archived_at', null)
     .order('created_at', { ascending: false })
     .order('id')
     .returns<ClassActivity[]>()
@@ -132,6 +135,9 @@ export async function updateClassActivity(
     }
 
     const current = existing as ClassActivity
+    if (current.archived_at) {
+      return failure('NOT_FOUND', 'This assignment is archived and cannot be edited.')
+    }
     if (expected && (current.class_id !== expected.class_id || current.activity_id !== expected.activity_id
       || current.opens_at !== expected.opens_at || current.closes_at !== expected.closes_at)) {
       return failure('CONFLICT', 'The schedule changed. Refresh the page, then reopen the editor before trying again.')
@@ -163,3 +169,28 @@ export async function updateClassActivity(
       error: null,
     }
   }
+
+export async function archiveClassActivity(
+  supabase: SupabaseClient,
+  assignmentId: string,
+): Promise<AssignmentResult<{ id: string }>> {
+  if (!isUuid(assignmentId)) {
+    return failure('VALIDATION_ERROR', 'Select a valid assignment.')
+  }
+
+  const archivedAt = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('class_activities')
+    .update({ archived_at: archivedAt })
+    .eq('id', assignmentId)
+    .is('archived_at', null)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { data: null, error }
+  if (!data) {
+    return failure('NOT_FOUND', 'Assignment not found or you do not have access.')
+  }
+
+  return { data: data as { id: string }, error: null }
+}

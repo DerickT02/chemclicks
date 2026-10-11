@@ -7,6 +7,8 @@ export function parseUtcInput(value: string): string | null {
   if (!value) return null;
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(value);
   if (!match) throw new Error("Invalid date.");
+  const year = Number(value.slice(0, 4));
+  if (year < 2000 || year > 2099) throw new Error("Invalid date.");
   const normalized = `${match[1]}:${match[2] ?? "00"}.${(match[3] ?? "").padEnd(3, "0")}Z`;
   const date = new Date(normalized);
   if (!Number.isFinite(date.getTime()) || date.toISOString() !== normalized) throw new Error("Invalid date.");
