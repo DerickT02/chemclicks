@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTeacherId } from "@/lib/server/teacher";
-import { insertClassActivity, updateClassActivity } from "@/lib/db/class_activities";
+import {
+  archiveClassActivity,
+  insertClassActivity,
+  updateClassActivity,
+} from "@/lib/db/class_activities";
 
 export type AssignmentFormState = { status: "idle" | "success" | "error"; message: string; };
 
@@ -21,6 +25,11 @@ function parseUtcInput(value: string): string | null {
   if (!value) return null;
 
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value)) {
+    throw new Error("Invalid date.");
+  }
+
+  const year = Number(value.slice(0, 4));
+  if (year < 2000 || year > 2099) {
     throw new Error("Invalid date.");
   }
 
@@ -96,6 +105,7 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
          .eq("id", assignmentId)
          .eq("class_id", classId)
          .eq("activity_id", activityId)
+         .is("archived_at", null)
          .maybeSingle();
 
        if (error || !assignment) {
@@ -171,3 +181,93 @@ export async function saveAssignment(_previousState: AssignmentFormState, formDa
          message: assignmentId ? "Dates updated." : "Activity assigned.",
        };
      }
+
+export async function unassignActivity(
+  _previousState: AssignmentFormState,
+  formData: FormData,
+): Promise<AssignmentFormState> {
+  const classId = readString(formData, "class_id");
+  const assignmentId = readString(formData, "assignment_id");
+
+  if (!isUuid(classId) || !isUuid(assignmentId)) {
+    return {
+      status: "error",
+      message: "This assignment could not be removed.",
+    };
+  }
+
+  try {
+    const supabase = await createClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authData.user) {
+      return {
+        status: "error",
+        message: "Please sign in again.",
+      };
+    }
+
+    const { data: ownedClass, error: classError } = await supabase
+      .from("classes")
+      .select("id")
+      .eq("id", classId)
+      .eq("teacher_id", authData.user.id)
+      .maybeSingle();
+
+    if (classError || !ownedClass) {
+      return {
+        status: "error",
+        message: "You cannot manage assignments for this class.",
+      };
+    }
+
+    const { data: assignment, error: assignmentError } = await supabase
+      .from("class_activities")
+      .select("id, archived_at")
+      .eq("id", assignmentId)
+      .eq("class_id", classId)
+      .maybeSingle();
+
+    if (assignmentError || !assignment || assignment.archived_at) {
+      return {
+        status: "error",
+        message: "Assignment not found or you do not have access.",
+      };
+    }
+
+    await requireTeacherId();
+    const writer = createAdminClient();
+    const result = await archiveClassActivity(writer, assignmentId);
+
+    if (result.error) {
+      const { code, message } = result.error;
+      return {
+        status: "error",
+        message:
+          code === "VALIDATION_ERROR" || code === "NOT_FOUND"
+            ? message
+            : "The assignment could not be archived. Please try again.",
+      };
+    }
+
+    if (!result.data) {
+      return {
+        status: "error",
+        message: "The assignment could not be archived.",
+      };
+    }
+  } catch {
+    return {
+      status: "error",
+      message: "The assignment could not be archived. Please try again.",
+    };
+  }
+
+  revalidatePath("/admin");
+
+  return {
+    status: "success",
+    message:
+      "Activity archived. Attempt history remains under Activity attempts. Assign again to start a new assignment.",
+  };
+}

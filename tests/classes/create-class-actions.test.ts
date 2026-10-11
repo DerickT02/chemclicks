@@ -5,6 +5,7 @@ const mock = vi.hoisted(() => ({
   teacher: vi.fn(),
   getUser: vi.fn(),
   find: vi.fn(),
+  hasName: vi.fn(),
   insert: vi.fn(),
   random: vi.fn(),
   requestClient: { name: "request" },
@@ -19,6 +20,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mock.adminClie
 vi.mock("@/lib/db/classes", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/db/classes")>()),
   findClassByCode: mock.find,
+  teacherHasClassNamed: mock.hasName,
   insertClass: mock.insert,
 }));
 vi.mock("@/lib/classes/class-code", async (importOriginal) => ({
@@ -43,6 +45,7 @@ beforeEach(() => {
   mock.teacher.mockResolvedValue("teacher-a");
   mock.getUser.mockResolvedValue({ data: { user: { id: "teacher-a" } }, error: null });
   mock.find.mockResolvedValue({ exists: false, error: null });
+  mock.hasName.mockResolvedValue({ exists: false, error: null });
   mock.insert.mockImplementation(async (_client, row) => inserted(row.class_code));
 });
 
@@ -157,5 +160,73 @@ describe("createClass", () => {
     const result = await createClass({ ...input, codeSource: "other" as "manual" });
     expect(result.ok).toBe(false);
     expect(mock.random).not.toHaveBeenCalled();
+  });
+});
+
+describe("createClass name/section uniqueness", () => {
+  const duplicateNameSection = {
+    code: "23505",
+    message: 'duplicate key value violates unique constraint "classes_teacher_name_section_norm_key"',
+    details: "Key (teacher_id, ...)=(teacher-a, chem 3, room 204) already exists.",
+  };
+
+  it("rejects the teacher's existing name/section pair without creating a class", async () => {
+    mock.hasName.mockResolvedValue({ exists: true, error: null });
+
+    const result = await createClass(input);
+    expect(result).toEqual({
+      ok: false,
+      field: "nameSection",
+      message: expect.stringContaining("Change the name or section"),
+    });
+    expect(mock.hasName).toHaveBeenCalledWith(mock.adminClient, "teacher-a", "Chem 3", "Room 204");
+    expect(mock.insert).not.toHaveBeenCalled();
+  });
+
+  it("allows the same name with a different section", async () => {
+    mock.hasName.mockImplementation(async (_client, _teacher, _name, section: string) => ({
+      exists: section === "Room 204",
+      error: null,
+    }));
+
+    const result = await createClass({ ...input, section: "Room 105" });
+    expect(result).toEqual({ ok: true, classId: "class-1", classCode: "A1B2C3" });
+    expect(mock.insert).toHaveBeenCalledWith(
+      mock.adminClient,
+      expect.objectContaining({ name: "Chem 3", section: "Room 105" }),
+    );
+  });
+
+  it("saves a unique pair with whitespace normalized", async () => {
+    const result = await createClass({ ...input, className: "  Chem   3 ", section: " Room \t 204 " });
+
+    expect(result.ok).toBe(true);
+    expect(mock.insert).toHaveBeenCalledWith(
+      mock.adminClient,
+      expect.objectContaining({ name: "Chem 3", section: "Room 204" }),
+    );
+  });
+
+  it("maps a concurrent database conflict to the field error without retrying or leaking details", async () => {
+    mock.insert.mockResolvedValue({ data: null, error: duplicateNameSection });
+
+    const result = await createClass({ ...input, codeSource: "generated" });
+    expect(result).toEqual({
+      ok: false,
+      field: "nameSection",
+      message: expect.stringContaining("already have a class"),
+    });
+    expect(mock.insert).toHaveBeenCalledTimes(1);
+    expect(mock.random).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toMatch(/23505|constraint|teacher-a|Key \(/);
+  });
+
+  it("does not expose pre-check lookup errors", async () => {
+    mock.hasName.mockResolvedValue({ exists: false, error: { message: "private details" } });
+
+    const result = await createClass(input);
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(result)).not.toContain("private details");
+    expect(mock.insert).not.toHaveBeenCalled();
   });
 });

@@ -7,15 +7,18 @@ import {
   describeChargeBalance,
   describeFormation,
   describeIon,
-  formatCharge,
+  formatChargeLabel,
   formatChargeValue,
   formatIonSymbol,
   formatSignedTotalCharge,
   getAtomRatio,
   getChargeTotals,
+  getFormulaUnitIons,
   getTransferredElectrons,
   ION_VOCABULARY,
   type Ion,
+  type IonicCompound,
+  type IonRole,
 } from "@/lib/chemistry/ionic-compounds";
 
 type DiagramSide = "top" | "right" | "bottom" | "left";
@@ -81,7 +84,51 @@ function IonSymbol({ ion }: { ion: Ion }) {
   );
 }
 
-function IonColumn({ ion, role }: { ion: Ion; role: "cation" | "anion" }) {
+/** An ion after electron transfer: its Lewis tile in brackets with the charge attached. */
+function BracketedIon({ ion, role }: { ion: Ion; role: IonRole }) {
+  const isCation = role === "cation";
+
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="relative shrink-0 rounded-sm border-x-2 border-muted-foreground/60 px-1"
+      >
+        <LewisTile
+          symbol={ion.symbol}
+          keptElectrons={isCation ? 0 : ion.valenceElectrons}
+          gainedElectrons={isCation ? 0 : Math.abs(ion.charge)}
+        />
+        <span className="absolute left-full -top-2 ml-1 text-sm font-semibold text-foreground">
+          {formatChargeLabel(ion.charge)}
+        </span>
+      </div>
+      <span className="sr-only">{describeIon(ion)}</span>
+    </>
+  );
+}
+
+function CombinedCompound({ compound }: { compound: IonicCompound }) {
+  return (
+    <div className="flex w-full flex-col items-center gap-3">
+      <p className="text-xs font-medium text-muted-foreground">
+        Combined compound: one formula unit of {compound.formula}
+      </p>
+      <ul
+        aria-label={`Ions in one formula unit of ${compound.name.toLowerCase()}`}
+        className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4"
+      >
+        {getFormulaUnitIons(compound).map(({ id, role, ion }) => (
+          <li key={id} className="flex">
+            <BracketedIon ion={ion} role={role} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function IonColumn({ ion, role }: { ion: Ion; role: IonRole }) {
   const isCation = role === "cation";
   const electronsMoved = Math.abs(ion.charge);
   const electronLabel = electronsMoved === 1 ? "electron" : "electrons";
@@ -99,16 +146,7 @@ function IonColumn({ ion, role }: { ion: Ion; role: "cation" | "anion" }) {
           →
         </span>
 
-        <div className="relative shrink-0 rounded-sm border-x-2 border-muted-foreground/60 px-1">
-          <LewisTile
-            symbol={ion.symbol}
-            keptElectrons={isCation ? 0 : ion.valenceElectrons}
-            gainedElectrons={isCation ? 0 : electronsMoved}
-          />
-          <span className="absolute -right-4 -top-2 text-sm font-semibold text-foreground">
-            {formatCharge(ion.charge)}
-          </span>
-        </div>
+        <BracketedIon ion={ion} role={role} />
       </div>
 
       <p className="text-center text-xs font-medium text-accent">
@@ -216,7 +254,7 @@ export default function IonicCompoundExplorer() {
               count {anion.count}
             </span>
           </DetailRow>
-          <DetailRow label="Atom ratio">
+          <DetailRow label="Ion ratio">
             {cation.symbol} : {anion.symbol} = {getAtomRatio(compound).replace(":", " : ")}
           </DetailRow>
           <DetailRow label="Charge balance">{describeChargeBalance(compound)}</DetailRow>
@@ -277,9 +315,13 @@ export default function IonicCompoundExplorer() {
           </div>
 
           <p aria-hidden="true" className="text-center text-base font-semibold text-foreground">
-            {cation.count} {formatIonSymbol(cation)} + {anion.count} {formatIonSymbol(anion)} →{" "}
-            {compound.formula}
+            {/* Coefficients of 1 are left unwritten, as in any balanced equation. */}
+            {cation.count > 1 && `${cation.count} `}
+            {formatIonSymbol(cation)} + {anion.count > 1 && `${anion.count} `}
+            {formatIonSymbol(anion)} → {compound.formula}
           </p>
+
+          <CombinedCompound compound={compound} />
 
           <figcaption
             id={descriptionId}

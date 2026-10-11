@@ -5,11 +5,13 @@ import {
   describeFormation,
   describeIon,
   formatCharge,
+  formatChargeLabel,
   formatChargeValue,
   formatIonSymbol,
   getAtomRatio,
   formatSignedTotalCharge,
   getChargeTotals,
+  getFormulaUnitIons,
   getNetCharge,
   getTransferredElectrons,
   isChargeBalanced,
@@ -80,6 +82,26 @@ describe("ionic compound examples", () => {
   });
 });
 
+describe("formula unit ions", () => {
+  it.each([
+    ["nacl", ["cation", "anion"]],
+    ["mgo", ["cation", "anion"]],
+    ["caf2", ["anion", "cation", "anion"]],
+    ["al2o3", ["anion", "cation", "anion", "cation", "anion"]],
+  ])("%s lists every ion once, alternating around the minority ion", (id, roles) => {
+    const compound = compoundById(id);
+    const ions = getFormulaUnitIons(compound);
+
+    expect(ions.map((item) => item.role)).toEqual(roles);
+    expect(ions.filter((item) => item.role === "cation")).toHaveLength(compound.cation.count);
+    expect(ions.filter((item) => item.role === "anion")).toHaveLength(compound.anion.count);
+    for (const item of ions) {
+      expect(item.ion).toBe(item.role === "cation" ? compound.cation : compound.anion);
+    }
+    expect(new Set(ions.map((item) => item.id)).size).toBe(ions.length);
+  });
+});
+
 describe("ion formatting", () => {
   it("writes ion symbols with superscript charges", () => {
     expect(formatIonSymbol(compoundById("nacl").cation)).toBe("Na⁺");
@@ -93,6 +115,13 @@ describe("ion formatting", () => {
     expect(formatCharge(-2)).toBe("²⁻");
     expect(formatChargeValue(3)).toBe("+3");
     expect(formatChargeValue(-1)).toBe("−1");
+  });
+
+  it("writes bracket charge labels magnitude first, leaving out a 1", () => {
+    expect(formatChargeLabel(1)).toBe("+");
+    expect(formatChargeLabel(3)).toBe("3+");
+    expect(formatChargeLabel(-1)).toBe("−");
+    expect(formatChargeLabel(-2)).toBe("2−");
   });
 
   it("gives screen readers a text alternative for each ion", () => {
@@ -116,6 +145,7 @@ describe("explanations", () => {
     expect(text).toContain("gives up 3 electrons and becomes Al³⁺");
     expect(text).toContain("gains 2 electrons and becomes O²⁻");
     expect(text).toContain("6 electrons move in total");
+    expect(text).toContain("attraction between these oppositely charged ions is the ionic bond");
     expect(text).not.toContain("Na⁺");
     expect(text).not.toContain("Cl⁻");
   });

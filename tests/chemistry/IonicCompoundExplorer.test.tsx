@@ -8,14 +8,19 @@ import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 afterEach(cleanup);
 
 const SALTS = [
-  { button: "Sodium chloride, NaCl", name: "Sodium chloride", cation: "sodium ion, charge plus 1", anion: "chloride ion, charge minus 1", ratio: "Na : Cl = 1 : 1" },
-  { button: "Magnesium oxide, MgO", name: "Magnesium oxide", cation: "magnesium ion, charge plus 2", anion: "oxide ion, charge minus 2", ratio: "Mg : O = 1 : 1" },
-  { button: "Calcium fluoride, CaF2", name: "Calcium fluoride", cation: "calcium ion, charge plus 2", anion: "fluoride ion, charge minus 1", ratio: "Ca : F = 1 : 2" },
-  { button: "Aluminum oxide, Al2O3", name: "Aluminum oxide", cation: "aluminum ion, charge plus 3", anion: "oxide ion, charge minus 2", ratio: "Al : O = 2 : 3" },
+  { button: "Sodium chloride, NaCl", name: "Sodium chloride", formula: "NaCl", cation: "sodium ion, charge plus 1", anion: "chloride ion, charge minus 1", ratio: "Na : Cl = 1 : 1", cationIon: "Na+", anionIon: "Cl−", cationCount: 1, anionCount: 1 },
+  { button: "Magnesium oxide, MgO", name: "Magnesium oxide", formula: "MgO", cation: "magnesium ion, charge plus 2", anion: "oxide ion, charge minus 2", ratio: "Mg : O = 1 : 1", cationIon: "Mg2+", anionIon: "O2−", cationCount: 1, anionCount: 1 },
+  { button: "Calcium fluoride, CaF2", name: "Calcium fluoride", formula: "CaF₂", cation: "calcium ion, charge plus 2", anion: "fluoride ion, charge minus 1", ratio: "Ca : F = 1 : 2", cationIon: "Ca2+", anionIon: "F−", cationCount: 1, anionCount: 2 },
+  { button: "Aluminum oxide, Al2O3", name: "Aluminum oxide", formula: "Al₂O₃", cation: "aluminum ion, charge plus 3", anion: "oxide ion, charge minus 2", ratio: "Al : O = 2 : 3", cationIon: "Al3+", anionIon: "O2−", cationCount: 2, anionCount: 3 },
 ] as const;
 
 function details() {
   return screen.getByText("Compound name").closest("dl") as HTMLElement;
+}
+
+function combinedIons(name: string) {
+  const list = screen.getByRole("list", { name: `Ions in one formula unit of ${name.toLowerCase()}` });
+  return within(list).getAllByRole("listitem");
 }
 
 function detailRow(label: string) {
@@ -93,6 +98,90 @@ describe("IonicCompoundExplorer", () => {
     expect(detailRow("Anion")).toHaveTextContent("Oxide ion, charge −2, count 3");
     expect(screen.getByText("× 2 in each formula unit")).toBeInTheDocument();
     expect(screen.getByText("× 3 in each formula unit")).toBeInTheDocument();
+  });
+
+  it.each(SALTS)(
+    "brackets and charges every ion of $name in the combined compound",
+    async (salt) => {
+      const user = userEvent.setup();
+      render(<IonicCompoundExplorer />);
+
+      await user.click(screen.getByRole("button", { name: salt.button }));
+
+      expect(
+        screen.getByText(`Combined compound: one formula unit of ${salt.formula}`),
+      ).toBeInTheDocument();
+      const ions = combinedIons(salt.name);
+      expect(ions).toHaveLength(salt.cationCount + salt.anionCount);
+
+      const cations = ions.filter((item) => item.textContent?.includes(salt.cation));
+      const anions = ions.filter((item) => item.textContent?.includes(salt.anion));
+      expect(cations).toHaveLength(salt.cationCount);
+      expect(anions).toHaveLength(salt.anionCount);
+
+      // Each item is one bracketed ion whose charge label belongs to that ion only.
+      for (const item of cations) {
+        expect(item).toHaveTextContent(salt.cationIon);
+        expect(item).not.toHaveTextContent(salt.anion);
+      }
+      for (const item of anions) {
+        expect(item).toHaveTextContent(salt.anionIon);
+        expect(item).not.toHaveTextContent(salt.cation);
+      }
+    },
+  );
+
+  it("keeps each charge with the right ion when switching salts", async () => {
+    const user = userEvent.setup();
+    render(<IonicCompoundExplorer />);
+
+    await user.click(screen.getByRole("button", { name: "Aluminum oxide, Al2O3" }));
+    expect(combinedIons("Aluminum oxide")).toHaveLength(5);
+
+    await user.click(screen.getByRole("button", { name: "Sodium chloride, NaCl" }));
+
+    expect(
+      screen.queryByRole("list", { name: "Ions in one formula unit of aluminum oxide" }),
+    ).not.toBeInTheDocument();
+    const ions = combinedIons("Sodium chloride");
+    expect(ions).toHaveLength(2);
+    const [first, second] = ions;
+    expect(first).toHaveTextContent("Na+");
+    expect(first).toHaveTextContent("sodium ion, charge plus 1");
+    expect(second).toHaveTextContent("Cl−");
+    expect(second).toHaveTextContent("chloride ion, charge minus 1");
+  });
+
+  it("writes the formation equation without coefficients of 1", async () => {
+    const user = userEvent.setup();
+    render(<IonicCompoundExplorer />);
+
+    expect(screen.getByText("Na⁺ + Cl⁻ → NaCl")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Calcium fluoride, CaF2" }));
+    expect(screen.getByText("Ca²⁺ + 2 F⁻ → CaF₂")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Aluminum oxide, Al2O3" }));
+    expect(screen.getByText("2 Al³⁺ + 3 O²⁻ → Al₂O₃")).toBeInTheDocument();
+  });
+
+  it("calls the count ratio an ion ratio", () => {
+    render(<IonicCompoundExplorer />);
+
+    expect(detailRow("Ion ratio")).toHaveTextContent("Na : Cl = 1 : 1");
+    expect(screen.queryByText("Atom ratio")).not.toBeInTheDocument();
+  });
+
+  it("keeps the isolated-ion formation diagram alongside the combined compound", async () => {
+    const user = userEvent.setup();
+    render(<IonicCompoundExplorer />);
+
+    await user.click(screen.getByRole("button", { name: "Calcium fluoride, CaF2" }));
+
+    expect(screen.getByRole("img", { name: /Diagram of calcium fluoride/ })).toBeInTheDocument();
+    expect(screen.getByText("× 1 in each formula unit")).toBeInTheDocument();
+    expect(screen.getByText("× 2 in each formula unit")).toBeInTheDocument();
+    expect(combinedIons("Calcium fluoride")).toHaveLength(3);
   });
 
   it("gives the diagram a grammatical text alternative for one and several electrons", async () => {
