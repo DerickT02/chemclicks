@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type {
   QuizAnswer,
   QuizCompleteResult,
@@ -23,6 +23,12 @@ export default function QuizShell({
   onRetry,
 }: QuizShellProps) {
   const groupId = useId();
+  // A ref, not state: state updates aren't visible to a second click handler
+  // that fires before React re-renders, so a rapid double-click on Submit
+  // could run this function twice and append the same question's answer
+  // twice. A ref is mutated synchronously, so the second call sees it
+  // immediately regardless of render timing.
+  const isSubmittingRef = useRef(false);
   const [index, setIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -81,18 +87,23 @@ export default function QuizShell({
   }
 
   async function handleSubmit() {
-    if (selectedIndex === null || submitted) return;
+    if (selectedIndex === null || submitted || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
-    const answer: QuizAnswer = {
-      questionId: current.id,
-      selectedIndex: current.answerOrder?.[selectedIndex] ?? selectedIndex,
-    };
-    const nextAnswers = [...answers, answer];
-    setAnswers(nextAnswers);
-    setSubmitted(true);
+    try {
+      const answer: QuizAnswer = {
+        questionId: current.id,
+        selectedIndex: current.answerOrder?.[selectedIndex] ?? selectedIndex,
+      };
+      const nextAnswers = [...answers, answer];
+      setAnswers(nextAnswers);
+      setSubmitted(true);
 
-    if (index === total - 1) {
-      await saveFinalResult(nextAnswers);
+      if (index === total - 1) {
+        await saveFinalResult(nextAnswers);
+      }
+    } finally {
+      isSubmittingRef.current = false;
     }
   }
 
