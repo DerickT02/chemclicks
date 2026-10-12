@@ -74,7 +74,7 @@ describe("mocked assign → open → finish contract (not a live deployment chec
 
     mocks.assignments.mockResolvedValue({ status: "ok", assignments: [{
       id: assignmentId, opens_at: null, closes_at: null,
-      activity: { id: activityId, title: definition.title, type: type as ActivityType, order_index: 1 },
+      activity: { id: activityId, title: "Assigned activity", type: type as ActivityType, order_index: 1 },
     }] });
     const html = renderToStaticMarkup(await AssignmentPage({ params: Promise.resolve({ assignmentId }) }));
     expect(html).toContain(`Explorer: ${definition.explorer}`);

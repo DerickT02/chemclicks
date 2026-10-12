@@ -1,7 +1,7 @@
 "use client";
 
 import type { ActivityCatalogEntry } from "@/lib/db/activities";
-import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
+import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 
 type Props = {
   /** Activities the teacher can still assign (already-assigned entries excluded). */
@@ -18,10 +18,7 @@ export default function ActivityCatalog({
   selectedActivityId,
   onSelect,
 }: Props) {
-  const visibleActivities = activities.filter((activity) =>
-    getActivityDefinition(activity.type)?.showInCatalog !== false,
-  );
-  if (visibleActivities.length === 0) {
+  if (activities.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
         {totalCatalogCount > 0
@@ -42,7 +39,7 @@ export default function ActivityCatalog({
         ) : null}
       </legend>
       <div className="grid gap-3 sm:grid-cols-2">
-        {visibleActivities.map((activity) => {
+        {activities.map((activity) => {
           const blockReason = getNewAssignmentBlockReason(activity.type);
           const disabled = Boolean(blockReason);
           const isSelected = !disabled && selectedActivityId === activity.id;

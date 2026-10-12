@@ -1,5 +1,4 @@
 import type { ActivityType } from "@/lib/db/activities";
-import { getActivityDefinition } from "@/lib/activities/registry";
 import { LEWIS_COVALENT_QUIZ_KEY, LEWIS_IONIC_QUIZ_KEY } from "@/lib/db/quiz-questions";
 
 export type LewisQuizKind = "covalent" | "ionic";
@@ -31,6 +30,6 @@ export const LEWIS_QUIZZES: Record<LewisQuizKind, LewisQuizConfig> = {
 };
 
 export function lewisQuizForLesson(type: ActivityType): LewisQuizKind | null {
-  const quiz = getActivityDefinition(type)?.quiz;
-  return quiz === "covalent" || quiz === "ionic" ? quiz : null;
+  const kinds = Object.keys(LEWIS_QUIZZES) as LewisQuizKind[];
+  return kinds.find((kind) => LEWIS_QUIZZES[kind].lessonType === type) ?? null;
 }
