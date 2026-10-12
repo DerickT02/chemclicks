@@ -11,9 +11,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/assignments/bohr-quiz-access", () => ({
   getBohrQuizAccess: getAccess,
 }));
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({}),
-}));
+const adminClient = vi.hoisted(() => ({ role: "admin" }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_QUIZ_KEY: "bohr_models",
   listQuizQuestions: listQuestions,
@@ -49,12 +48,22 @@ describe("Bohr quiz page", () => {
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
+  it("does not read questions while the quiz is locked", async () => {
+    getAccess.mockResolvedValue({ status: "locked" });
+
+    const html = renderToStaticMarkup(await BohrModelQuizPage());
+
+    expect(html).toContain("This quiz is locked");
+    expect(listQuestions).not.toHaveBeenCalled();
+  });
+
   it("loads the questions from the database and hands them to the quiz", async () => {
     listQuestions.mockResolvedValue({ data: [question, question], error: null });
 
     const html = renderToStaticMarkup(await BohrModelQuizPage());
 
-    expect(listQuestions).toHaveBeenCalledWith(expect.anything(), "bohr_models");
+    // The server's own client: student sessions are not allowed to read the rows.
+    expect(listQuestions).toHaveBeenCalledWith(adminClient, "bohr_models");
     expect(html).toContain("Quiz with 2 questions");
     expect(html).not.toContain("Check your understanding");
     expect(html).not.toContain("Back to");

@@ -180,3 +180,19 @@ describe("Lewis quiz question restriction migration", () => {
     );
   });
 });
+
+describe("Bohr quiz question restriction migration", () => {
+  const sql = readMigration("20261012060000_restrict_bohr_quiz_questions.sql")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+  it("hides the Bohr pool from client sessions and keeps the Lewis pools hidden", () => {
+    expect(sql).toContain(
+      "using (is_active and quiz_key not in ('bohr_models', 'lewis_bonding', 'lewis_covalent', 'lewis_ionic'))",
+    );
+  });
+
+  it("only replaces the read policy", () => {
+    expect(sql).not.toMatch(/\b(grant|update|delete|insert)\b/);
+  });
+});
