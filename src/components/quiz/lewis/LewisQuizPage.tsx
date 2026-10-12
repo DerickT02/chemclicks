@@ -33,9 +33,6 @@ export default async function LewisQuizPage({ kind }: Props) {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-foreground">{title}</h1>
-          <p className="text-sm text-muted-foreground">
-            Check your understanding. Your score is saved for your teacher when you finish.
-          </p>
         </header>
 
         {access.status === "error" ? (

@@ -51,9 +51,6 @@ export default async function BohrModelQuizPage() {
           <h1 className="text-3xl font-semibold text-foreground">
             Bohr Models Quiz
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Check your understanding. Your score is saved for your teacher when you finish.
-          </p>
         </header>
 
         <BohrModelsQuiz
