@@ -29,6 +29,17 @@ describe('teacher report', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
     for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 exploration attempt', '1 quiz attempt', '4/5 · Passed', '1 completed', '1 in progress', 'Ruler', 'Not completed', '2026-09-23 12:00:00 UTC', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
   })
+  it('names each quiz and shows its score instead of the stored quiz key', () => {
+    const quizAttempt = (id: string, quizKey: string, score: number, passed: boolean) => ({
+      id, attemptNumber: 1, status: 'completed' as const, startedAt: '2026-09-23T12:00:00Z', completedAt: '2026-09-23T12:05:00Z',
+      kind: 'quiz' as const, quizKey, score, questionTotal: 12, percentage: (score / 12) * 100, passed,
+    })
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[1], attempts: [quizAttempt('a', 'bohr_models', 4, false), quizAttempt('b', 'lewis_ionic', 11, true), quizAttempt('c', 'future_quiz', 12, true)],
+    }] }} />)
+    for (const text of ['Bohr Models Quiz', '4/12 · Not passed', 'Ionic Compounds Quiz', '11/12 · Passed', '12/12 · Passed']) expect(html).toContain(text)
+    for (const key of ['bohr_models', 'lewis_ionic', 'future_quiz']) expect(html).not.toContain(key)
+  })
   it('loads the explicitly selected assignment and keeps it selected', async () => {
     const html = renderToStaticMarkup(await Page(props('second')))
     expect(mock.summary).toHaveBeenCalledWith('class', 'second')

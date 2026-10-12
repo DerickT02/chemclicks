@@ -1,6 +1,15 @@
 import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
 
 import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
+import { LEWIS_QUIZZES } from '@/lib/assignments/lewis-quizzes'
+import { BOHR_QUIZ_KEY } from '@/lib/db/quiz-questions'
+
+// Names a teacher recognises; the stored key is an internal identifier.
+const QUIZ_TITLES: Record<string, string> = {
+  [BOHR_QUIZ_KEY]: 'Bohr Models Quiz',
+  [LEWIS_QUIZZES.covalent.quizKey]: LEWIS_QUIZZES.covalent.title,
+  [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
+}
 
 export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
   return (
@@ -38,13 +47,13 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                               <>
                                 {attempt.instrument === 'cylinder' ? 'Graduated cylinder' : 'Ruler'}
                                 {attempt.precisionMode && ` · ${attempt.precisionMode}`}
-                                {attempt.score !== null && attempt.score !== undefined && attempt.questionTotal !== null && attempt.questionTotal !== undefined && (
-                                  <span className="block">
-                                    {`${attempt.score}/${attempt.questionTotal} · ${attempt.passed ? 'Passed' : 'Not passed'}`}
-                                  </span>
-                                )}
                               </>
-                            ) : attempt.quizKey ? `Quiz · ${attempt.quizKey}` : 'Exploration'}
+                            ) : attempt.quizKey ? (Object.hasOwn(QUIZ_TITLES, attempt.quizKey) ? QUIZ_TITLES[attempt.quizKey] : 'Quiz') : 'Exploration'}
+                            {attempt.score !== null && attempt.score !== undefined && attempt.questionTotal !== null && attempt.questionTotal !== undefined && (
+                              <span className="block">
+                                {`${attempt.score}/${attempt.questionTotal} · ${attempt.passed ? 'Passed' : 'Not passed'}`}
+                              </span>
+                            )}
                           </td>
                           <td className="p-2">{attempt.status === 'completed' ? 'Completed' : 'In progress'}</td>
                           <td className="whitespace-nowrap p-2"><LocalizedTimestamp value={attempt.startedAt} /></td>
