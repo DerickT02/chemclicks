@@ -1,12 +1,11 @@
 # Database tests: destructive, opt-in only
 
-`npm test` and `npm run test:watch` run reviewed mocked/unit/component suites only.
+`npm test` and `npm run test:watch` run every suite under `tests/` except `tests/database/`.
 They do not load application `.env` files, overwrite the three Supabase credential
 variables with inert values, and block unmocked `fetch`. DOM suites opt into jsdom
 with `// @vitest-environment jsdom`; server-rendering suites stay in Node. This is
 an accident-prevention boundary, not a general-purpose network/process sandbox.
-Mock every external client/request in new unit tests; review additions to the
-allowlist in `scripts/test-safety.mts`.
+Mock every external client/request in new unit tests.
 
 All of `tests/database/` is excluded, **including `schema/`**. Several schema tests
 create/delete real records. SQL-source-only checks in that directory are also

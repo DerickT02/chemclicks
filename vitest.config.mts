@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import { fileURLToPath, URL } from 'node:url'
-import { UNIT_TEST_DIRECTORIES, UNIT_TEST_ENV } from './scripts/test-safety.mts'
+import { UNIT_TEST_ENV } from './scripts/test-safety.mts'
 
 export default defineConfig({
   // Never load application .env files for unit/component tests.
@@ -13,7 +13,8 @@ export default defineConfig({
     setupFiles: [fileURLToPath(new URL('./tests/setup-unit.ts', import.meta.url))],
     // DOM suites already opt in with @vitest-environment jsdom. SSR tests stay in Node.
     environment: 'node',
-    include: UNIT_TEST_DIRECTORIES.map(directory => `tests/${directory}/**/*.test.{ts,tsx}`),
+    // Every suite runs except the database fixtures, which write to a real project.
+    include: ['tests/**/*.test.{ts,tsx}'],
     exclude: ['tests/database/**'],
   },
 })

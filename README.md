@@ -150,7 +150,7 @@ Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`
 ## 🧪 Testing
 
 Tests use **Vitest 5** and React Testing Library. The default commands run only
-reviewed mocked/unit/component suites, without application `.env` credentials;
+mocked unit/component suites, without application `.env` credentials;
 unmocked `fetch` is blocked. No Supabase project is required.
 
 ```bash

@@ -1,7 +1,3 @@
-export const UNIT_TEST_DIRECTORIES = [
-  'auth', 'assignments', 'bohr', 'chemistry', 'classes', 'measurement', 'quiz', 'routes', 'testing', 'ui',
-] as const
-
 export const UNIT_TEST_ENV = {
   NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:1',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'unit-test-anon-key',

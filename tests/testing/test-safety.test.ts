@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import config from '../../vitest.config.mts'
 import packageJson from '../../package.json'
-import { DATABASE_WRITE_ACKNOWLEDGEMENT, UNIT_TEST_DIRECTORIES, UNIT_TEST_ENV, databaseTestEnvironment } from '../../scripts/test-safety.mts'
+import { DATABASE_WRITE_ACKNOWLEDGEMENT, UNIT_TEST_ENV, databaseTestEnvironment } from '../../scripts/test-safety.mts'
 
 const ref = 'abcdefghijklmnopqrst'
 function jwt(role: string, projectRef?: string): string {
@@ -17,19 +17,16 @@ const fixture = {
 const environment = (patch: Record<string, string | undefined> = {}, applicationUrls: string[] = []) => databaseTestEnvironment({ ...fixture, ...patch }, applicationUrls)
 
 describe('safe unit-test policy', () => {
-  it('disables dotenv loading and applies the reviewed include/exclude policy in the real config', () => {
-    expect(config).toMatchObject({ envDir: false, test: { environment: 'node', env: UNIT_TEST_ENV, exclude: ['tests/database/**'] } })
-    expect(config.test?.include).toEqual(UNIT_TEST_DIRECTORIES.map(directory => `tests/${directory}/**/*.test.{ts,tsx}`))
+  it('disables dotenv loading and runs every suite except the database fixtures', () => {
+    expect(config).toMatchObject({
+      envDir: false,
+      test: { environment: 'node', env: UNIT_TEST_ENV, include: ['tests/**/*.test.{ts,tsx}'], exclude: ['tests/database/**'] },
+    })
   })
   it('pins run/watch scripts to the safe config and separates the database runner', () => {
     expect(packageJson.scripts.test).toBe('vitest run --config vitest.config.mts')
     expect(packageJson.scripts['test:watch']).toBe('vitest --config vitest.config.mts')
     expect(packageJson.scripts['test:database']).toBe('vitest run --config vitest.database.config.mts')
-  })
-  it('allowlists only reviewed directories, never database fixture directories', () => {
-    expect(UNIT_TEST_DIRECTORIES).not.toContain('database')
-    expect(UNIT_TEST_DIRECTORIES).not.toContain('integration')
-    expect(UNIT_TEST_DIRECTORIES).not.toContain('schema')
   })
   it('replaces inherited application credentials with inert test values', () => {
     for (const [name, value] of Object.entries(UNIT_TEST_ENV)) expect(process.env[name]).toBe(value)
