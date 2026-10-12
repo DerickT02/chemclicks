@@ -21,7 +21,7 @@ export type StudentWorkQueueResult =
     progressError: string | null;
   };
 
-const PROGRESS_ERROR = "Exploration progress could not be loaded. Refresh assignments to try again.";
+const PROGRESS_ERROR = "Exploration progress could not be loaded. Refresh the page to try again.";
 const namePart = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const isProgressStatus = (value: unknown): value is ProgressStatus =>
   value === "not_started" || value === "in_progress" || value === "completed";

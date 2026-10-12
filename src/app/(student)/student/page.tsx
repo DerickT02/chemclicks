@@ -1,6 +1,5 @@
 import Link from "next/link";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
-import RefreshAssignments from "@/components/assignments/RefreshAssignments";
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { LEWIS_QUIZZES, lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
@@ -37,7 +36,7 @@ function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; 
         <p className="text-sm text-muted-foreground">Closed — no further work can be submitted. You can still view your saved exploration history.</p>
         <Link href={`/student/assignments/${assignment.id}/history`} prefetch={false} className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold">View saved history<span className="sr-only">: {assignment.activity.title}</span></Link>
       </>}
-      {section === "invalid" && <p className="text-sm text-muted-foreground">The schedule could not be confirmed. Refresh assignments or ask your teacher.</p>}
+      {section === "invalid" && <p className="text-sm text-muted-foreground">The schedule could not be confirmed. Refresh the page or ask your teacher.</p>}
       {!hasActivityContent(assignment.activity.type) && (
         <p className="text-sm text-muted-foreground">Exercise not available yet. {getNewAssignmentBlockReason(assignment.activity.type)}</p>
       )}
@@ -74,8 +73,6 @@ export default async function StudentAssignmentsPage() {
             <p className="font-medium">{result.context.studentName} · {result.context.className}
               {result.context.section && ` — ${result.context.section}`}</p>
           )}
-          <p className="text-sm text-muted-foreground">Use Start exploration inside an activity to track your work, then Finish exploration to save it. Scores from assigned quizzes you finish are saved for your teacher.</p>
-          <RefreshAssignments />
         </header>
         {result.status === "error" ? (
           <p role="alert" className="text-sm text-destructive">{result.message}</p>
@@ -84,7 +81,7 @@ export default async function StudentAssignmentsPage() {
             {result.progressError && <p role="alert" className="text-sm text-destructive">{result.progressError}</p>}
             {result.assignments.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border p-6 text-muted-foreground">
-                Your teacher has not assigned any activities yet. Check back, refresh assignments, or use untracked practice below.
+                Your teacher has not assigned any activities yet. Check back, refresh the page, or use untracked practice below.
               </p>
             ) : !hasAvailable ? (
               <p className="rounded-lg border border-dashed border-border p-6 text-muted-foreground">

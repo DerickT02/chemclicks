@@ -6,7 +6,6 @@ import type { StudentWorkQueueResult } from "@/lib/server/student-work-queue";
 const reader = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/server/student-work-queue", () => ({ getStudentWorkQueue: reader }));
 vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); } }));
-vi.mock("@/components/assignments/RefreshAssignments", () => ({ default: () => <button>Refresh assignments</button> }));
 import StudentPage from "@/app/(student)/student/page";
 
 const now = Date.parse("2026-04-01T12:00:00Z");
@@ -57,8 +56,9 @@ describe("student dashboard work queue", () => {
     expect(output).toContain("Period A");
     for (const text of ["To do (1)", "In progress (1)", "Completed explorations (1)", "Open to start",
       "Resume exploration", "Review exploration", "Exploration completion saved", "This is not a quiz grade",
-      "Use Start exploration inside an activity to track your work", "Scores from assigned quizzes you finish are saved for your teacher",
-      "Explore untracked practice", "Refresh assignments"]) expect(output).toContain(text);
+      "Explore untracked practice"]) expect(output).toContain(text);
+    expect(output).not.toContain("Use Start exploration");
+    expect(output).not.toContain("Refresh assignments");
     for (const id of ["todo", "resume", "review"]) expect(output).toContain(`href="/student/assignments/${id}"`);
   });
 
@@ -86,7 +86,7 @@ describe("student dashboard work queue", () => {
     reader.mockResolvedValue(response([]));
     const output = await html();
     expect(output).toContain("Your teacher has not assigned any activities yet");
-    expect(output).toContain("refresh assignments");
+    expect(output).toContain("refresh the page");
     expect(output).toContain('href="/student/labs"');
     expect(output).not.toContain("No activities are available right now");
   });
@@ -108,7 +108,6 @@ describe("student dashboard work queue", () => {
     expect(output).toContain('role="alert"');
     expect(output).not.toContain("not assigned any activities");
     expect(output).not.toContain("Alex Student");
-    expect(output).toContain("Refresh assignments");
   });
 
   it("does not offer exercise access for unsupported types or invalid schedules", async () => {

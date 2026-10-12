@@ -17,7 +17,6 @@ vi.mock("@/lib/server/student-work-queue", () => ({ getStudentWorkQueue: async (
     assignments: result.assignments.map((row: StudentAssignment) => ({ ...row, progress: "not_started" })),
   } : result;
 } }));
-vi.mock("@/components/assignments/RefreshAssignments", () => ({ default: () => <button>Refresh assignments</button> }));
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); },
   notFound: () => { throw new Error("NOT_FOUND"); },
