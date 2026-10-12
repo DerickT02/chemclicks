@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { getTeacherClassActivities } from '@/lib/server/teacher-activities'
 import { getTeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
 import { AttemptRoster } from './AttemptRoster'
@@ -18,8 +17,7 @@ export default async function ActivityAttemptsPage({ params, searchParams }: {
   const summary = selectedId ? await getTeacherActivityAttemptSummary(classId, selectedId) : null
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-foreground">
-      <Link href={`/admin?classId=${classId}`} className="text-sm underline">Back to classroom</Link>
-      <h1 className="mt-5 text-3xl font-semibold">Activity attempts</h1>
+      <h1 className="text-3xl font-semibold">Activity attempts</h1>
       <p className="mt-2 text-muted-foreground">{classroom.name}</p>
       {classroom.assignments.length === 0 ? (
         <p className="mt-6 rounded-lg border border-border bg-card p-5">No activities assigned to this class yet.</p>

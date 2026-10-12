@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { createClass, generateClassCode } from "./actions";
@@ -110,14 +109,7 @@ export default function CreateClassPage() {
   return (
     <div className="min-h-screen bg-background p-6 text-foreground md:p-10">
       <div className="mx-auto max-w-md">
-        <Link
-          href="/admin"
-          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        >
-          ← Back to classrooms
-        </Link>
-
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight">Add a class</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Add a class</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Choose a display name, section label (optional), and a unique 6-character code
           students will use to join. Enter your own code or generate one.
