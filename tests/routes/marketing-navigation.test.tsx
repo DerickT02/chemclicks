@@ -75,10 +75,9 @@ describe("practice navigation", () => {
     ["practice index", LabsPage],
     ["Bohr practice", BohrModelsPage],
     ["measurement practice", MeasurementLabPage],
-  ] as const)("labels %s as untracked without a duplicate back link", (_label, Page) => {
+  ] as const)("shows %s without a tracking disclaimer or duplicate back link", (_label, Page) => {
     const html = renderToStaticMarkup(<Page />);
-    expect(html).toContain("Untracked practice");
-    expect(html).toContain("does not record assignment completion");
+    expect(html).not.toContain("Untracked practice");
     expect(html).not.toContain("Back to");
   });
 

@@ -8,9 +8,9 @@ vi.mock("@/components/lewis/CovalentBondExplorer", () => ({ default: () => null 
 import LewisPracticePage from "@/app/(student)/student/labs/lewis/page";
 
 describe("Lewis practice lab", () => {
-  it("is untracked practice with no quizzes; quizzes are reached through assignments", () => {
+  it("has no quizzes; quizzes are reached through assignments", () => {
     const html = renderToStaticMarkup(<LewisPracticePage />);
-    expect(html).toContain("Untracked practice");
+    expect(html).not.toContain("Untracked practice");
     expect(html).not.toContain("Back to");
     expect(html).not.toContain("/student/quizzes/");
     expect(html).not.toMatch(/quiz/i);

@@ -36,10 +36,7 @@ export default function LabsPage() {
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
 
         <header className="mb-10">
-          <h1 className="text-3xl font-bold text-foreground mb-1">Practice labs</h1>
-          <p className="text-muted-foreground text-sm">
-            Untracked practice — exploring here does not record assignment completion. Pick a lab to start learning.
-          </p>
+          <h1 className="text-3xl font-bold text-foreground">Practice labs</h1>
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

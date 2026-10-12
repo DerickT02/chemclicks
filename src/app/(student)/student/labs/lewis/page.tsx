@@ -37,9 +37,6 @@ export default function LewisDotDiagramsPage() {
 
         {/* Page header */}
         <header className="mb-10">
-          <p className="mb-4 text-sm text-muted-foreground">
-            Untracked practice — exploring here does not record assignment completion.
-          </p>
           <div className="flex items-center gap-3 mb-3">
             <span className="text-4xl" aria-hidden="true">🧪</span>
             <div>
