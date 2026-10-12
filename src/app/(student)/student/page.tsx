@@ -102,7 +102,7 @@ export default async function StudentAssignmentsPage() {
         )}
         <aside className="space-y-2 rounded-lg border border-border p-5" aria-label="Untracked practice">
           <h2 className="text-lg font-semibold">Want more practice?</h2>
-          <p className="text-sm text-muted-foreground">Practice is separate from assigned work and does not save exploration completion or quiz results for your teacher.</p>
+          <p className="text-sm text-muted-foreground">Practice is separate from assigned work and is not saved for your teacher.</p>
           <Link href="/student/labs" className="text-sm font-semibold text-accent underline">Explore untracked practice</Link>
         </aside>
       </div>
