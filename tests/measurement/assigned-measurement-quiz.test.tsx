@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -83,6 +84,32 @@ describe("assigned measurement quiz", () => {
     expect(await screen.findByRole("heading", { name: "Ruler results: 4 of 5 correct" })).toBeTruthy();
     expect(screen.getByText("Passed", { exact: false })).toBeTruthy();
     expect(screen.getByText("Attempt 1")).toBeTruthy();
+  });
+
+  it("keeps focus on the answer while it saves and after an incorrect result", async () => {
+    const user = userEvent.setup();
+    let finishSaving: (receipt: unknown) => void = () => {};
+    actions.record.mockImplementation(() => new Promise((resolve) => { finishSaving = resolve; }));
+    render(<MeasurementQuiz assignmentId="assignment-1" mode="ruler_tenths" />);
+
+    await user.click(screen.getByRole("button", { name: "Start quiz" }));
+    const input = await screen.findByLabelText("Your reading, in centimeters");
+    await user.type(input, "0.0{Enter}");
+
+    // Still saving: the answer cannot be edited or sent twice, but focus stays put.
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute("readonly");
+    await user.keyboard("{Enter}");
+    expect(actions.record).toHaveBeenCalledTimes(1);
+
+    finishSaving({
+      counted: true,
+      firstTryCorrect: false,
+      result: { status: "incorrect", reason: "value", message: "Try again." },
+    });
+    await screen.findByText("Try again.");
+    expect(input).toHaveFocus();
+    expect(input).not.toHaveAttribute("readonly");
   });
 
   it("retries through a new server attempt and keeps the assigned instrument fixed", async () => {

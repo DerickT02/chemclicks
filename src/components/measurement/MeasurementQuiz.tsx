@@ -239,6 +239,7 @@ export function MeasurementQuestion({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     // Invalid and incorrect answers keep the student on the input to retry. A
     // correct answer mounts the Next button, which takes focus with autoFocus.
     inputRef.current?.focus();
@@ -312,8 +313,8 @@ export function MeasurementQuestion({
               onChange={(event) =>
                 dispatch({ type: "edit-answer", answer: event.target.value })
               }
-              readOnly={isCorrect}
-              disabled={pending}
+              // Read-only, not disabled, while an answer saves: a disabled input drops focus.
+              readOnly={isCorrect || pending}
               aria-invalid={result?.status === "invalid"}
               aria-describedby={`${hintId} ${feedbackId}`}
               className="w-32 rounded-md border border-border bg-background px-3 py-2 font-mono text-foreground outline-none read-only:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive"
