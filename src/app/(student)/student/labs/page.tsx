@@ -36,7 +36,6 @@ export default function LabsPage() {
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
 
         <header className="mb-10">
-          <Link href="/student" className="mb-4 inline-block text-sm text-foreground underline">Back to assignments</Link>
           <h1 className="text-3xl font-bold text-foreground mb-1">Practice labs</h1>
           <p className="text-muted-foreground text-sm">
             Untracked practice — exploring here does not record assignment completion. Pick a lab to start learning.

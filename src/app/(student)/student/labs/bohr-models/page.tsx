@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import BohrModelViewer from "@/components/bohr-models/BohrModelViewer";
 
 export const metadata: Metadata = {
@@ -15,7 +14,6 @@ export default function BohrModelsPage() {
 
         {/* Page header */}
         <header className="mb-10">
-          <Link href="/student/labs" className="mb-4 inline-block text-sm text-foreground underline">Back to practice labs</Link>
           <p className="mb-4 text-sm text-muted-foreground">Untracked practice — exploring here does not record assignment completion.</p>
           <div className="flex items-center gap-3 mb-3">
             <span className="text-4xl" aria-hidden="true">⚛️</span>

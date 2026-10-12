@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
@@ -38,9 +37,6 @@ export default function LewisDotDiagramsPage() {
 
         {/* Page header */}
         <header className="mb-10">
-          <Link href="/student/labs" className="mb-4 inline-block text-sm text-foreground underline">
-            Back to practice labs
-          </Link>
           <p className="mb-4 text-sm text-muted-foreground">
             Untracked practice — exploring here does not record assignment completion.
           </p>

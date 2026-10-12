@@ -70,15 +70,19 @@ describe("practice navigation", () => {
     expect(html).toContain("Explore ruler scales");
   });
 
+  // The navigation bar already links to My assignments and Practice labs.
   it.each([
-    ["practice index", LabsPage, "/student"],
-    ["Bohr practice", BohrModelsPage, "/student/labs"],
-    ["measurement practice", MeasurementLabPage, "/student/labs"],
-  ] as const)("labels %s as untracked and provides a real back destination", (_label, Page, backPath) => {
+    ["practice index", LabsPage],
+    ["Bohr practice", BohrModelsPage],
+    ["measurement practice", MeasurementLabPage],
+  ] as const)("labels %s as untracked without a duplicate back link", (_label, Page) => {
     const html = renderToStaticMarkup(<Page />);
     expect(html).toContain("Untracked practice");
     expect(html).toContain("does not record assignment completion");
-    expect(html).toContain(`href="${backPath}"`);
-    verifyLinks(html);
+    expect(html).not.toContain("Back to");
+  });
+
+  it("links the practice index to lab pages that exist", () => {
+    verifyLinks(renderToStaticMarkup(<LabsPage />));
   });
 });
