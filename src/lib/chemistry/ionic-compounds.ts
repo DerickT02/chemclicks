@@ -218,11 +218,11 @@ export function formatSignedTotalCharge(total: number): string {
 
 export const ION_VOCABULARY = {
   cation:
-    "Cation — a positive ion, usually from a metal that lost valence electrons.",
+    "A positive ion, usually from a metal that lost valence electrons.",
   anion:
-    "Anion — a negative ion, usually from a nonmetal that gained electrons.",
+    "A negative ion, usually from a nonmetal that gained electrons.",
   ionicCharge:
-    "Ionic charge — the charge on one ion. A neutral formula unit has total positive and negative charges that cancel to zero.",
+    "The charge on one ion. A neutral formula unit has total positive and negative charges that cancel to zero.",
 } as const;
 
 export function isChargeBalanced(compound: IonicCompound): boolean {

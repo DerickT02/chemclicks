@@ -40,7 +40,9 @@ describe("IonicCompoundExplorer", () => {
   it("offers all four salts as named buttons, with the first selected", () => {
     render(<IonicCompoundExplorer />);
     expect(screen.getByRole("heading", { name: "Ion vocabulary" })).toBeInTheDocument();
-    expect(screen.getByText(/Cation — a positive ion/)).toBeInTheDocument();
+    // The term is the heading of its definition, so the definition does not repeat it.
+    expect(screen.getByText(/^A positive ion, usually/)).toBeInTheDocument();
+    expect(screen.queryByText(/Cation —/)).not.toBeInTheDocument();
     const group = screen.getByRole("group", { name: "Choose an example salt" });
 
     for (const salt of SALTS) {
