@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getActivityDefinition } from "@/lib/activities/registry";
 
-const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), user: vi.fn() }));
+const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), teacher: vi.fn() }));
 vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
-  auth: { getUser: mocks.user },
-  from: () => ({ select: () => ({ in: async () => ({ data: [], error: null }) }) }),
-}) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
+vi.mock("@/lib/server/teacher", () => ({ requireTeacherId: mocks.teacher }));
 vi.mock("@/lib/db/activities", () => ({ listActivityCatalog: mocks.catalog }));
 vi.mock("@/lib/db/class_activities", () => ({ getClassActivities: mocks.assignments }));
 vi.mock("@/lib/db/classes", () => ({ listActiveClassesForTeacher: mocks.classes }));
@@ -25,7 +23,7 @@ const render = async () => renderToStaticMarkup(await AdminPage({ searchParams: 
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.user.mockResolvedValue({ data: { user: { id: "teacher" } }, error: null });
+  mocks.teacher.mockResolvedValue("teacher");
   mocks.lessonProgress.mockResolvedValue({ classId, className: "Chemistry", students: [] });
   mocks.classes.mockResolvedValue({ data: [{ id: classId, name: "Chemistry", section: "A", class_code: "ABC123", student_count: 0 }], error: null });
   mocks.catalog.mockResolvedValue({ data: [activity], error: null });
@@ -154,6 +152,8 @@ describe("teacher enrollment and lesson progress", () => {
   it("does not query a foreign class requested through the URL", async () => {
     populateClass();
     await AdminPage({ searchParams: Promise.resolve({ classId: "foreign-class" }) });
+    expect(mocks.teacher).toHaveBeenCalledTimes(1);
+    expect(mocks.classes).toHaveBeenCalledWith(expect.anything(), "teacher");
     expect(mocks.assignments).toHaveBeenCalledWith(expect.anything(), classId);
     expect(mocks.lessonProgress).toHaveBeenCalledWith(classId);
   });
@@ -162,9 +162,12 @@ describe("teacher enrollment and lesson progress", () => {
     await expect(render()).rejects.toThrow("We couldn't load your classes. Please try again.");
     expect(mocks.assignments).not.toHaveBeenCalled();
   });
-  it("does not read classroom data when verified authentication returns an error", async () => {
-    mocks.user.mockResolvedValue({ data: { user: { id: "teacher" } }, error: { message: "private auth details" } });
-    expect(await render()).toContain("Please sign in to view your classes");
+  it("does not read classroom data without a verified teacher", async () => {
+    mocks.teacher.mockRejectedValue(new Error("private auth details"));
+    const html = await render();
+    expect(html).toContain("Please sign in to view your classes");
+    expect(html).not.toContain("private auth");
     expect(mocks.classes).not.toHaveBeenCalled();
+    expect(mocks.lessonProgress).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { listActiveClassesForTeacher } from "@/lib/db/classes";
+import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import { LessonProgressList } from "@/app/admin/LessonProgressList";
 
@@ -21,12 +22,13 @@ export default async function AdminPage({
   searchParams: Promise<{ classId?: string; classDisabled?: string; classCreated?: string }>;
 }) {
   const supabase = await createClient();
-  const [{ classId, classDisabled, classCreated }, { data: userData, error: authError }] = await Promise.all([
+  // One verification for the whole request; the lesson progress reader reuses it.
+  const [{ classId, classDisabled, classCreated }, teacherId] = await Promise.all([
     searchParams,
-    supabase.auth.getUser(),
+    requireTeacherId().catch(() => null),
   ]);
 
-  if (authError || !userData.user) {
+  if (!teacherId) {
     return (
       <div className="min-h-screen bg-background px-6 py-12 text-foreground md:px-10">
         <h1 className="text-3xl font-semibold">Classrooms</h1>
@@ -37,7 +39,7 @@ export default async function AdminPage({
 
   const { data: classesData, error: classesError } = await listActiveClassesForTeacher(
     supabase,
-    userData.user.id,
+    teacherId,
   );
 
   if (classesError || classesData === null) {
