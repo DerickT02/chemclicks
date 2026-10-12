@@ -51,7 +51,7 @@ export async function getStudentWorkQueue(): Promise<StudentWorkQueueResult> {
 
     const { data: assignments, error: assignmentError } = await client.from("class_activities")
       .select("id, class_id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
-      .eq("class_id", session.classId).order("id").returns<AssignmentRow[]>();
+      .eq("class_id", session.classId).is("archived_at", null).order("id").returns<AssignmentRow[]>();
     if (assignmentError || !assignments) throw new Error("Assignments unavailable.");
 
     const checkedAt = Date.now();

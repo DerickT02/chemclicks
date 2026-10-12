@@ -45,7 +45,7 @@ beforeEach(() => {
   });
   mocks.admin.mockImplementation(() => ({ from: (table: string) => {
     const builder: Record<string, (...args: unknown[]) => unknown> = {};
-    for (const method of ["select", "eq", "in", "order"]) {
+    for (const method of ["select", "eq", "is", "in", "order"]) {
       builder[method] = (...args: unknown[]) => {
         mocks.calls.push({ table, method, args });
         return builder;
@@ -70,6 +70,8 @@ describe("authorized student work queue", () => {
     expect(result.progressError).toBeNull();
     expect(JSON.stringify(result)).not.toMatch(/private-login|private-code|student_id|class_id|score|passed/);
     expect(tables()).toEqual(["students", "classes", "class_activities", "student_progress"]);
+    // Unassigned (archived) work must not reappear in the student's list.
+    expect(calls("class_activities", "is").map(call => call.args)).toEqual([["archived_at", null]]);
     expect(calls("students", "eq").map(call => call.args)).toEqual([["id", studentId], ["class_id", classId]]);
     expect(calls("classes", "eq").map(call => call.args)).toEqual([["id", classId], ["is_active", true]]);
     expect(calls("class_activities", "eq").map(call => call.args)).toEqual([["class_id", classId]]);
