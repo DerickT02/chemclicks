@@ -6,7 +6,7 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
   return (
     <section aria-labelledby="activity-title" className="rounded-xl border border-border bg-card p-5">
       <h2 id="activity-title" className="text-xl font-semibold">{summary.activityTitle}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{summary.students.length} students enrolled. Counts include completed and in-progress attempts. Times include their zone and use your device&apos;s zone after loading.</p>
+      <p className="mt-2 text-sm text-muted-foreground">{summary.students.length} students enrolled.</p>
       {summary.students.length === 0 ? <p className="mt-5">No students enrolled in this class yet.</p> : (
         <ul className="mt-5 divide-y divide-border">
           {summary.students.map(student => (

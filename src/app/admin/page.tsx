@@ -105,10 +105,6 @@ export default async function AdminPage({
             Class disabled. Student access is blocked; classroom data has been kept.
           </p>
         )}
-        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Teacher admin view. Create classes, share classroom codes, and see where students
-          are in the lesson.
-        </p>
 
         <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -161,9 +157,6 @@ export default async function AdminPage({
 
             <div className="mt-6 border-t border-border pt-5">
               <h3 className="text-sm font-semibold text-foreground">Add a class</h3>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                Set up a new class and share its join code with students.
-              </p>
               <Link
                 href="/admin/create-class"
                 className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"

@@ -110,10 +110,6 @@ export default function CreateClassPage() {
     <div className="min-h-screen bg-background p-6 text-foreground md:p-10">
       <div className="mx-auto max-w-md">
         <h1 className="text-2xl font-semibold tracking-tight">Add a class</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Choose a display name, section label (optional), and a unique 6-character code
-          students will use to join. Enter your own code or generate one.
-        </p>
 
         <form
           className="mt-8 flex flex-col gap-5 rounded-lg border border-border bg-card p-6 shadow-sm"
