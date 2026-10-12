@@ -11,10 +11,6 @@ import LewisLabPage from "@/app/(student)/student/labs/lewis/page";
 
 // The measurement quiz imports its assignment server actions; unit tests never run them.
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/assignments/lewis-quiz-access", () => ({
-  getLewisQuizAccess: async () => ({ status: "available" }),
-}));
-
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); },
 }));
@@ -44,24 +40,21 @@ describe("route page behavior", () => {
     expect(html).not.toContain("Something went wrong");
   });
 
-  it("renders lab pages instead of redirecting to the assignment list", async () => {
+  it("renders lab pages instead of redirecting to the assignment list", () => {
     expect(() => MeasurementLabPage()).not.toThrow();
-    await expect(LewisLabPage()).resolves.toBeTruthy();
+    expect(() => LewisLabPage()).not.toThrow();
   });
 
-  it("renders every Lewis explorer on the practice lab and links to real quizzes", async () => {
-    const html = renderToStaticMarkup(await LewisLabPage());
+  it("renders every Lewis explorer on the practice lab without quiz links", () => {
+    const html = renderToStaticMarkup(<LewisLabPage />);
 
     expect(html).toContain("Lewis Diagrams");
     expect(html).toContain("Ionic Bonds");
     expect(html).toContain("Covalent Bonds");
     expect(html).toContain("Example Salts");
     expect(html).toContain("Example Molecules");
-    expect(html).toContain('href="/student/quizzes/covalent"');
-    expect(html).toContain('href="/student/quizzes/ionic"');
-    expect(html).not.toContain('href="/student/quizzes/lewis"');
+    expect(html).not.toContain("/student/quizzes/");
     expect(html).toContain("Untracked practice");
-    expect(html).toContain("Your score is saved for your teacher when you finish.");
   });
 
   it("links the measurement lab to its practice questions", () => {
