@@ -82,7 +82,7 @@ describe("authorized student work queue", () => {
   it("gives future/closed/invalid/unsupported work null progress and only asks for open exercises", async () => {
     assignments = [assignment("open"), assignment("future", { opens_at: "9999-01-01T00:00:00Z" }),
       assignment("closed", { closes_at: "2000-01-01T00:00:00Z" }), assignment("invalid", { closes_at: "bad" }),
-      assignment("unsupported", { activity: { id: "bohr", title: "Bohr", type: "bohr_model_intro", order_index: 1 } }),
+      assignment("unsupported", { activity: { id: "future", title: "Future", type: "future_activity" as AssignmentRow["activity"]["type"], order_index: 1 } }),
     ];
     const result = await queue();
     expect(result.assignments.map(row => [row.id, row.progress])).toEqual([

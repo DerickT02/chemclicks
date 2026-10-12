@@ -34,6 +34,7 @@ vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({
   },
 }) }));
 vi.mock("@/components/assignments/AssignmentAccess", () => ({ default: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock("@/components/bohr-models/BohrModelViewer", () => ({ default: () => <p>Explorer: bohr</p> }));
 vi.mock("@/components/lewis/LewisDotExplorer", () => ({ default: () => <p>Explorer: lewis-diagram</p> }));
 vi.mock("@/components/lewis/CovalentBondExplorer", () => ({ default: () => <p>Explorer: covalent</p> }));
 vi.mock("@/components/lewis/IonicCompoundExplorer", () => ({ default: () => <p>Explorer: ionic</p> }));

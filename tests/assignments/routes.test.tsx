@@ -22,6 +22,7 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
 }));
 vi.mock("@/components/assignments/AssignmentAccess", () => ({ default: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock("@/components/bohr-models/BohrModelViewer", () => ({ default: () => <p>Bohr exercise</p> }));
 vi.mock("@/components/measurement/GraduatedCylinder", () => ({ default: () => <p>Cylinder exercise</p> }));
 vi.mock("@/components/measurement/PrecisionRuler", () => ({ default: ({ precision }: { precision: string }) => <p>Ruler exercise: {precision}</p> }));
 vi.mock("@/components/lewis/LewisDotExplorer", () => ({ default: () => <p>Lewis exercise</p> }));
@@ -101,6 +102,36 @@ describe("student assignment pages", () => {
     expect(html).not.toContain("Lewis exercise");
     expect(html).not.toContain("Ionic exercise");
     expect(html).not.toContain("Covalent exercise");
+    expect(html).not.toContain("Bohr exercise");
+  });
+  it.each(["bohr_model_intro", "bohr_model_stability"])("renders the Bohr viewer for %s assignments", async (type) => {
+    const bohr = { ...assignment, id: "bohr", activity: { ...assignment.activity, type } };
+    reader.mockResolvedValue({ status: "ok", assignments: [bohr] });
+    const html = renderToStaticMarkup(await page("bohr"));
+    expect(html).toContain("Bohr exercise");
+    expect(html).toContain("Start exploration");
+    expect(html).toContain('href="/student/quizzes/bohr"');
+    expect(html).not.toContain("Lewis exercise");
+    expect(html).not.toContain("not available yet");
+    expect(renderToStaticMarkup(await StudentPage())).toContain("/student/assignments/bohr");
+  });
+  it("keeps quiz attempts out of the exploration controls and history while still listing them as quiz history", async () => {
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
+    attempts.mockResolvedValue([{
+      id: "quiz", attempt_number: 1, quiz_key: "measurement_cylinder_tenths", instrument: "cylinder", precision_mode: "tenths",
+      status: "completed", score: 4, question_total: 5, passed: true,
+      started_at: "2026-10-01T12:00:00Z", completed_at: "2026-10-01T12:05:00Z",
+    }]);
+    const html = renderToStaticMarkup(await page());
+    expect(html).toContain("Start exploration");
+    expect(html).toContain("Saved exploration history (0)");
+    expect(html).toContain("4 of 5 correct");
+  });
+  it("refuses a Bohr assignment the authorized reader does not return", async () => {
+    // Closed, archived and other-class rows never leave getStudentAssignments.
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
+    await expect(page("bohr")).rejects.toThrow("NOT_FOUND");
+    expect(renderToStaticMarkup(await StudentPage())).not.toContain("/student/assignments/bohr");
   });
   it.each(["tenths", "hundredths"])("starts the coarse-to-fine comparison for the %s ruler assignment", async (precision) => {
     reader.mockResolvedValue({ status: "ok", assignments: [{
@@ -138,16 +169,17 @@ describe("student assignment pages", () => {
   });
   it("links implemented assignments and labels missing exercise content", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment, {
-      ...assignment, id: "bohr", activity: { ...assignment.activity, type: "bohr_model_intro" },
+      ...assignment, id: "future", activity: { ...assignment.activity, type: "future_activity" },
     }] });
     const html = renderToStaticMarkup(await StudentPage());
     expect(html).toContain(`/student/assignments/${assignment.id}`);
-    expect(html).not.toContain("/student/assignments/bohr");
+    expect(html).not.toContain("/student/assignments/future");
     expect(html).toContain("Exercise not available yet");
   });
-  it.each(["bohr_model_intro", "bohr_model_stability"])("explains unsupported %s work without attempt controls", async (type) => {
+  it("explains work of an unrecognised type without attempt controls", async () => {
+    const type = "future_activity";
     reader.mockResolvedValue({ status: "ok", assignments: [{
-      ...assignment, id: "unsupported", activity: { ...assignment.activity, title: "Bohr activity", type },
+      ...assignment, id: "unsupported", activity: { ...assignment.activity, title: "Future activity", type },
     }] });
     const html = renderToStaticMarkup(await page("unsupported"));
     expect(html).toContain("This activity’s exercise is not available yet.");

@@ -66,7 +66,7 @@ describe("teacher assignment action", () => {
     expect(mocks.insert).not.toHaveBeenCalled();
   });
   it.each([
-    "bohr_model_intro", "bohr_model_stability", "future_activity", "constructor",
+    "future_activity", "constructor",
   ])("rejects new unsupported %s assignments using stored metadata before privileged writes", async (type) => {
     mocks.query.mockResolvedValueOnce({ data: { id: classId }, error: null })
       .mockResolvedValueOnce({ data: { id: activityId, type }, error: null });
@@ -83,7 +83,7 @@ describe("teacher assignment action", () => {
   });
 
   it("allows date updates on existing unsupported assignments without creating new work", async () => {
-    mocks.query.mockResolvedValue({ data: { id: assignmentId, type: "bohr_model_intro" }, error: null });
+    mocks.query.mockResolvedValue({ data: { id: assignmentId, type: "future_activity" }, error: null });
     expect((await saveAssignment(initial, form({ assignment_id: assignmentId }))).status).toBe("success");
     expect(mocks.update).toHaveBeenCalled();
     expect(mocks.insert).not.toHaveBeenCalled();

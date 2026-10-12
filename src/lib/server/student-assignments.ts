@@ -19,6 +19,7 @@ export async function getAssignmentAttempts(assignmentId: string): Promise<Stude
     .eq('student_id', session.studentId).eq('class_activity_id', assignmentId).maybeSingle()
   if (error) throw new Error('Progress could not be loaded.')
   if (!progress) return []
+  // Exploration and quiz attempts share this progress row; callers separate them by quiz_key.
   const { data, error: attemptError } = await client.from('student_attempts')
     .select('*')
     .eq('progress_id', progress.id).order('attempt_number', { ascending: false })

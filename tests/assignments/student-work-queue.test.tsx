@@ -112,7 +112,7 @@ describe("student dashboard work queue", () => {
 
   it("does not offer exercise access for unsupported types or invalid schedules", async () => {
     reader.mockResolvedValue(response([
-      assignment("bohr", { activity: { id: "bohr", title: "Bohr", type: "bohr_model_intro", order_index: 1 } }),
+      assignment("future", { activity: { id: "future", title: "Future", type: "future_activity" as QueueAssignment["activity"]["type"], order_index: 1 } }),
       assignment("invalid", { closes_at: "bad" }),
     ]));
     const output = await html();

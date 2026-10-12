@@ -5,19 +5,16 @@ import { hasActivityContent } from "@/lib/assignments/activity-content";
 const entries = Object.entries(ACTIVITY_REGISTRY);
 
 describe("shared activity support contract", () => {
-  it("enables deliverable Lewis, ruler and cylinder explorations", () => {
-    expect(entries.filter(([type]) => canAssignActivity(type)).map(([type]) => type)).toEqual([
-      "lewis_diagram", "lewis_structures_covalent", "lewis_structures_ionic", "measurement_ruler_tenths", "measurement_ruler_hundredths", "measurement_graduated_cylinder",
+  it("gives every catalog activity an assignable exploration", () => {
+    expect(entries.map(([type]) => type)).toEqual([
+      "bohr_model_intro", "bohr_model_stability", "lewis_diagram", "lewis_structures_covalent", "lewis_structures_ionic",
+      "measurement_ruler_tenths", "measurement_ruler_hundredths", "measurement_graduated_cylinder",
     ]);
     for (const [type, definition] of entries) {
       expect(definition.description).not.toBe("");
-      expect(hasActivityContent(type)).toBe(Boolean(definition.explorer));
-      if (canAssignActivity(type)) {
-        expect(definition.explorer).not.toBeNull();
-        expect(getNewAssignmentBlockReason(type)).toBeNull();
-      } else {
-        expect(getNewAssignmentBlockReason(type)).toBeTruthy();
-      }
+      expect(hasActivityContent(type)).toBe(true);
+      expect(canAssignActivity(type)).toBe(true);
+      expect(getNewAssignmentBlockReason(type)).toBeNull();
     }
   });
 

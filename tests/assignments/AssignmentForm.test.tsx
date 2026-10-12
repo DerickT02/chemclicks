@@ -105,26 +105,23 @@ describe("assignment activity selection", () => {
     ).toBeDisabled();
   });
 
-  it("disables Bohr and enables both ruler precisions", async () => {
+  it("disables an activity type the app does not know and enables the rest", async () => {
     const user = userEvent.setup();
-    const unavailable: ActivityCatalogEntry[] = [
+    const catalog: ActivityCatalogEntry[] = [
+      { ...activities[0], id: "future", title: "Future activity", type: "future_activity" as ActivityCatalogEntry["type"] },
       { ...activities[0], id: "bohr-intro", title: "Bohr intro", type: "bohr_model_intro" },
-      { ...activities[0], id: "bohr-stability", title: "Bohr stability", type: "bohr_model_stability" },
-      { ...activities[0], id: "tenths", title: "Tenths ruler", type: "measurement_ruler_tenths" },
       { ...activities[0], id: "hundredths", title: "Hundredths ruler", type: "measurement_ruler_hundredths" },
     ];
-    render(<AssignmentForm classId="class" activities={unavailable} />);
+    render(<AssignmentForm classId="class" activities={catalog} />);
     const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(4);
-    expect(radios[3]).toBeEnabled();
-    expect(screen.getAllByText(/assigned exploration experience is not supported/)).toHaveLength(2);
-    for (const radio of radios.slice(0, 2)) {
-      expect(radio).toBeDisabled();
-      await user.click(radio);
-      expect(radio).not.toBeChecked();
-    }
-    await user.click(radios[2]);
-    expect(radios[2]).toBeChecked();
+    expect(radios).toHaveLength(3);
+    expect(screen.getByText(/not supported for new assignments/)).toBeInTheDocument();
+    expect(radios[0]).toBeDisabled();
+    await user.click(radios[0]);
+    expect(radios[0]).not.toBeChecked();
+    expect(radios[2]).toBeEnabled();
+    await user.click(radios[1]);
+    expect(radios[1]).toBeChecked();
     expect(screen.getByRole("button", { name: "Assign activity" })).toBeEnabled();
   });
 
@@ -134,7 +131,7 @@ describe("assignment activity selection", () => {
     await user.click(screen.getAllByRole("radio")[0]);
     expect(screen.getByRole("button", { name: "Assign activity" })).toBeEnabled();
     const next = change === "removed" ? activities.slice(1)
-      : change === "unsupported" ? [{ ...activities[0], type: "bohr_model_intro" as const }, activities[1]] : activities;
+      : change === "unsupported" ? [{ ...activities[0], type: "future_activity" as ActivityCatalogEntry["type"] }, activities[1]] : activities;
     view.rerender(<AssignmentForm classId="class" activities={next}
       assignedActivityIds={change === "assigned" ? [activities[0].id] : []} />);
     expect(screen.getByRole("button", { name: "Assign activity" })).toBeDisabled();

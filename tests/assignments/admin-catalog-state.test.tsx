@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { getActivityDefinition } from "@/lib/activities/registry";
 
 const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), teacher: vi.fn() }));
 vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
@@ -83,17 +82,15 @@ describe("teacher catalog safety states", () => {
     expect(html).toContain("This class has no assigned activities");
   });
 
-  it.each([
-    "bohr_model_intro", "bohr_model_stability",
-  ])("labels existing %s assignments with their support restriction", async (type) => {
-    mocks.catalog.mockResolvedValue({ data: [{ ...activity, type }], error: null });
+  it("labels an existing assignment of an unrecognised type with its support restriction", async () => {
+    mocks.catalog.mockResolvedValue({ data: [{ ...activity, type: "future_activity" }], error: null });
     mocks.assignments.mockResolvedValue({ data: [assignment], error: null });
     const html = await render();
     expect(html).toContain("Activity title");
     expect(html).toContain("New assignments unavailable");
     expect(html).toContain("Edit dates for Activity title");
     expect(html).toContain("Unassign");
-    expect(html).toContain(getActivityDefinition(type)?.newAssignmentBlockReason);
+    expect(html).toContain("This activity is not supported for new assignments.");
   });
 
   it("retains a useful unavailable label when an existing assignment has no catalog entry", async () => {

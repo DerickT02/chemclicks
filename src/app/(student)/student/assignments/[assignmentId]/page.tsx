@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AttemptHistory from "@/components/assignments/AttemptHistory";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getAssignmentAttempts } from '@/lib/server/student-assignments';
@@ -6,6 +7,7 @@ import { notFound, redirect } from "next/navigation";
 import { getStudentAssignmentSchedules } from "@/lib/db/student-assignments";
 import { scheduleStatus } from "@/lib/assignments/schedule";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
+import BohrModelViewer from "@/components/bohr-models/BohrModelViewer";
 import MeasurementComparison from "@/components/measurement/MeasurementComparison";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
@@ -65,6 +67,7 @@ export default async function AssignmentPage({ params }: {
             </section>
           )}
           <section className="rounded-xl border border-border bg-card p-6">
+            {explorer === "bohr" && <BohrModelViewer />}
             {explorer === "lewis-diagram" && <LewisDotExplorer />}
             {explorer === "ionic" && <IonicCompoundExplorer />}
             {explorer === "covalent" && <CovalentBondExplorer />}
@@ -118,6 +121,15 @@ export default async function AssignmentPage({ params }: {
           )}
         </AssignmentAccess>
         {quizKind && <LewisQuizCard kind={quizKind} assignments={result.assignments} />}
+        {explorer === "bohr" && (
+          <section className="space-y-3 rounded-xl border border-border bg-card p-6">
+            <h2 className="text-lg font-semibold">Bohr Models Quiz</h2>
+            <Link href="/student/quizzes/bohr" prefetch={false}
+              className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
+              Start quiz
+            </Link>
+          </section>
+        )}
       </div>
     </main>
   );
