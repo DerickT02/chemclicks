@@ -78,7 +78,7 @@ describe("mocked assign → open → finish contract (not a live deployment chec
     }] });
     const html = renderToStaticMarkup(await AssignmentPage({ params: Promise.resolve({ assignmentId }) }));
     expect(html).toContain(`Explorer: ${definition.explorer}`);
-    expect(html).toContain("exploration participation, not quiz scores");
+    expect(html).toContain("Saved exploration history");
     expect(html).not.toContain("exercise is not available yet");
 
     const attemptForm = new FormData();

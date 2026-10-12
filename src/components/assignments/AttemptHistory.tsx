@@ -7,7 +7,6 @@ export default function AttemptHistory({ attempts }: Props) {
   return (
     <details className="rounded-xl border border-border bg-card p-5">
       <summary className="cursor-pointer font-medium">Saved exploration history ({attempts.length})</summary>
-      <p className="mt-3 text-sm text-muted-foreground">These records show exploration participation, not quiz scores.</p>
       {attempts.length === 0 ? <p className="mt-3 text-sm">No exploration attempts have been saved yet.</p> : (
         <ul className="mt-3 space-y-2 text-sm">
           {attempts.map(attempt => <li key={attempt.id}>
