@@ -9,7 +9,6 @@
     "lint": "eslint",
     "test": "vitest run --config vitest.config.mts",
     "test:watch": "vitest --config vitest.config.mts",
-    "test:database": "vitest run --config vitest.database.config.mts",
     "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {

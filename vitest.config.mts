@@ -1,6 +1,5 @@
 import { defineConfig } from 'vitest/config'
 import { fileURLToPath, URL } from 'node:url'
-import { UNIT_TEST_ENV } from './scripts/test-safety.mts'
 
 export default defineConfig({
   // Never load application .env files for unit/component tests.
@@ -9,7 +8,12 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   test: {
-    env: UNIT_TEST_ENV,
+    // Inert values, so no test can reach a real Supabase project.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:1',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'unit-test-anon-key',
+      SUPABASE_SERVICE_ROLE_KEY: 'unit-test-service-role-key',
+    },
     setupFiles: [fileURLToPath(new URL('./tests/setup-unit.ts', import.meta.url))],
     // DOM suites already opt in with @vitest-environment jsdom. SSR tests stay in Node.
     environment: 'node',

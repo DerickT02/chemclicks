@@ -164,11 +164,8 @@ npm test -- tests/auth/student-login.test.ts
 ```
 
 `tests/database/` is excluded, including database-writing **schema** tests.
-`npm run test:database` uses a separate guarded configuration and fails before
-importing fixture suites unless a disposable project and explicit shell opt-in
-are supplied. These suites create/delete real database and Auth records; obtain
-specific approval before using them. See [Database testing](docs/database-testing.md)
-for fixture-only variables, target checks, limitations, and invocation.
+Those suites create and delete real database and Auth records, so no script
+runs them; use only a disposable Supabase project if you run them by hand.
 
 The safe-checks GitHub workflow runs `npm ci`, `npm test`, TypeScript, and lint,
 without Supabase secrets, database operations, migrations, or deployment.
