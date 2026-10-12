@@ -1,8 +1,11 @@
 import Link from "next/link";
+import AttemptHistory from "@/components/assignments/AttemptHistory";
+import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getAssignmentAttempts } from '@/lib/server/student-assignments';
 import AttemptControls from './AttemptControls';
 import { notFound, redirect } from "next/navigation";
-import { getStudentAssignments } from "@/lib/db/student-assignments";
+import { getStudentAssignmentSchedules } from "@/lib/db/student-assignments";
+import { scheduleStatus } from "@/lib/assignments/schedule";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 import BohrModelViewer from "@/components/bohr-models/BohrModelViewer";
 import MeasurementComparison from "@/components/measurement/MeasurementComparison";
@@ -13,6 +16,7 @@ import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
 import MeasurementQuiz from "@/components/measurement/MeasurementQuiz";
 
 import { hasActivityContent } from "@/lib/assignments/activity-content";
+import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import { measurementQuizModeForActivity } from "@/lib/measurement/modes";
 
@@ -22,52 +26,65 @@ export default async function AssignmentPage({ params }: {
   params: Promise<{ assignmentId: string }>;
 }) {
   const { assignmentId } = await params;
-  // Same authorized reader as the list; no client-supplied class/student IDs.
-  const result = await getStudentAssignments();
+  // Own-class metadata; opening access and saved-history access are separate.
+  const result = await getStudentAssignmentSchedules();
   if (result.status === "unauthenticated") redirect("/login/student");
   if (result.status === "error") throw new Error(result.message);
   const assignment = result.assignments.find((item) => item.id === assignmentId);
   if (!assignment) notFound();
 
+  // eslint-disable-next-line react-hooks/purity -- Request-time Server Component availability check.
+  const status = scheduleStatus(assignment, Date.now());
+  if (status === "Closed") redirect(`/student/assignments/${assignment.id}/history`);
+  if (status !== "Open") return (
+    <main className="min-h-screen-below-nav space-y-4 bg-background px-6 py-10 text-foreground">
+      <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
+      <p role="status">This activity is not available right now. Check its schedule on My assignments or ask your teacher.</p>
+    </main>
+  );
   const type = assignment.activity.type;
+  const definition = getActivityDefinition(type);
+  const explorer = definition?.explorer;
   const quizKind = lewisQuizForLesson(type);
   const measurementQuizMode = measurementQuizModeForActivity(type);
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
-  const explorationAttempts = attempts.filter((attempt) => attempt.quiz_key === null);
+  // Quiz attempts share the table; exploration rows carry no quiz key.
+  const explorationAttempts = attempts.filter((attempt) => !attempt.quiz_key);
   const measurementAttempts = attempts.filter((attempt) => attempt.instrument !== null && attempt.instrument !== undefined);
   const latest = explorationAttempts[0];
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-5xl space-y-6">
-        <Link href="/student" className="text-accent underline">Back to assignments</Link>
         <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
-        <AssignmentAccess key={`${assignment.id}:${assignment.closes_at}`} closesAt={assignment.closes_at}>
+        <AssignmentAccess key={assignment.id} closesAt={assignment.closes_at}>
           {hasActivityContent(type) && (
-            <section aria-label="Exploration attempts" className="rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-3 text-lg font-semibold">Exploration attempts</h2>
-              <AttemptControls key={latest?.id ?? 'new'} assignmentId={assignmentId} attemptId={latest?.id} completed={latest?.status === 'completed'} />
-              <p className="mt-3 text-sm text-muted-foreground">{explorationAttempts.length} attempts. Completion records exploration participation, not a quiz score.</p>
-              <ul className="mt-3 space-y-2 text-sm">
-                {explorationAttempts.map(attempt => <li key={attempt.id}>
-                  Attempt {attempt.attempt_number}: {attempt.status === 'completed' ? 'Completed' : 'In progress'} — started {new Date(attempt.started_at).toLocaleString('en-US', { timeZone: 'UTC' })} UTC
-                  {attempt.completed_at && <>; completed {new Date(attempt.completed_at).toLocaleString('en-US', { timeZone: 'UTC' })} UTC</>}
-                </li>)}
-              </ul>
+            <section aria-label="Exploration instructions" className="space-y-3 rounded-xl border border-border bg-card p-5">
+              <h2 className="text-lg font-semibold">Goal: {definition?.description}</h2>
+              <p className="text-sm text-muted-foreground">Start exploration to record participation, try a few examples or readings below, then use Finish exploration after the exercise. Opening the page alone does not save completion.</p>
+              {latest?.status === "completed" ? <p role="status">Completion saved. This records exploration participation, not a quiz score. You can review the exercise without starting again.</p>
+                : latest ? <p>Your exploration is in progress. Continue below, then save your completion.</p> : null}
+              {(!latest || latest.status === "completed") && <AttemptControls key={latest?.id ?? 'new'} assignmentId={assignmentId} attemptId={latest?.id} completed={latest?.status === 'completed'} />}
             </section>
           )}
           <section className="rounded-xl border border-border bg-card p-6">
-            {(type === "bohr_model_intro" || type === "bohr_model_stability") && <BohrModelViewer />}
-            {type === "lewis_diagram" && <LewisDotExplorer />}
-            {type === "lewis_structures_ionic" && <IonicCompoundExplorer />}
-            {type === "lewis_structures_covalent" && <CovalentBondExplorer />}
-            {type === "measurement_graduated_cylinder" && <MeasurementComparison instrument="cylinder" />}
-            {(type === "measurement_ruler_tenths" || type === "measurement_ruler_hundredths") && (
-              <MeasurementComparison instrument="ruler" />
-            )}
+            {explorer === "bohr" && <BohrModelViewer />}
+            {explorer === "lewis-diagram" && <LewisDotExplorer />}
+            {explorer === "ionic" && <IonicCompoundExplorer />}
+            {explorer === "covalent" && <CovalentBondExplorer />}
+            {explorer === "cylinder" && <MeasurementComparison instrument="cylinder" />}
+            {explorer === "ruler" && <MeasurementComparison instrument="ruler" />}
             {!hasActivityContent(type) && (
-              <p className="text-muted-foreground">This activity’s exercise is not available yet.</p>
+              <div className="space-y-2 text-muted-foreground" role="status">
+                <p>This activity’s exercise is not available yet.</p>
+                <p>{getNewAssignmentBlockReason(type)}</p>
+              </div>
             )}
           </section>
+          {latest?.status === "in_progress" && <section aria-label="Finish exploration" className="space-y-3 rounded-xl border border-border bg-card p-5">
+            <p className="text-sm">Finished exploring? Save your participation below, then return to assignments or take an available quiz.</p>
+            <AttemptControls key={latest.id} assignmentId={assignmentId} attemptId={latest.id} completed={false} />
+          </section>}
+          {hasActivityContent(type) && <AttemptHistory attempts={explorationAttempts} />}
           {measurementQuizMode && (
             <>
               <section aria-label="Measurement quiz history" className="rounded-xl border border-border bg-card p-6">
@@ -85,7 +102,7 @@ export default async function AssignmentPage({ params }: {
                           <p className="mt-1">
                             {`${attempt.score ?? 0} of ${attempt.question_total ?? 0} correct · ${attempt.passed ? "Passed" : "Not passed"}`}
                             {attempt.completed_at && (
-                              <> · completed <time dateTime={attempt.completed_at}>{new Date(attempt.completed_at).toLocaleString("en-US", { timeZone: "UTC" })} UTC</time></>
+                              <> · completed <LocalizedTimestamp value={attempt.completed_at} /></>
                             )}
                           </p>
                         ) : (
@@ -104,6 +121,15 @@ export default async function AssignmentPage({ params }: {
           )}
         </AssignmentAccess>
         {quizKind && <LewisQuizCard kind={quizKind} assignments={result.assignments} />}
+        {explorer === "bohr" && (
+          <section className="space-y-3 rounded-xl border border-border bg-card p-6">
+            <h2 className="text-lg font-semibold">Bohr Models Quiz</h2>
+            <Link href="/student/quizzes/bohr" prefetch={false}
+              className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
+              Start quiz
+            </Link>
+          </section>
+        )}
       </div>
     </main>
   );

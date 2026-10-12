@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AuthCard,
   AuthField,
+  AuthFormError,
   AuthFooter,
   AuthPageLayout,
   AuthPrimaryButton,
@@ -12,6 +13,7 @@ import {
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentID, validateStudentCode } from "@/lib/auth/validate-student-signup";
 import { loginStudent } from "./actions";
+import { SESSION_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 export default function StudentLoginPage() {
   const [studentID, setStudentID] = useState("");
@@ -44,20 +46,27 @@ export default function StudentLoginPage() {
     }
 
     setIsSubmitting(true);
-    const result = await loginStudent(normalizedStudentID, normalizedCode);
-    if (!result.ok) {
-      if (result.field === "studentID") setStudentIDError(result.message);
-      else if (result.field === "code") setCodeError(result.message);
-      else setFormError(result.message);
-      setIsSubmitting(false);
-      return;
-    }
+    try {
+      const result = await loginStudent(normalizedStudentID, normalizedCode);
+      if (!result.ok) {
+        if (result.field === "studentID") setStudentIDError(result.message);
+        else if (result.field === "code") setCodeError(result.message);
+        else setFormError(result.message);
+        return;
+      }
 
-    setStudentID(normalizedStudentID);
-    setCode(normalizedCode);
-    setIsSubmitting(false);
-    setIsLoggedIn(true);
-    window.location.href = "/student";
+      setStudentID(normalizedStudentID);
+      setCode(normalizedCode);
+      setIsLoggedIn(true);
+      // Reload the document so shared layouts see the newly established session.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- intentionally discard pre-login layout state
+      window.location.assign("/student");
+    } catch {
+      setIsLoggedIn(false);
+      setFormError(SESSION_RETRY_MESSAGE);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -66,6 +75,9 @@ export default function StudentLoginPage() {
         title="Student Login"
         footer={
           <AuthFooter className="flex flex-col gap-2">
+            <Link href="/create-account/student" className={authSecondaryLinkClassName}>
+              Join a class
+            </Link>
             <Link href="/login/teacher" className={authSecondaryLinkClassName}>
               Not a student?
             </Link>
@@ -99,9 +111,9 @@ export default function StudentLoginPage() {
             }}
             error={codeError}
           />
-          {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+          <AuthFormError message={formError} />
           {isLoggedIn ? (
-            <p className="text-sm text-green-600">Student login successful.</p>
+            <p className="text-sm text-muted-foreground" role="status">Signed in. Opening your assignments...</p>
           ) : null}
           <AuthPrimaryButton type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Signing in..." : "Sign in"}

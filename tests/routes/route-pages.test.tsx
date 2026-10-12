@@ -5,7 +5,6 @@ import NotFound from "../../src/app/not-found";
 import AppError from "../../src/app/error";
 import LoginRolePage from "../../src/app/login/page";
 import MeasurementLabPage from "../../src/app/(student)/student/labs/measurement/page";
-import MeasurementQuestionsPage from "../../src/app/(student)/student/labs/measurement/questions/page";
 
 import LewisLabPage from "@/app/(student)/student/labs/lewis/page";
 
@@ -43,7 +42,7 @@ describe("route page behavior", () => {
     expect(() => LewisLabPage()).not.toThrow();
   });
 
-  it("renders every Lewis explorer on the Lewis lab and links to its quiz", () => {
+  it("renders every Lewis explorer on the practice lab without quiz links", () => {
     const html = renderToStaticMarkup(<LewisLabPage />);
 
     expect(html).toContain("Lewis Diagrams");
@@ -51,14 +50,14 @@ describe("route page behavior", () => {
     expect(html).toContain("Covalent Bonds");
     expect(html).toContain("Example Salts");
     expect(html).toContain("Example Molecules");
-    expect(html).toContain('href="/student/quizzes/lewis"');
+    expect(html).not.toContain("/student/quizzes/");
   });
 
-  it("links the measurement lab to its practice questions", () => {
+  it("offers no practice questions in the measurement lab", () => {
     const html = renderToStaticMarkup(<MeasurementLabPage />);
 
-    expect(html).toContain('href="/student/labs/measurement/questions"');
-    expect(html).toContain("Practice measurement questions");
+    expect(html).not.toContain("/student/labs/measurement/questions");
+    expect(html).not.toMatch(/quiz|questions/i);
   });
 
   it("offers only the tenths ruler in the measurement lab", () => {
@@ -68,15 +67,5 @@ describe("route page behavior", () => {
     expect(html).toContain("nearest tenth of a centimeter");
     expect(html).toContain('aria-valuetext="5.0 centimeters"');
     expect(html.toLowerCase()).not.toContain("hundredth");
-  });
-
-  it("renders the measurement questions page with the instrument chooser", () => {
-    const html = renderToStaticMarkup(<MeasurementQuestionsPage />);
-
-    expect(html).toContain("Measurement Questions");
-    expect(html).toContain("Start ruler questions");
-    expect(html).toContain("Start graduated cylinder questions");
-    expect(html).toContain('href="/student/labs/measurement"');
-    expect(html).not.toContain("Page not found");
   });
 });

@@ -112,6 +112,7 @@ describe("QuizShell", () => {
     expect(
       screen.queryByRole("link", { name: "Continue to next section" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to assignments" })).toHaveAttribute("href", "/student");
   });
 
   it("shows a retry action when saving the final result fails", async () => {

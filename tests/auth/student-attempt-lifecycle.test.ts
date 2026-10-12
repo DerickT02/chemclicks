@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
-const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), refresh: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 vi.mock('@/lib/auth/student-session', () => ({ getStudentSession: mocks.session }))
 vi.mock('@/lib/server/database', () => ({ createServiceClient: () => ({ rpc: mocks.rpc }) }))
 import { transitionStudentAttempt } from '@/lib/server/student-assignments'
+import { saveAttempt } from '@/app/(student)/student/assignments/[assignmentId]/actions'
 import { assignmentIsOpen, isSupportedExploration } from '@/lib/activities/availability'
 const assignment = '11111111-1111-1111-1111-111111111111'
 const attempt = '22222222-2222-2222-2222-222222222222'
-beforeEach(() => { vi.clearAllMocks(); mocks.session.mockResolvedValue({ studentId: 'student', classId: 'class' }) })
+beforeEach(() => { vi.clearAllMocks(); mocks.refresh.mockReset(); mocks.session.mockResolvedValue({ studentId: 'student', classId: 'class' }) })
 describe('attempt lifecycle boundary', () => {
   it('uses verified session identity and does not accept scores or timestamps', async () => {
     mocks.rpc.mockResolvedValue({ data: [{ id: attempt }], error: null })
@@ -30,6 +32,20 @@ describe('attempt lifecycle boundary', () => {
   it('reports database failure without claiming completion', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code: '42501' } })
     await expect(transitionStudentAttempt(assignment, 'start')).rejects.toThrow('Could not save')
+  })
+  it('returns no error after a confirmed save', async () => {
+    const form = new FormData()
+    form.set('assignmentId', assignment); form.set('action', 'complete'); form.set('attemptId', attempt)
+    mocks.rpc.mockResolvedValue({ data: [{ id: attempt, status: 'completed' }], error: null })
+    expect(await saveAttempt({ error: null }, form)).toEqual({ error: null })
+  })
+  it('never announces completion or refreshes after a failed save', async () => {
+    const form = new FormData()
+    form.set('assignmentId', assignment); form.set('action', 'complete'); form.set('attemptId', attempt)
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: '42501' } })
+    const result = await saveAttempt({ error: null }, form)
+    expect(result.error).toContain('Could not save')
+    expect(mocks.refresh).not.toHaveBeenCalled()
   })
   it('matches the inclusive open and exclusive close boundaries', () => {
     expect(assignmentIsOpen(null, null, 1000)).toBe(true)

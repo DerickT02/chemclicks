@@ -2,12 +2,15 @@ import "server-only";
 
 import { isAssignmentAvailable } from "@/lib/assignments/availability";
 import { LEWIS_QUIZZES, type LewisQuizKind } from "@/lib/assignments/lewis-quizzes";
-import { getStudentAssignments, type StudentAssignment } from "@/lib/db/student-assignments";
+import { scheduleStatus } from "@/lib/assignments/schedule";
+import { getStudentAssignmentSchedules, type StudentAssignment } from "@/lib/db/student-assignments";
 
 export type LewisQuizAccess =
   | { status: "unauthenticated" }
   | { status: "error"; message: string }
   | { status: "locked" }
+  | { status: "scheduled"; assignment: StudentAssignment }
+  | { status: "closed"; assignment: StudentAssignment }
   | { status: "available"; assignment: StudentAssignment };
 
 /**
@@ -28,9 +31,13 @@ export function findLewisQuizAssignment(
 
 /** Resolves access from the signed-in student's own class assignments. */
 export async function getLewisQuizAccess(kind: LewisQuizKind): Promise<LewisQuizAccess> {
-  const result = await getStudentAssignments();
+  const result = await getStudentAssignmentSchedules();
   if (result.status !== "ok") return result;
 
-  const assignment = findLewisQuizAssignment(result.assignments, kind);
-  return assignment ? { status: "available", assignment } : { status: "locked" };
+  const assignment = result.assignments.find((item) =>
+    item.activity.type === LEWIS_QUIZZES[kind].lessonType,
+  );
+  if (!assignment) return { status: "locked" };
+  const status = scheduleStatus(assignment, Date.now());
+  return { status: status === "Open" ? "available" : status === "Scheduled" ? "scheduled" : "closed", assignment };
 }

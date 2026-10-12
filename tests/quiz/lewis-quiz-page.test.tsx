@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { isValidElement } from "react";
+import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 
 const getAccess = vi.hoisted(() => vi.fn());
 const listQuestions = vi.hoisted(() => vi.fn());
@@ -21,9 +23,10 @@ vi.mock("@/lib/db/quiz-questions", () => ({
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/lewis/LewisQuiz", () => ({
-  default: ({ title, questions }: { title: string; questions: unknown[] }) => (
-    <p>{`${title} with ${questions.length} questions`}</p>
-  ),
+  default: ({ title, questions, loadError }: { title: string; questions: unknown[]; loadError?: string | null }) => loadError
+    ? <p role="alert">{loadError}</p>
+    : questions.length === 0 ? <p>No quiz questions are available right now.</p>
+    : <p>{`${title} with ${questions.length} questions`}</p>,
 }));
 import LewisQuizPage from "@/components/quiz/lewis/LewisQuizPage";
 import CovalentQuizRoute from "@/app/(student)/student/quizzes/covalent/page";
@@ -72,7 +75,21 @@ describe.each([
 
     expect(listQuestions).toHaveBeenCalledWith(expect.anything(), quizKey);
     expect(html).toContain(`${title} with 3 questions`);
+    expect(html).not.toContain("Check your understanding");
+    expect(html).not.toContain("Back to");
+    expect(html).not.toContain("before moving on");
     expect(html).not.toContain('role="alert"');
+  });
+
+  it.each([
+    ["scheduled", "This quiz is not open yet."],
+    ["closed", "This quiz is closed."],
+    ["locked", "This quiz is locked."],
+  ])("explains %s access without reading quiz content", async (status, message) => {
+    getAccess.mockResolvedValue({ status, assignment: { id: "assignment-1" } });
+    const html = await render();
+    expect(html).toContain(message);
+    expect(listQuestions).not.toHaveBeenCalled();
   });
 
   it("shows a failure state instead of an empty or successful-looking quiz", async () => {
@@ -87,6 +104,29 @@ describe.each([
     expect(html).toContain("couldn&#x27;t load the quiz questions");
     expect(html).not.toContain(" with ");
     expect(html).not.toContain("permission denied");
+  });
+
+  it("keeps the same quiz boundary when dates change or question loading fails", async () => {
+    listQuestions.mockResolvedValue({ data: [question], error: null });
+    const boundary = async () => {
+      const page = await LewisQuizPage({ kind });
+      const children: unknown[] = page.props.children.props.children;
+      const node = children.find(child => isValidElement(child) && child.type === AssignmentAccess);
+      if (!isValidElement<{ closesAt: string | null; contentType: string }>(node)) throw new Error("Missing quiz boundary");
+      return node;
+    };
+    const initial = await boundary();
+    getAccess.mockResolvedValue({ status: "available", assignment: { id: "assignment-1", closes_at: "2030-01-01T12:00:00Z" } });
+    listQuestions.mockRejectedValue(new Error("private query failure"));
+    const refreshed = await boundary();
+    expect(initial.key).toBe("assignment-1");
+    expect(refreshed.key).toBe(initial.key);
+    expect(refreshed.props).toMatchObject({ closesAt: "2030-01-01T12:00:00Z", contentType: "quiz" });
+    const html = renderToStaticMarkup(await LewisQuizPage({ kind }));
+    expect(html).toContain("couldn&#x27;t load the quiz questions");
+    expect(html).not.toContain("private query failure");
+    getAccess.mockResolvedValue({ status: "available", assignment: { id: "assignment-2", closes_at: null } });
+    expect((await boundary()).key).toBe("assignment-2");
   });
 
   it("shows an empty state when there are no active questions", async () => {

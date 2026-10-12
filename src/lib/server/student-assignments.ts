@@ -1,24 +1,31 @@
 import 'server-only'
 import { getStudentSession } from '@/lib/auth/student-session'
 import { createServiceClient } from '@/lib/server/database'
-import { getStudentAssignments } from '@/lib/db/student-assignments'
+import { getStudentAssignmentSchedules } from '@/lib/db/student-assignments'
+import { scheduleStatus } from '@/lib/assignments/schedule'
 import type { StudentAttempt } from '@/lib/db/student_attempts'
 
+export type ExplorationAttempt = Pick<StudentAttempt, 'id' | 'attempt_number' | 'status' | 'started_at' | 'completed_at'>
+
+/** Own saved exploration and quiz attempts, including closed work; never returns exercise content or permits writes. */
 export async function getAssignmentAttempts(assignmentId: string): Promise<StudentAttempt[]> {
   const session = await getStudentSession()
   if (!session) throw new Error('Please sign in as a student.')
-  const assignments = await getStudentAssignments()
-  if (assignments.status !== 'ok' || !assignments.assignments.some(a => a.id === assignmentId)) throw new Error('Assignment unavailable.')
+  const assignments = await getStudentAssignmentSchedules()
+  const assignment = assignments.status === 'ok' ? assignments.assignments.find(a => a.id === assignmentId) : undefined
+  if (!assignment || !['Open', 'Closed'].includes(scheduleStatus(assignment, Date.now()))) throw new Error('Assignment unavailable.')
   const client = createServiceClient()
   const { data: progress, error } = await client.from('student_progress').select('id')
     .eq('student_id', session.studentId).eq('class_activity_id', assignmentId).maybeSingle()
   if (error) throw new Error('Progress could not be loaded.')
   if (!progress) return []
-  // Quiz attempts share this progress row; only exploration rows drive the attempt controls.
-  const { data, error: attemptError } = await client.from('student_attempts').select('*')
-    .eq('progress_id', progress.id).is('quiz_key', null).order('attempt_number', { ascending: false })
-  if (attemptError) throw new Error('Attempts could not be loaded.')
-  return data as StudentAttempt[]
+  // Exploration and quiz attempts share this progress row; callers separate them by quiz_key.
+  const { data, error: attemptError } = await client.from('student_attempts')
+    .select('*')
+    .eq('progress_id', progress.id).order('attempt_number', { ascending: false })
+    .returns<StudentAttempt[]>()
+  if (attemptError || data === null) throw new Error('Attempts could not be loaded.')
+  return data
 }
 
 export type AttemptAction = 'start' | 'complete' | 'retry'

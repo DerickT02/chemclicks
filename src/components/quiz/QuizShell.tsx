@@ -179,6 +179,12 @@ export default function QuizShell({
               Continue to next section
             </Link>
           )}
+          <Link
+            href="/student"
+            className={result.passed && !result.nextDestination ? primaryButtonClassName : secondaryButtonClassName}
+          >
+            Back to assignments
+          </Link>
           {result.passed && result.attemptId && !result.nextDestination && (
             <p className="text-sm text-muted-foreground">
               Your passing result is saved. No next assigned section is

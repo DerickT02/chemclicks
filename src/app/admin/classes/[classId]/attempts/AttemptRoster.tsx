@@ -1,17 +1,12 @@
 import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
 
-const dateFormat = new Intl.DateTimeFormat('en-US', {
-  dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC',
-})
-function Timestamp({ value }: { value: string }) {
-  return <time dateTime={value}>{dateFormat.format(new Date(value))} UTC</time>
-}
+import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
 
 export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
   return (
     <section aria-labelledby="activity-title" className="rounded-xl border border-border bg-card p-5">
       <h2 id="activity-title" className="text-xl font-semibold">{summary.activityTitle}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{summary.students.length} students enrolled. Counts include completed and in-progress attempts. All times are UTC.</p>
+      <p className="mt-2 text-sm text-muted-foreground">{summary.students.length} students enrolled.</p>
       {summary.students.length === 0 ? <p className="mt-5">No students enrolled in this class yet.</p> : (
         <ul className="mt-5 divide-y divide-border">
           {summary.students.map(student => (
@@ -52,8 +47,8 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                             ) : attempt.quizKey ? `Quiz · ${attempt.quizKey}` : 'Exploration'}
                           </td>
                           <td className="p-2">{attempt.status === 'completed' ? 'Completed' : 'In progress'}</td>
-                          <td className="whitespace-nowrap p-2"><Timestamp value={attempt.startedAt} /></td>
-                          <td className="whitespace-nowrap p-2">{attempt.completedAt ? <Timestamp value={attempt.completedAt} /> : 'Not completed'}</td>
+                          <td className="whitespace-nowrap p-2"><LocalizedTimestamp value={attempt.startedAt} /></td>
+                          <td className="whitespace-nowrap p-2">{attempt.completedAt ? <LocalizedTimestamp value={attempt.completedAt} /> : 'Not completed'}</td>
                         </tr>
                       ))}</tbody>
                     </table>

@@ -9,14 +9,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({
   createClass: vi.fn(),
   generateClassCode: vi.fn(),
-  refresh: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock("@/app/admin/create-class/actions", () => ({
   createClass: mock.createClass,
   generateClassCode: mock.generateClassCode,
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mock.refresh }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mock.push }) }));
 
 import CreateClassPage from "@/app/admin/create-class/page";
 
@@ -26,6 +26,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const codeInput = () => screen.getByLabelText("Class code");
+// A created class opens on the dashboard, which shows its saved code.
+const opensCreatedClass = () => waitFor(() =>
+  expect(mock.push).toHaveBeenCalledWith("/admin?classId=class-1&classCreated=1"));
 
 describe("create class form", () => {
   it("generates a code and replaces it on regenerate", async () => {
@@ -59,7 +62,7 @@ describe("create class form", () => {
       classCode: "A1B2C3",
       codeSource: "generated",
     });
-    expect(await screen.findByText("Class created with code A1B2C3.")).toBeInTheDocument();
+    await opensCreatedClass();
   });
 
   it("switches back to manual when the teacher edits a generated code", async () => {
@@ -78,7 +81,7 @@ describe("create class form", () => {
     expect(mock.createClass).toHaveBeenCalledWith(
       expect.objectContaining({ classCode: "MINE12", codeSource: "manual" }),
     );
-    expect(await screen.findByText("Class created with code MINE12.")).toBeInTheDocument();
+    await opensCreatedClass();
   });
 
   it("keeps the entered values and shows an accessible error for a duplicate code", async () => {
@@ -164,6 +167,7 @@ describe("create class form", () => {
     expect(screen.getByRole("button", { name: "Generate code" })).toBeDisabled();
 
     resolve({ ok: true, classId: "class-1", classCode: "A1B2C3" });
-    await waitFor(() => expect(screen.getByText("Class created with code A1B2C3.")).toBeInTheDocument());
+    await opensCreatedClass();
+    expect(mock.push).toHaveBeenCalledTimes(1);
   });
 });

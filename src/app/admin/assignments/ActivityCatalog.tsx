@@ -1,6 +1,7 @@
 "use client";
 
 import type { ActivityCatalogEntry } from "@/lib/db/activities";
+import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 
 type Props = {
   /** Activities the teacher can still assign (already-assigned entries excluded). */
@@ -39,7 +40,9 @@ export default function ActivityCatalog({
       </legend>
       <div className="grid gap-3 sm:grid-cols-2">
         {activities.map((activity) => {
-          const isSelected = selectedActivityId === activity.id;
+          const blockReason = getNewAssignmentBlockReason(activity.type);
+          const disabled = Boolean(blockReason);
+          const isSelected = !disabled && selectedActivityId === activity.id;
           const descriptionId = `activity-${activity.id}-description`;
 
           return (
@@ -49,13 +52,14 @@ export default function ActivityCatalog({
                 isSelected
                   ? "border-accent bg-accent/10"
                   : "border-border bg-background/40 hover:border-ring"
-              }`}
+              } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
             >
               <input
                 type="radio"
                 name="activity_id"
                 value={activity.id}
                 checked={isSelected}
+                disabled={disabled}
                 aria-describedby={descriptionId}
                 onChange={() => onSelect(activity.id)}
                 className="mt-1 size-4 shrink-0 accent-accent"
@@ -66,7 +70,7 @@ export default function ActivityCatalog({
                     {activity.title}
                   </span>
                   <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    {activity.category}
+                    {blockReason ? "Unavailable" : activity.category}
                   </span>
                 </span>
                 <span
@@ -74,6 +78,7 @@ export default function ActivityCatalog({
                   className="mt-1 block text-xs leading-relaxed text-muted-foreground"
                 >
                   {activity.description}
+                  {blockReason ? <span className="mt-2 block font-medium">{blockReason}</span> : null}
                 </span>
               </span>
             </label>

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { createClass, generateClassCode } from "./actions";
@@ -18,7 +17,6 @@ export default function CreateClassPage() {
   const [classNameError, setClassNameError] = useState<string | undefined>();
   const [nameSectionError, setNameSectionError] = useState<string | undefined>();
   const [submitError, setSubmitError] = useState<string | undefined>();
-  const [submitSuccess, setSubmitSuccess] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
   const [isGenerating, startGenerating] = useTransition();
   const busyRef = useRef(false);
@@ -36,7 +34,6 @@ export default function CreateClassPage() {
     if (busyRef.current) return;
     busyRef.current = true;
     setClassCodeError(undefined);
-    setSubmitSuccess(undefined);
 
     startGenerating(async () => {
       try {
@@ -61,7 +58,6 @@ export default function CreateClassPage() {
     setClassNameError(undefined);
     setNameSectionError(undefined);
     setSubmitError(undefined);
-    setSubmitSuccess(undefined);
 
     const trimmedName = className.trim();
     if (!trimmedName) {
@@ -95,13 +91,9 @@ export default function CreateClassPage() {
           return;
         }
 
-        setSubmitSuccess(`Class created with code ${result.classCode}.`);
-        setClassName("");
-        setSection("");
-        setClassCode("");
-        setCodeSource("manual");
-        setHasGenerated(false);
-        router.refresh();
+        router.push(`/admin?classId=${encodeURIComponent(result.classId)}&classCreated=1`);
+      } catch {
+        setSubmitError("We could not confirm the class was created. Check your classrooms before trying again.");
       } finally {
         busyRef.current = false;
       }
@@ -117,18 +109,7 @@ export default function CreateClassPage() {
   return (
     <div className="min-h-screen bg-background p-6 text-foreground md:p-10">
       <div className="mx-auto max-w-md">
-        <Link
-          href="/admin"
-          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        >
-          ← Back to classrooms
-        </Link>
-
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight">Add a class</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Choose a display name, section label (optional), and a unique 6-character code
-          students will use to join. Enter your own code or generate one.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">Add a class</h1>
 
         <form
           className="mt-8 flex flex-col gap-5 rounded-lg border border-border bg-card p-6 shadow-sm"
@@ -237,9 +218,6 @@ export default function CreateClassPage() {
 
           {submitError ? (
             <p className="text-sm text-destructive" role="alert">{submitError}</p>
-          ) : null}
-          {submitSuccess ? (
-            <p className="text-sm text-accent">{submitSuccess}</p>
           ) : null}
 
           <button

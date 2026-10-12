@@ -12,6 +12,7 @@ type LewisQuizProps = {
   quizKey?: string;
   /** The full question pool, loaded from the database by the page. */
   questions: QuizQuestion[];
+  loadError?: string | null;
   onComplete?: (result: QuizCompleteResult) => void;
 };
 
@@ -20,6 +21,7 @@ export default function LewisQuiz({
   assignmentId,
   quizKey,
   questions,
+  loadError,
   onComplete,
 }: LewisQuizProps) {
   return (
@@ -28,6 +30,7 @@ export default function LewisQuiz({
       pool={questions}
       questionsPerAttempt={LEWIS_QUESTIONS_PER_ATTEMPT}
       passingThresholdPercent={80}
+      loadError={loadError}
       assignmentId={assignmentId}
       quizKey={quizKey}
       onComplete={onComplete}

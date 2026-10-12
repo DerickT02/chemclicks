@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluateAnswer } from "@/lib/measurement/answer";
-import { measurementQuizModeForActivity } from "@/lib/measurement/modes";
+import { getMeasurementQuizMode, measurementQuizModeForActivity } from "@/lib/measurement/modes";
 import { MODE_QUESTION_POOL, QUESTIONS_PER_ATTEMPT, pickReadings } from "@/lib/measurement/quiz";
 
 describe("assigned measurement quiz modes", () => {
@@ -22,6 +22,16 @@ describe("assigned measurement quiz modes", () => {
       expect(readings).toHaveLength(QUESTIONS_PER_ATTEMPT);
       expect(new Set(readings).size).toBe(QUESTIONS_PER_ATTEMPT);
       expect(readings.every((reading) => pool.includes(reading))).toBe(true);
+    }
+  });
+
+  it("only asks for readings the instrument can show", () => {
+    for (const [key, pool] of Object.entries(MODE_QUESTION_POOL)) {
+      const { spec } = getMeasurementQuizMode(key as keyof typeof MODE_QUESTION_POOL);
+      for (const reading of pool) {
+        expect(reading).toBeGreaterThanOrEqual(spec.min);
+        expect(reading).toBeLessThanOrEqual(spec.max);
+      }
     }
   });
 

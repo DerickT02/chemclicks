@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+
+// The quiz imports its assignment server actions; unit tests never run them.
+vi.mock("server-only", () => ({}));
 
 import GraduatedCylinder from "../../src/components/measurement/GraduatedCylinder";
 import MeasurementQuiz, {
