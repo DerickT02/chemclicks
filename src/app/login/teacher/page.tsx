@@ -12,8 +12,16 @@ import {
   AuthPrimaryButton,
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
+import {
+  buildTeacherPasswordResetRedirectTo,
+  getTeacherPasswordResetMessage,
+} from "@/lib/auth/teacher-email-verification";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
-import { INVALID_CREDENTIALS_MESSAGE } from "@/lib/errors/user-facing-errors";
+import {
+  DATABASE_RETRY_MESSAGE,
+  GENERIC_RETRY_MESSAGE,
+  INVALID_CREDENTIALS_MESSAGE,
+} from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TeacherLoginPage() {
@@ -43,10 +51,50 @@ function TeacherLoginForm() {
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resetNotice, setResetNotice] = useState<string | undefined>();
+  const [isSendingReset, setIsSendingReset] = useState(false);
   const verificationRequired = searchParams.get("verification") === "required";
+  const passwordWasReset = searchParams.get("password") === "reset";
 
   async function handleForgottenPassword() {
-    // TODO. Blank for SCRUM-184.
+    setEmailError(undefined);
+    setPasswordError(undefined);
+    setFormError(undefined);
+    setResetNotice(undefined);
+
+    if (!email.trim()) {
+      setEmailError("Enter your email above to reset your password.");
+      return;
+    }
+
+    const nextEmailError = validateTeacherEmail(email);
+    if (nextEmailError) {
+      setEmailError(nextEmailError);
+      return;
+    }
+
+    setIsSendingReset(true);
+
+    try {
+      const supabase = createClient();
+      const normalizedEmail = email.trim();
+
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: buildTeacherPasswordResetRedirectTo(window.location.origin),
+      });
+
+      if (error) {
+        setFormError(GENERIC_RETRY_MESSAGE);
+        return;
+      }
+
+      // Generic message so we don't reveal whether the email has an account.
+      setResetNotice(getTeacherPasswordResetMessage(normalizedEmail));
+    } catch {
+      setFormError(GENERIC_RETRY_MESSAGE);
+    } finally {
+      setIsSendingReset(false);
+    }
   }
 
   async function handleLogin(e: FormEvent) {
@@ -54,11 +102,11 @@ function TeacherLoginForm() {
     setEmailError(undefined);
     setPasswordError(undefined);
     setFormError(undefined);
+    setResetNotice(undefined);
 
     const nextEmailError = validateTeacherEmail(email);
     if (nextEmailError) {
       setEmailError(nextEmailError);
-      setPassword("");
       return;
     }
 
@@ -69,37 +117,43 @@ function TeacherLoginForm() {
 
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const normalizedEmail = email.trim();
+    try {
+      const supabase = createClient();
+      const normalizedEmail = email.trim();
 
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
 
-    if (signInError) {
-      setFormError(INVALID_CREDENTIALS_MESSAGE);
-      setPassword("");
+      if (signInError) {
+        setFormError(INVALID_CREDENTIALS_MESSAGE);
+        setPassword("");
+        return;
+      }
+
+      // Teacher membership is separate from student access; no administrator approval is required.
+      const { data: teacher, error: teacherError } = await supabase
+        .from("teachers")
+        .select("id")
+        .eq("id", signInData.user.id)
+        .maybeSingle();
+
+      if (teacherError || !teacher) {
+        setFormError(teacherError
+          ? DATABASE_RETRY_MESSAGE
+          : "This account does not have a teacher profile. Sign in with a teacher account.");
+        setPassword("");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      router.push("/admin");
+    } catch {
+      setFormError(DATABASE_RETRY_MESSAGE);
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    // Confirm the user has an approved teacher account in public.teachers
-    const { data: teacher, error: teacherError } = await supabase
-      .from("teachers")
-      .select("id")
-      .eq("id", signInData.user.id)
-      .maybeSingle();
-
-    if (teacherError || !teacher) {
-      await supabase.auth.signOut();
-      setFormError("This account is not approved as a teacher. Please contact your administrator.");
-      setPassword("");
-      setIsSubmitting(false);
-      return;
-    }
-
-    router.push("/admin");
   }
 
   return (
@@ -114,9 +168,10 @@ function TeacherLoginForm() {
             <button
               type="button"
               onClick={() => void handleForgottenPassword()}
+              disabled={isSendingReset}
               className={authSecondaryLinkClassName}
             >
-              Forgot password?
+              {isSendingReset ? "Sending reset link..." : "Forgot password?"}
             </button>
             <Link href="/login/student" className={authSecondaryLinkClassName}>
               Not a teacher?
@@ -153,6 +208,16 @@ function TeacherLoginForm() {
           />
           {verificationRequired ? (
             <AuthFormError message="Please verify your email before signing in to teacher features." />
+          ) : null}
+          {passwordWasReset && !resetNotice ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              Your password has been updated. Please sign in.
+            </p>
+          ) : null}
+          {resetNotice ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              {resetNotice}
+            </p>
           ) : null}
           <AuthFormError message={formError} />
           <AuthPrimaryButton type="submit" disabled={isSubmitting}>

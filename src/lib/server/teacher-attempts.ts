@@ -14,6 +14,8 @@ export type TeacherActivityAttemptSummary = {
     lastName: string
     verified: boolean
     attemptCount: number
+    explorationAttemptCount?: number
+    quizAttemptCount?: number
     completedCount: number
     inProgressCount: number
     attempts: {
@@ -22,6 +24,14 @@ export type TeacherActivityAttemptSummary = {
       status: 'in_progress' | 'completed'
       startedAt: string
       completedAt: string | null
+      kind?: 'exploration' | 'quiz'
+      quizKey?: string | null
+      instrument?: 'ruler' | 'cylinder' | null
+      precisionMode?: 'tenths' | 'hundredths' | null
+      score?: number | null
+      questionTotal?: number | null
+      percentage?: number | null
+      passed?: boolean | null
     }[]
   }[]
 }
@@ -37,7 +47,12 @@ export async function getTeacherActivityAttemptSummary(
   if (!uuid.test(classId) || !uuid.test(assignmentId)) {
     throw new Error('Invalid class or assignment.')
   }
-  const { data, error } = await createServiceClient().rpc('teacher_activity_attempt_summary', {
+  const client = createServiceClient()
+  const { data: classroom, error: classError } = await client.from('classes')
+    .select('id').eq('id', classId).eq('teacher_id', teacherId)
+    .eq('is_active', true).maybeSingle()
+  if (classError || !classroom) throw new Error('Class access denied or unavailable.')
+  const { data, error } = await client.rpc('teacher_activity_attempt_summary', {
     p_teacher_id: teacherId,
     p_class_id: classId,
     p_assignment_id: assignmentId,

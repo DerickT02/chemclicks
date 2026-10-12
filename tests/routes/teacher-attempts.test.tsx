@@ -12,9 +12,9 @@ const report: TeacherActivityAttemptSummary = {
   classId: 'class', className: 'Chemistry', assignmentId: 'second', activityId: 'activity', activityTitle: 'Lewis diagrams',
   students: [
     { studentId: 'zero', firstName: 'Zero', lastName: 'Student', verified: false, attemptCount: 0, completedCount: 0, inProgressCount: 0, attempts: [] },
-    { studentId: 'many', firstName: 'Many', lastName: 'Student', verified: true, attemptCount: 2, completedCount: 1, inProgressCount: 1, attempts: [
-      { id: 'two', attemptNumber: 2, status: 'in_progress', startedAt: '2026-09-24T12:00:00Z', completedAt: null },
-      { id: 'one', attemptNumber: 1, status: 'completed', startedAt: '2026-09-23T12:00:00Z', completedAt: '2026-09-23T12:05:00Z' },
+    { studentId: 'many', firstName: 'Many', lastName: 'Student', verified: true, attemptCount: 2, explorationAttemptCount: 1, quizAttemptCount: 1, completedCount: 1, inProgressCount: 1, attempts: [
+      { id: 'two', attemptNumber: 2, status: 'in_progress', startedAt: '2026-09-24T12:00:00Z', completedAt: null, kind: 'exploration', quizKey: null },
+      { id: 'one', attemptNumber: 1, status: 'completed', startedAt: '2026-09-23T12:00:00Z', completedAt: '2026-09-23T12:05:00Z', kind: 'quiz', quizKey: 'measurement_ruler_tenths', instrument: 'ruler', precisionMode: 'tenths', score: 4, questionTotal: 5, percentage: 80, passed: true },
     ] },
   ],
 }
@@ -27,7 +27,18 @@ const props = (assignmentId?: string) => ({ params: Promise.resolve({ classId: '
 describe('teacher report', () => {
   it('renders zeros, statuses and readable timestamps with a timezone', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
-    for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 completed', '1 in progress', 'Not completed', 'Sep 23, 2026', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
+    for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 exploration attempt', '1 quiz attempt', '4/5 · Passed', '1 completed', '1 in progress', 'Ruler', 'Not completed', '2026-09-23 12:00:00 UTC', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
+  })
+  it('names each quiz and shows its score instead of the stored quiz key', () => {
+    const quizAttempt = (id: string, quizKey: string, score: number, passed: boolean) => ({
+      id, attemptNumber: 1, status: 'completed' as const, startedAt: '2026-09-23T12:00:00Z', completedAt: '2026-09-23T12:05:00Z',
+      kind: 'quiz' as const, quizKey, score, questionTotal: 12, percentage: (score / 12) * 100, passed,
+    })
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[1], attempts: [quizAttempt('a', 'bohr_models', 4, false), quizAttempt('b', 'lewis_ionic', 11, true), quizAttempt('c', 'future_quiz', 12, true)],
+    }] }} />)
+    for (const text of ['Bohr Models Quiz', '4/12 · Not passed', 'Ionic Compounds Quiz', '11/12 · Passed', '12/12 · Passed']) expect(html).toContain(text)
+    for (const key of ['bohr_models', 'lewis_ionic', 'future_quiz']) expect(html).not.toContain(key)
   })
   it('loads the explicitly selected assignment and keeps it selected', async () => {
     const html = renderToStaticMarkup(await Page(props('second')))

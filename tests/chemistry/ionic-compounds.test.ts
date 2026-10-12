@@ -5,9 +5,14 @@ import {
   describeFormation,
   describeIon,
   formatCharge,
+  formatChargeLabel,
   formatChargeValue,
   formatIonSymbol,
   getAtomRatio,
+  formatSignedTotalCharge,
+  getChargeTotals,
+  getFormulaUnitIons,
+  getIsolatedIons,
   getNetCharge,
   getTransferredElectrons,
   isChargeBalanced,
@@ -57,11 +62,54 @@ describe("ionic compound examples", () => {
     },
   );
 
+  it.each([
+    ["nacl", 1, -1, 0],
+    ["mgo", 2, -2, 0],
+    ["caf2", 2, -2, 0],
+    ["al2o3", 6, -6, 0],
+  ])("%s charge totals sum to a neutral formula unit", (id, positive, negative, net) => {
+    const totals = getChargeTotals(compoundById(id));
+    expect(totals.totalPositive).toBe(positive);
+    expect(totals.totalNegative).toBe(negative);
+    expect(totals.net).toBe(net);
+    expect(formatSignedTotalCharge(totals.net)).toBe("0");
+  });
+
   it("counts the electrons transferred per formula unit", () => {
     expect(getTransferredElectrons(compoundById("nacl"))).toBe(1);
     expect(getTransferredElectrons(compoundById("mgo"))).toBe(2);
     expect(getTransferredElectrons(compoundById("caf2"))).toBe(2);
     expect(getTransferredElectrons(compoundById("al2o3"))).toBe(6);
+  });
+});
+
+describe("formula unit ions", () => {
+  it.each([
+    ["nacl", ["cation", "anion"]],
+    ["mgo", ["cation", "anion"]],
+    ["caf2", ["anion", "cation", "anion"]],
+    ["al2o3", ["anion", "cation", "anion", "cation", "anion"]],
+  ])("%s lists every ion once, alternating around the minority ion", (id, roles) => {
+    const compound = compoundById(id);
+    const ions = getFormulaUnitIons(compound);
+
+    expect(ions.map((item) => item.role)).toEqual(roles);
+    expect(ions.filter((item) => item.role === "cation")).toHaveLength(compound.cation.count);
+    expect(ions.filter((item) => item.role === "anion")).toHaveLength(compound.anion.count);
+    for (const item of ions) {
+      expect(item.ion).toBe(item.role === "cation" ? compound.cation : compound.anion);
+    }
+    expect(new Set(ions.map((item) => item.id)).size).toBe(ions.length);
+  });
+
+  it.each(["nacl", "mgo", "caf2", "al2o3"])("%s has one isolated ion of each kind", (id) => {
+    const compound = compoundById(id);
+    const ions = getIsolatedIons(compound);
+
+    expect(ions.map((item) => item.role)).toEqual(["cation", "anion"]);
+    expect(ions[0].ion).toBe(compound.cation);
+    expect(ions[1].ion).toBe(compound.anion);
+    expect(new Set(ions.map((item) => item.id)).size).toBe(2);
   });
 });
 
@@ -78,6 +126,13 @@ describe("ion formatting", () => {
     expect(formatCharge(-2)).toBe("²⁻");
     expect(formatChargeValue(3)).toBe("+3");
     expect(formatChargeValue(-1)).toBe("−1");
+  });
+
+  it("writes bracket charge labels magnitude first, leaving out a 1", () => {
+    expect(formatChargeLabel(1)).toBe("+");
+    expect(formatChargeLabel(3)).toBe("3+");
+    expect(formatChargeLabel(-1)).toBe("−");
+    expect(formatChargeLabel(-2)).toBe("2−");
   });
 
   it("gives screen readers a text alternative for each ion", () => {
@@ -101,6 +156,7 @@ describe("explanations", () => {
     expect(text).toContain("gives up 3 electrons and becomes Al³⁺");
     expect(text).toContain("gains 2 electrons and becomes O²⁻");
     expect(text).toContain("6 electrons move in total");
+    expect(text).toContain("attraction between these oppositely charged ions is the ionic bond");
     expect(text).not.toContain("Na⁺");
     expect(text).not.toContain("Cl⁻");
   });

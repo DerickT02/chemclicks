@@ -39,12 +39,12 @@ export const RULER_SPEC: InstrumentSpec = {
   unit: "cm",
   unitName: "centimeters",
   min: 0,
-  max: 15,
+  max: 10,
   graduation: 0.1,
   step: 0.01,
   decimals: 2,
   tolerance: 0.02,
-  defaultReading: 7.5,
+  defaultReading: 5,
 };
 
 export const CYLINDER_SPEC: InstrumentSpec = {
@@ -69,7 +69,10 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentSpec> = {
 
 export function quantizeReading(value: number, spec: InstrumentSpec): number {
   const clamped = Math.min(spec.max, Math.max(spec.min, value));
-  return Number((Math.round(clamped / spec.step) * spec.step).toFixed(spec.decimals));
+  const scaled = clamped / spec.step;
+  // Preserve half-step rounding when division lands just below an exact tie.
+  const rounded = Math.round(scaled + Number.EPSILON * Math.max(1, Math.abs(scaled)));
+  return Number((rounded * spec.step).toFixed(spec.decimals));
 }
 
 export function formatReading(value: number, spec: InstrumentSpec): string {

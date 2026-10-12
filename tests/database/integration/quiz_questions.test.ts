@@ -108,17 +108,7 @@ describe("quiz_questions RLS", () => {
     expect(result.data?.map((row) => row.id)).not.toContain(hiddenQuestionId);
   });
 
-  it("has the moved Bohr questions available to a signed-in user", async () => {
-    const result = await signedIn
-      .from("quiz_questions")
-      .select("question_key")
-      .eq("quiz_key", "bohr_models");
-
-    expect(result.error).toBeNull();
-    expect(result.data).toHaveLength(36);
-  });
-
-  it.each(["lewis_bonding", "lewis_covalent", "lewis_ionic"])(
+  it.each(["bohr_models", "lewis_bonding", "lewis_covalent", "lewis_ionic"])(
     "hides the assignment-gated %s questions from a signed-in user",
     async (quizKey) => {
       const result = await signedIn

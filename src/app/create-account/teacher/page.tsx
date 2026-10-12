@@ -15,7 +15,6 @@ import {
   getTeacherVerificationMessage,
 } from "@/lib/auth/teacher-email-verification";
 import { validateTeacherSignup } from "@/lib/auth/validate-teacher-signup";
-import { insertTeacher } from "@/lib/db/teachers";
 import { DATABASE_RETRY_MESSAGE, isDuplicateAuthError } from "@/lib/errors/user-facing-errors";
 import { createClient } from "@/lib/supabase/client";
 
@@ -71,77 +70,67 @@ export default function TeacherCreateAccountPage() {
       setEmailError(result.emailError);
       setPasswordError(result.passwordError);
       setConfirmError(result.confirmError);
-      setPassword("");
-      setConfirmPassword("");
       return;
     }
 
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const normalizedDisplayName = displayName.trim();
-    const normalizedEmail = email.trim();
-    const emailRedirectTo = buildTeacherEmailRedirectTo(window.location.origin);
+    try {
+      const supabase = createClient();
+      const normalizedDisplayName = displayName.trim();
+      const normalizedEmail = email.trim();
+      const emailRedirectTo = buildTeacherEmailRedirectTo(window.location.origin);
 
-    const { data: authData, error } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password,
-      options: {
-        emailRedirectTo,
-        data: {
-          display_name: normalizedDisplayName,
+      const { data: authData, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          emailRedirectTo,
+          data: {
+            display_name: normalizedDisplayName,
+          },
         },
-      },
-    });
+      });
 
-    // With email confirmation enabled, Supabase can return an obfuscated user
-    // with no identities instead of an AuthError for an existing email.
-    // See: https://stackoverflow.com/questions/73802604/how-to-check-if-user-already-exists-in-supabase
-    if (
-      authData.user?.identities?.length === 0 ||
-      isDuplicateAuthError(error)
-    ) {
-      setEmailError(
-        "This email is already registered. Please use a different email or sign in.",
-      );
+      // With email confirmation enabled, an existing email may return an
+      // obfuscated user with no identities rather than an AuthError.
+      if (
+        authData.user?.identities?.length === 0 ||
+        isDuplicateAuthError(error)
+      ) {
+        setEmailError(
+          "This email is already registered. Please use a different email or sign in.",
+        );
+        setPassword("");
+        setConfirmPassword("");
+        return;
+      }
+
+      if (error) {
+        setFormError(DATABASE_RETRY_MESSAGE);
+        setPassword("");
+        setConfirmPassword("");
+        return;
+      }
+
+      if (!authData.user) {
+        setFormError("Could not create account. Please try again.");
+        return;
+      }
+
+      // The public.teachers row is created by the on_auth_user_created_teacher
+      // trigger (see migration 20260920000100), using options.data.display_name.
+
+      setDisplayName("");
+      setEmail(normalizedEmail);
       setPassword("");
       setConfirmPassword("");
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (error) {
+      setConfirmationSent(true);
+    } catch {
       setFormError(DATABASE_RETRY_MESSAGE);
-      setPassword("");
-      setConfirmPassword("");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    if (!authData.user) {
-      setFormError("Could not create account. Please try again.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    const { error: teacherError } = await insertTeacher(supabase, {
-      id: authData.user.id,
-      email: normalizedEmail,
-      display_name: normalizedDisplayName,
-    });
-
-    if (teacherError) {
-      setFormError(teacherError.message || "Could not create teacher profile.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    setDisplayName("");
-    setEmail(normalizedEmail);
-    setPassword("");
-    setConfirmPassword("");
-    setConfirmationSent(true);
-    setIsSubmitting(false);
   }
 
   return (

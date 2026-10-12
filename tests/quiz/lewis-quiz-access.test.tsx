@@ -5,7 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const mocks = vi.hoisted(() => ({ reader: vi.fn(), listQuestions: vi.fn(), adminClient: {} }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignments: mocks.reader }));
+vi.mock("@/lib/db/student-assignments", () => ({
+  getStudentAssignments: mocks.reader,
+  getStudentAssignmentSchedules: mocks.reader,
+}));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
@@ -46,7 +49,7 @@ function assignmentOf(type: string, window: { opens_at?: string | null; closes_a
 const covalentLesson = assignmentOf("lewis_structures_covalent");
 const ionicLesson = assignmentOf("lewis_structures_ionic");
 const diagram = assignmentOf("lewis_diagram");
-const question = { id: "q1", question: "Q?", options: ["A", "B"], correctIndex: 0 };
+const question = { id: "q1", question: "Q?", options: ["A", "B"] };
 
 const withAssignments = (assignments: unknown[]) =>
   mocks.reader.mockResolvedValue({ status: "ok", assignments });
@@ -128,11 +131,14 @@ describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, titl
     expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
 
-  it("is locked before the lesson opens and after it closes", async () => {
+  it("distinguishes scheduled and closed work without loading questions", async () => {
     withAssignments([{ ...lesson, opens_at: iso(HOUR) }]);
-    expectLocked(await renderQuiz());
+    expect((await getLewisQuizAccess(kind)).status).toBe("scheduled");
+    expect(await renderQuiz()).toContain("This quiz is not open yet.");
     withAssignments([{ ...lesson, closes_at: iso(-HOUR) }]);
-    expectLocked(await renderQuiz());
+    expect((await getLewisQuizAccess(kind)).status).toBe("closed");
+    expect(await renderQuiz()).toContain("This quiz is closed.");
+    expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
 
   it("opens inside the lesson's availability window", async () => {
@@ -147,7 +153,8 @@ describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, titl
     withAssignments([]);
     expectLocked(await renderQuiz());
     withAssignments([{ ...lesson, closes_at: iso(-1000) }]);
-    expectLocked(await renderQuiz());
+    expect(await renderQuiz()).toContain("This quiz is closed.");
+    expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
 
   it("offers the quiz from its lesson page", async () => {
@@ -174,7 +181,7 @@ describe("independent Lewis quizzes", () => {
   ])("closing the $closed lesson locks only the $closed quiz", async ({ closed, open }) => {
     const lessons = { covalent: covalentLesson, ionic: ionicLesson };
     withAssignments([{ ...lessons[closed], closes_at: iso(-1000) }, lessons[open]]);
-    expect(await renderQuizFor(closed)).toContain("This quiz is locked.");
+    expect(await renderQuizFor(closed)).toContain("This quiz is closed.");
     expect(await renderQuizFor(open)).toContain("Started ");
   });
 

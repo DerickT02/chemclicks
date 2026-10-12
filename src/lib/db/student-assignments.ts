@@ -17,8 +17,18 @@ type Result =
   | { status: "error"; message: string }
   | { status: "ok"; assignments: StudentAssignment[] };
 
-/** Never accept student/class IDs from callers or cache across requests. */
+/** Only currently open work; never accept student/class IDs from callers. */
 export async function getStudentAssignments(): Promise<Result> {
+  return readStudentAssignments(true);
+}
+
+/** Own-class schedule metadata only, including upcoming/closed work; no exercise content. */
+export async function getStudentAssignmentSchedules(): Promise<Result> {
+  return readStudentAssignments(false);
+}
+
+/** Never cache across requests; both read paths enforce student/class ownership. */
+async function readStudentAssignments(onlyAvailable: boolean): Promise<Result> {
   try {
     const session = await getStudentSession();
     if (!session) return { status: "unauthenticated" };
@@ -40,29 +50,26 @@ export async function getStudentAssignments(): Promise<Result> {
     if (!classroom) return { status: "unauthenticated" };
 
     const now = new Date().toISOString();
-    const assignments: StudentAssignment[] = [];
-    const pageSize = 100;
-    for (let offset = 0; ; offset += pageSize) {
-      const { data, error } = await supabase
-        .from("class_activities")
-        .select("id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
-        .eq("class_id", classroom.id)
+    let query = supabase
+      .from("class_activities")
+      .select("id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)")
+      .eq("class_id", classroom.id)
+      .is("archived_at", null);
+    if (onlyAvailable) {
+      query = query
         .or(`opens_at.is.null,opens_at.lte.${now}`)
-        .or(`closes_at.is.null,closes_at.gt.${now}`)
-        .order("id")
-        .range(offset, offset + pageSize - 1)
-        .returns<StudentAssignment[]>();
-      if (error) throw error;
-      assignments.push(...(data ?? []));
-      if (!data || data.length < pageSize) break;
+        .or(`closes_at.is.null,closes_at.gt.${now}`);
     }
+    const { data, error } = await query.order("id").returns<StudentAssignment[]>();
+    if (error) throw error;
+    const assignments = data ?? [];
 
     // Recheck after querying, in case a deadline passed during the request.
     const checkedAt = Date.now();
     return {
       status: "ok",
       assignments: assignments
-        .filter((assignment) => isAssignmentAvailable(assignment, checkedAt))
+        .filter((assignment) => !onlyAvailable || isAssignmentAvailable(assignment, checkedAt))
         .sort((a, b) => a.activity.order_index - b.activity.order_index || a.id.localeCompare(b.id)),
     };
   } catch {

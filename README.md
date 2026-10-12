@@ -2,8 +2,8 @@
 
 > *Chemistry education, one click at a time.*
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)
+![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=flat-square&logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8?style=flat-square&logo=tailwindcss)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=flat-square&logo=supabase)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
@@ -50,8 +50,8 @@ Key relationships:
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | [Next.js 15](https://nextjs.org/) (App Router) |
-| Language | TypeScript |
+| Framework | [Next.js 16](https://nextjs.org/) (App Router), React 19 |
+| Language | TypeScript 6 |
 | Styling | Tailwind CSS |
 | Database | Supabase (PostgreSQL) |
 | Auth | Supabase Auth |
@@ -64,9 +64,9 @@ Key relationships:
 
 ### Prerequisites
 
-- **Node.js** v18+
-- **npm** v9+
-- A [Supabase](https://supabase.com) project (free tier works)
+- **Node.js** 22.13+ on the Node 22 LTS line (local/CI validation uses 22.22.2)
+- **npm** v10+
+- A separately approved [Supabase](https://supabase.com) development project for application flows; mocked tests require no project or credentials
 
 ### Local Setup
 
@@ -76,7 +76,7 @@ git clone https://github.com/DerickT02/chemclicks.git
 cd chemclicks
 
 # 2. Install dependencies
-npm install
+npm ci
 
 # 3. Set up environment variables
 cp .env.example .env.local
@@ -100,13 +100,11 @@ Keep the service-role key out of source control and configure it in the
 deployment environment as well as `.env.local`. It is used only by trusted
 server code for student login and server-side student data access.
 
-Link the CLI and apply database migrations with:
-
-```bash
-supabase link --project-ref cprrlddivmtrlkubluyt
-supabase db push --dry-run
-supabase db push
-```
+Do not link a shared project or apply migrations as a routine setup step.
+Audit the deployed schema/Auth contract first and obtain separate explained
+approval for each database/Auth change. SQL exists in both
+`supabase/migrations/` and `src/lib/supabase/migration/`; historical files do not
+prove which migrations are deployed. No fresh-database baseline is certified.
 
 Student login requires
 `supabase/migrations/20260922191858_student_supabase_auth.sql`. It adds an
@@ -151,21 +149,28 @@ Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`
 
 ## 🧪 Testing
 
-> *This section will be completed in CSC 191.*
-
-Planned testing strategy:
-
-- **Unit Tests** — Component-level logic using [Jest](https://jestjs.io/) + [React Testing Library](https://testing-library.com/)
-- **Integration Tests** — API routes and Supabase interactions
-- **End-to-End Tests** — Full user flows using [Playwright](https://playwright.dev/)
+Tests use **Vitest 5** and React Testing Library. The default commands run only
+mocked unit/component suites, without application `.env` credentials;
+unmocked `fetch` is blocked. No Supabase project is required.
 
 ```bash
-# Run unit tests (CSC 191)
-npm run test
+npm test                 # Safe unit/component suites
+npm run test:watch       # Same safe selection, watch mode
+npm run typecheck        # TypeScript, no emit
+npm run lint
 
-# Run e2e tests (CSC 191)
-npm run test:e2e
+# A selected mocked suite
+npm test -- tests/auth/student-login.test.ts
 ```
+
+`tests/database/` is excluded, including database-writing **schema** tests.
+Those suites create and delete real database and Auth records, so no script
+runs them; use only a disposable Supabase project if you run them by hand.
+
+The safe-checks GitHub workflow runs `npm ci`, `npm test`, TypeScript, and lint,
+without Supabase secrets, database operations, migrations, or deployment.
+Browser/E2E coverage is still pending; no `test:e2e` script is configured.
+Mocked route/component checks do not certify browser or deployed-RPC behavior.
 
 ---
 

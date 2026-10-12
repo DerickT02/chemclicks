@@ -4,6 +4,15 @@ import { getElectronShells } from "@/lib/chemistry/lewis";
 const MAX_ELECTRONS = ELEMENTS.length;
 const SHELL_NAMES = ["K", "L", "M", "N"] as const;
 
+/** Noble-gas stable (NGS) electron counts for this curriculum (He, Ne, Ar). */
+export const NOBLE_GAS_STABLE_ELECTRON_COUNTS = [2, 10, 18] as const;
+
+export type StabilityIndicator = {
+  met: boolean;
+  label: string;
+  explanation: string;
+};
+
 export function calculateIonicCharge(protons: number, electrons: number): number | null {
   if (
     !Number.isInteger(protons) || protons < 1 || protons > ELEMENTS.length ||
@@ -17,6 +26,73 @@ export function calculateIonicCharge(protons: number, electrons: number): number
 export function describeIonicCharge(charge: number): string {
   if (charge === 0) return "0 (neutral)";
   return charge > 0 ? `+${charge} (cation)` : `−${-charge} (anion)`;
+}
+
+export function isNobleGasStableElectronCount(electrons: number): boolean {
+  if (!Number.isInteger(electrons) || electrons < 0 || electrons > MAX_ELECTRONS) {
+    return false;
+  }
+  return (NOBLE_GAS_STABLE_ELECTRON_COUNTS as readonly number[]).includes(electrons);
+}
+
+export function describeNobleGasStability(electrons: number): StabilityIndicator {
+  const met = isNobleGasStableElectronCount(electrons);
+  return {
+    met,
+    label: met ? "NGS: met" : "NGS: not met",
+    explanation: met
+      ? `This particle has ${electrons} electrons, one of the noble-gas stable counts (2, 10, or 18).`
+      : `NGS is met when an atom or ion has 2, 10, or 18 electrons total; this model has ${electrons}.`,
+  };
+}
+
+export function isNeutralChargeStable(protons: number, electrons: number): boolean {
+  return (
+    Number.isInteger(protons) &&
+    Number.isInteger(electrons) &&
+    protons >= 1 &&
+    protons <= ELEMENTS.length &&
+    electrons >= 0 &&
+    electrons <= MAX_ELECTRONS &&
+    protons === electrons
+  );
+}
+
+export function describeNeutralChargeStability(
+  protons: number,
+  electrons: number,
+): StabilityIndicator {
+  const met = isNeutralChargeStable(protons, electrons);
+  return {
+    met,
+    label: met ? "NCS: met" : "NCS: not met",
+    explanation: met
+      ? "Protons equal electrons (neutral charge stability)."
+      : `NCS is met when protons equal electrons; here ${protons} ${protons === 1 ? "proton" : "protons"} and ${electrons} ${electrons === 1 ? "electron" : "electrons"}.`,
+  };
+}
+
+/** Protons minus electrons with signed result, e.g. "11 − 10 = +1". */
+export function describeProtonElectronDifference(
+  protons: number,
+  electrons: number,
+): string | null {
+  const charge = calculateIonicCharge(protons, electrons);
+  if (charge === null) return null;
+  const magnitude =
+    charge === 0 ? "0" : charge > 0 ? `+${charge}` : `−${Math.abs(charge)}`;
+  return `${protons} − ${electrons} = ${magnitude}`;
+}
+
+export function describeChargeRule(charge: number | null): string {
+  if (charge === null) return "Charge cannot be calculated for these counts.";
+  if (charge === 0) {
+    return "Equal protons and electrons give neutral charge (0).";
+  }
+  if (charge > 0) {
+    return "Fewer electrons than protons gives a positive ion (cation).";
+  }
+  return "More electrons than protons gives a negative ion (anion).";
 }
 
 type ShellRuleResult = {

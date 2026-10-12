@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
@@ -7,7 +6,7 @@ import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
 export const metadata: Metadata = {
   title: "Lewis Structures — ChemClicks",
   description:
-    "Draw Lewis diagrams for elements 1–20, then explore how atoms form ionic and covalent bonds.",
+    "Explore Lewis diagrams for elements 1–20, then see how atoms form ionic and covalent bonds.",
 };
 
 const SECTIONS = [
@@ -63,16 +62,6 @@ export default function LewisDotDiagramsPage() {
               <Explorer />
             </section>
           ))}
-        </div>
-
-        {/* Quiz CTA */}
-        <div className="mt-10 flex justify-center">
-          <Link
-            href="/student/quizzes/lewis"
-            className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90"
-          >
-            Go to quiz →
-          </Link>
         </div>
 
       </div>

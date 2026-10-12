@@ -11,7 +11,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
       const builder: Record<string, (...args: unknown[]) => unknown> = {};
-      for (const method of ["select", "eq", "or", "order", "range"]) {
+      for (const method of ["select", "eq", "is", "or", "order"]) {
         builder[method] = (...args: unknown[]) => {
           mocks.calls.push({ table, method, args });
           return builder;
@@ -24,7 +24,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-import { getStudentAssignments } from "@/lib/db/student-assignments";
+import { getStudentAssignments, getStudentAssignmentSchedules } from "@/lib/db/student-assignments";
 
 const studentId = "11111111-1111-4111-8111-111111111111";
 const classId = "22222222-2222-4222-8222-222222222222";
@@ -59,6 +59,9 @@ describe("getStudentAssignments", () => {
     expect(callsTo("class_activities", "eq")).toEqual([
       expect.objectContaining({ args: ["class_id", classId] }),
     ]);
+    expect(callsTo("class_activities", "is")).toEqual([
+      expect.objectContaining({ args: ["archived_at", null] }),
+    ]);
     const windowFilters = callsTo("class_activities", "or").map((call) => call.args[0]);
     expect(windowFilters).toEqual([
       expect.stringMatching(/^opens_at\.is\.null,opens_at\.lte\./),
@@ -74,6 +77,38 @@ describe("getStudentAssignments", () => {
     ], error: null };
     const result = await getStudentAssignments();
     expect(result).toEqual({ status: "ok", assignments: [row("open", null, null)] });
+  });
+
+  it("reads own-class schedule metadata without exposing exercise content or filtering closed work", async () => {
+    const rows = [row("open", null, null), row("future", iso(HOUR), null), row("closed", null, iso(-HOUR))];
+    mocks.results.class_activities = { data: rows, error: null };
+    const result = await getStudentAssignmentSchedules();
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") expect(result.assignments).toHaveLength(3);
+    expect(callsTo("class_activities", "eq")).toEqual([
+      expect.objectContaining({ args: ["class_id", classId] }),
+    ]);
+    expect(callsTo("class_activities", "or")).toEqual([]);
+    expect(callsTo("class_activities", "select")).toEqual([
+      expect.objectContaining({ args: ["id, opens_at, closes_at, activity:activities!inner(id, title, type, order_index)"] }),
+    ]);
+  });
+
+  it("denies schedule reads for missing sessions and inactive classes", async () => {
+    mocks.session.mockResolvedValue(null);
+    expect(await getStudentAssignmentSchedules()).toEqual({ status: "unauthenticated" });
+    expect(callsTo("class_activities", "select")).toEqual([]);
+    mocks.session.mockResolvedValue({ studentId, classId });
+    mocks.results.classes = { data: null, error: null };
+    expect(await getStudentAssignmentSchedules()).toEqual({ status: "unauthenticated" });
+    expect(callsTo("class_activities", "select")).toEqual([]);
+  });
+
+  it("reports schedule read failures rather than fabricating unassigned work", async () => {
+    mocks.results.class_activities = { data: null, error: { message: "private error" } };
+    expect(await getStudentAssignmentSchedules()).toEqual({
+      status: "error", message: "Your assignments could not be loaded. Please try again.",
+    });
   });
 
   it("treats missing sessions and inactive classes as unauthenticated", async () => {

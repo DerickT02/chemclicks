@@ -1,6 +1,7 @@
 // Logic and types regarding the CLASSES table.
 
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import { classLabelKey } from "@/lib/classes/class-name";
 
 export type Class = {
   id: string          // UUID, auto-generated
@@ -14,13 +15,22 @@ export type Class = {
 
 export type InsertClass = Pick<Class, "teacher_id" | "name" | "section" | "class_code">;
 
-export type ClassListItem = Pick<Class, "id" | "name" | "section" | "class_code">;
+export type ClassListItem = Pick<Class, "id" | "name" | "section" | "class_code"> & {
+  /** Enrolled students, counted in the same read as the class list. */
+  student_count: number;
+};
+
+type ClassListRow = Pick<Class, "id" | "name" | "section" | "class_code"> & {
+  students: { count: number }[] | null;
+};
 
 /**
  * Lists active classes owned by the given teacher, newest first. Filters by
  * `teacher_id` explicitly (defense in depth alongside RLS) and `is_active`,
  * so a teacher's classroom list never includes another teacher's classes or
- * a class they've deactivated.
+ * a class they've deactivated. Each class carries its enrolled-student count
+ * so the dashboard does not need a second read of the roster; that count is
+ * only correct with a client that is allowed to read `students`.
  */
 export async function listActiveClassesForTeacher(
   supabase: SupabaseClient,
@@ -28,16 +38,22 @@ export async function listActiveClassesForTeacher(
 ): Promise<{ data: ClassListItem[] | null; error: PostgrestError | null }> {
   const { data, error } = await supabase
     .from("classes")
-    .select("id, name, section, class_code")
+    .select("id, name, section, class_code, students(count)")
     .eq("teacher_id", teacherId)
     .eq("is_active", true)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id")
+    .returns<ClassListRow[]>();
 
-  if (error) {
-    return { data: null, error };
-  }
+  if (error || data === null) return { data: null, error };
 
-  return { data: data as ClassListItem[], error: null };
+  return {
+    data: data.map(({ students, ...classItem }) => ({
+      ...classItem,
+      student_count: students?.[0]?.count ?? 0,
+    })),
+    error: null,
+  };
 }
 
 /**
@@ -47,6 +63,45 @@ export async function listActiveClassesForTeacher(
  */
 export function isDuplicateClassCodeError(error: PostgrestError): boolean {
   return error.code === "23505" && error.message.includes("class_code");
+}
+
+/**
+ * True when a PostgrestError is a teacher/name/section uniqueness violation:
+ * either the exact-match `classes_teacher_name_section_key` constraint or the
+ * normalized `classes_teacher_name_section_norm_key` index.
+ */
+export function isDuplicateClassNameSectionError(error: PostgrestError): boolean {
+  return error.code === "23505" && error.message.includes("classes_teacher_name_section");
+}
+
+/**
+ * True when the teacher already has a class (active or not) whose name and
+ * section match after normalization. Filters by `teacher_id` explicitly so it
+ * is safe with the admin client, and returns only a boolean so no other
+ * teacher's data leaves this function. A fast pre-check; the normalized unique
+ * index remains the source of truth under concurrent submissions.
+ */
+export async function teacherHasClassNamed(
+  supabase: SupabaseClient,
+  teacherId: string,
+  name: string,
+  section: string,
+): Promise<{ exists: boolean; error: PostgrestError | null }> {
+  const { data, error } = await supabase
+    .from("classes")
+    .select("name, section")
+    .eq("teacher_id", teacherId);
+
+  if (error) {
+    return { exists: false, error };
+  }
+
+  const nameKey = classLabelKey(name);
+  const sectionKey = classLabelKey(section);
+  const exists = (data as Pick<Class, "name" | "section">[]).some(
+    (row) => classLabelKey(row.name) === nameKey && classLabelKey(row.section) === sectionKey,
+  );
+  return { exists, error: null };
 }
 
 /**
@@ -70,18 +125,6 @@ export async function findClassByCode(
   }
 
   return { exists: data !== null, error: null };
-}
-
-/**
- * Deletes a row from `classes` by id. RLS enforces that only the owning teacher
- * can delete (teacher_id = auth.uid()), so use the request-scoped server client.
- */
-export async function deleteClass(
-  supabase: SupabaseClient,
-  id: string,
-): Promise<{ error: PostgrestError | null }> {
-  const { error } = await supabase.from("classes").delete().eq("id", id);
-  return { error };
 }
 
 /**

@@ -42,11 +42,16 @@ BEGIN
   IF jsonb_array_length(result->'students')<>4 THEN RAISE EXCEPTION 'Roster not scoped correctly'; END IF;
   FOR row_data IN SELECT value FROM jsonb_array_elements(result->'students') LOOP
     IF row_data->>'studentId' IN (zero_student::text,empty_student::text) THEN
-      IF row_data->>'attemptCount'<>'0' OR row_data->'attempts'<>'[]'::jsonb THEN RAISE EXCEPTION 'Zero attempts missing'; END IF;
+      IF row_data->>'attemptCount'<>'0' OR row_data->>'explorationAttemptCount'<>'0'
+        OR row_data->>'quizAttemptCount'<>'0' OR row_data->'attempts'<>'[]'::jsonb THEN
+        RAISE EXCEPTION 'Zero attempts missing'; END IF;
     ELSIF row_data->>'studentId'=one_student::text THEN
-      IF row_data->>'attemptCount'<>'1' OR row_data->>'inProgressCount'<>'1' THEN RAISE EXCEPTION 'One attempt wrong'; END IF;
+      IF row_data->>'attemptCount'<>'1' OR row_data->>'explorationAttemptCount'<>'1'
+        OR row_data->>'quizAttemptCount'<>'0' OR row_data->>'inProgressCount'<>'1' THEN
+        RAISE EXCEPTION 'One attempt wrong'; END IF;
     ELSIF row_data->>'studentId'=many_student::text THEN
       IF row_data->>'attemptCount'<>'2' OR row_data->>'completedCount'<>'1' OR row_data->>'inProgressCount'<>'1'
+        OR row_data->>'explorationAttemptCount'<>'2' OR row_data->>'quizAttemptCount'<>'0'
         OR row_data#>>'{attempts,0,attemptNumber}'<>'2'
         OR row_data#>>'{attempts,0,status}'<>'in_progress'
         OR row_data#>'{attempts,0,completedAt}'<>'null'::jsonb
