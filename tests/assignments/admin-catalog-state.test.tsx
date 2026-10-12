@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), teacher: vi.fn() }));
 vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ session: "teacher" }) }));
+vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({ role: "service" }) }));
 vi.mock("@/lib/server/teacher", () => ({ requireTeacherId: mocks.teacher }));
 vi.mock("@/lib/db/activities", () => ({ listActivityCatalog: mocks.catalog }));
 vi.mock("@/lib/db/class_activities", () => ({ getClassActivities: mocks.assignments }));
@@ -151,7 +152,8 @@ describe("teacher enrollment and lesson progress", () => {
     const html = await render();
     expect(html).toContain("Lewis Diagrams: Completed");
     expect(mocks.teacher).toHaveBeenCalledTimes(1);
-    expect(mocks.classes).toHaveBeenCalledWith(expect.anything(), "teacher");
+    // Counts need the service role, and only ever for the verified teacher's own classes.
+    expect(mocks.classes).toHaveBeenCalledWith({ role: "service" }, "teacher");
     expect(mocks.assignments).toHaveBeenCalledExactlyOnceWith(expect.anything(), classId);
     expect(mocks.lessonProgress).toHaveBeenCalledExactlyOnceWith(classId);
   });

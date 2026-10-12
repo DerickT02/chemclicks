@@ -11,6 +11,7 @@ import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { listActiveClassesForTeacher } from "@/lib/db/classes";
+import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import { LessonProgressList } from "@/app/admin/LessonProgressList";
@@ -53,7 +54,10 @@ export default async function AdminPage({
   // themselves, and their results are used only if that class turns out to be
   // in this teacher's own list.
   const [{ data: classesData, error: classesError }, catalogResult, requestedDetails] = await Promise.all([
-    listActiveClassesForTeacher(supabase, teacherId),
+    // The service role is needed for the student counts: the teacher's own
+    // session cannot read the students table. The query is limited to the
+    // verified teacher's classes, so nothing else is exposed.
+    listActiveClassesForTeacher(createServiceClient(), teacherId),
     listActivityCatalog(supabase),
     classId ? loadClassDetails(classId) : null,
   ]);

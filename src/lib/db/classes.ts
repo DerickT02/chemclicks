@@ -29,7 +29,8 @@ type ClassListRow = Pick<Class, "id" | "name" | "section" | "class_code"> & {
  * `teacher_id` explicitly (defense in depth alongside RLS) and `is_active`,
  * so a teacher's classroom list never includes another teacher's classes or
  * a class they've deactivated. Each class carries its enrolled-student count
- * so the dashboard does not need a second read of the roster.
+ * so the dashboard does not need a second read of the roster; that count is
+ * only correct with a client that is allowed to read `students`.
  */
 export async function listActiveClassesForTeacher(
   supabase: SupabaseClient,
