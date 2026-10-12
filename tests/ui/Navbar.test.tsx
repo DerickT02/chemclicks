@@ -91,6 +91,7 @@ describe("role-aware navigation", () => {
     await signedIn("teacher");
     expect(screen.getByRole("link", { name: "ChemClicks" })).toHaveAttribute("href", "/admin");
     expect(screen.getByRole("link", { name: "Classrooms" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Labs" })).toHaveAttribute("href", "/admin/labs");
     expect(screen.queryByRole("link", { name: "Bohr Models" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Practice labs" })).not.toBeInTheDocument();
     expect(document.querySelector('a[href="#"]')).not.toBeInTheDocument();
@@ -112,6 +113,20 @@ describe("role-aware navigation", () => {
     mocks.pathname = "/admin/classes/class-1/attempts";
     await signedIn("teacher");
     expect(screen.getByRole("link", { name: "Classrooms" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Labs" })).not.toHaveAttribute("aria-current");
+  });
+
+  it.each(["/admin/labs", "/admin/labs/measurement"])("marks Labs, not Classrooms, active for a teacher on %s", async (path) => {
+    mocks.pathname = path;
+    await signedIn("teacher");
+    expect(screen.getByRole("link", { name: "Labs" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Classrooms" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not offer the teacher Labs tab to students", async () => {
+    await signedIn();
+    expect(screen.queryByRole("link", { name: "Labs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Practice labs" })).toHaveAttribute("href", "/student/labs");
   });
 
   it("announces mobile expansion and closes the menu on link navigation", async () => {

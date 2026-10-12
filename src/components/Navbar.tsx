@@ -16,7 +16,10 @@ const LINKS = {
     { label: "My assignments", href: "/student" },
     { label: "Practice labs", href: "/student/labs" },
   ],
-  teacher: [{ label: "Classrooms", href: "/admin" }],
+  teacher: [
+    { label: "Classrooms", href: "/admin" },
+    { label: "Labs", href: "/admin/labs" },
+  ],
 };
 
 function scrollPaddingTopPx(): number {
@@ -60,6 +63,8 @@ function isActiveLink(pathname: string, href: string): boolean {
   if (href === "/student") {
     return pathname === href || pathname.startsWith("/student/assignments/") || pathname.startsWith("/student/quizzes/");
   }
+  // The teacher's labs live under /admin but are their own destination.
+  if (href === "/admin" && isActiveLink(pathname, "/admin/labs")) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
