@@ -20,60 +20,30 @@ function required(env: Environment, name: string): string {
   return value
 }
 
-function isLoopback(url: URL): boolean {
-  return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-}
-
-function targetIdentity(url: URL): string {
-  return isLoopback(url) ? `loopback:${url.port || (url.protocol === 'https:' ? '443' : '80')}` : url.hostname
-}
-
-function validateKey(key: string, role: 'anon' | 'service_role', projectRef: string): void {
-  const prefix = role === 'anon' ? 'sb_publishable_' : 'sb_secret_'
-  if (key.startsWith(prefix) && key.length > prefix.length) return
+/** Host and port, with every loopback name treated as the same machine. */
+function target(value: string): string | null {
   try {
-    const parts = key.split('.')
-    if (parts.length !== 3) throw new Error()
-    const payload: unknown = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
-    if (!payload || typeof payload !== 'object' || !('role' in payload) || payload.role !== role) throw new Error()
-    if ('ref' in payload && payload.ref !== projectRef) throw new Error()
+    const url = new URL(value)
+    const host = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ? 'loopback' : url.hostname
+    return `${host}:${url.port}`
   } catch {
-    throw new Error(`Database tests require a ${role} key for the selected test project; key contents are not logged.`)
+    return null
   }
 }
 
 /** Local checks only: no network access and no assertion that a project is truly disposable. */
 export function databaseTestEnvironment(env: Environment, applicationUrls: readonly string[]): Record<string, string> {
   assertDatabaseTestOptIn(env)
-  const rawUrl = required(env, 'TEST_SUPABASE_URL')
-  const projectRef = required(env, 'TEST_SUPABASE_PROJECT_REF')
+  const url = required(env, 'TEST_SUPABASE_URL')
   const anonKey = required(env, 'TEST_SUPABASE_ANON_KEY')
   const serviceKey = required(env, 'TEST_SUPABASE_SERVICE_ROLE_KEY')
-  let url: URL
-  try { url = new URL(rawUrl) } catch { throw new Error('TEST_SUPABASE_URL must be a valid test-project URL.') }
-  if (url.username || url.password || url.search || url.hash || url.pathname !== '/') {
-    throw new Error('TEST_SUPABASE_URL must be a plain project origin without credentials, path, query, or fragment.')
+  const testTarget = target(url)
+  if (testTarget === null) throw new Error('TEST_SUPABASE_URL must be a valid test-project URL.')
+  if (applicationUrls.some(applicationUrl => target(applicationUrl) === testTarget)) {
+    throw new Error('Refusing database tests against a configured application project. Use a separate disposable project.')
   }
-  const local = isLoopback(url)
-  if (local) {
-    if (!['http:', 'https:'].includes(url.protocol) || projectRef !== 'local') {
-      throw new Error('Loopback database tests require HTTP(S) and TEST_SUPABASE_PROJECT_REF=local.')
-    }
-  } else if (url.protocol !== 'https:' || url.port || !/^[a-z0-9]{20}$/.test(projectRef)
-    || url.hostname !== `${projectRef}.supabase.co`) {
-    throw new Error('Hosted database tests require HTTPS and a matching TEST_SUPABASE_PROJECT_REF on the standard Supabase project URL.')
-  }
-  for (const applicationUrl of applicationUrls) {
-    let parsed: URL
-    try { parsed = new URL(applicationUrl) } catch { continue }
-    if (targetIdentity(parsed) === targetIdentity(url)) {
-      throw new Error('Refusing database tests against a configured application project. Use a separate disposable project.')
-    }
-  }
-  validateKey(anonKey, 'anon', projectRef)
-  validateKey(serviceKey, 'service_role', projectRef)
   return {
-    NEXT_PUBLIC_SUPABASE_URL: url.origin,
+    NEXT_PUBLIC_SUPABASE_URL: new URL(url).origin,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
     SUPABASE_SERVICE_ROLE_KEY: serviceKey,
   }

@@ -28,31 +28,26 @@ proof that the deployed schema is compatible or that fixtures are isolated.
 ## Dedicated fixture environment
 
 Create an ignored `.env.database-test.local` at the repository root, or export
-these four variables in the shell:
+these three variables in the shell:
 
 ```dotenv
 TEST_SUPABASE_URL=https://<disposable-project-ref>.supabase.co
-TEST_SUPABASE_PROJECT_REF=<disposable-project-ref>
 TEST_SUPABASE_ANON_KEY=<test-project-anon-or-publishable-key>
 TEST_SUPABASE_SERVICE_ROLE_KEY=<test-project-service-role-or-secret-key>
 ```
 
-For an isolated loopback instance, use its HTTP(S) URL and
-`TEST_SUPABASE_PROJECT_REF=local`. The runner rejects the same loopback port as a
-configured application project, including localhost/127.0.0.1/IPv6 aliases.
-Shell values override the dedicated file. Do not commit this file or keys.
+For an isolated loopback instance, use its URL. The runner rejects the same
+loopback port as a configured application project, including
+localhost/127.0.0.1/IPv6 aliases. Shell values override the dedicated file. Do not commit this file or keys.
 Application credential names are never used as fixture fallbacks.
 
-The runner requires a matching standard HTTPS Supabase project origin (or
-loopback HTTP(S)), refuses URLs with userinfo/path/query/fragment, and rejects
-known application targets from exported variables and `.env`, `.env.local`,
-`.env.development[.local]`, `.env.production[.local]`, and `.env.test[.local]`.
-Application files are read only to build that target denylist, not to supply
-fixture credentials. JWT roles and embedded project references are checked
-locally; publishable/secret keys cannot be associated with a project locally.
-No key signatures, project purpose, permissions, or remote state are verified.
-Operators must confirm those facts and obtain approval independently. Unknown
-production targets cannot be detected from local configuration alone.
+The runner rejects known application targets from exported variables and
+`.env`, `.env.local`, `.env.development[.local]`, `.env.production[.local]`, and
+`.env.test[.local]`. Application files are read only to build that target
+denylist, not to supply fixture credentials. The keys, project purpose,
+permissions, and remote state are not verified. Operators must confirm those
+facts and obtain approval independently. Unknown production targets cannot be
+detected from local configuration alone.
 
 ## Explicit invocation, after approval
 
