@@ -149,18 +149,41 @@ describe("teacher enrollment and lesson progress", () => {
     expect(html).not.toContain("% complete");
     expect(html).not.toContain("private RPC");
   });
-  it("does not query a foreign class requested through the URL", async () => {
+  it("loads the requested class alongside the class list, without reading it twice", async () => {
     populateClass();
-    await AdminPage({ searchParams: Promise.resolve({ classId: "foreign-class" }) });
+    const html = await render();
+    expect(html).toContain("Lewis Diagrams: Completed");
     expect(mocks.teacher).toHaveBeenCalledTimes(1);
     expect(mocks.classes).toHaveBeenCalledWith(expect.anything(), "teacher");
-    expect(mocks.assignments).toHaveBeenCalledWith(expect.anything(), classId);
-    expect(mocks.lessonProgress).toHaveBeenCalledWith(classId);
+    expect(mocks.assignments).toHaveBeenCalledExactlyOnceWith(expect.anything(), classId);
+    expect(mocks.lessonProgress).toHaveBeenCalledExactlyOnceWith(classId);
+  });
+  it("discards results for a class that is not the teacher's and shows their own class instead", async () => {
+    populateClass();
+    const foreignId = "99999999-9999-4999-8999-999999999999";
+    mocks.assignments.mockImplementation(async (_client: unknown, id: string) => id === foreignId
+      ? { data: [{ ...assignment, id: "foreign-assignment", class_id: foreignId }], error: null }
+      : { data: fiveAssignments, error: null });
+    mocks.lessonProgress.mockImplementation(async (id: string) => {
+      if (id === foreignId) throw new Error("Class progress access denied or unavailable.");
+      return { classId, className: "Chemistry", students: [lessonStudent] };
+    });
+    const html = renderToStaticMarkup(await AdminPage({ searchParams: Promise.resolve({ classId: foreignId }) }));
+    expect(html).toContain(`data-class-id="${classId}"`);
+    expect(html).toContain("Mina Chen");
+    expect(html).not.toContain("Student progress could not be loaded");
+    expect(mocks.assignments).toHaveBeenLastCalledWith(expect.anything(), classId);
+    expect(mocks.lessonProgress).toHaveBeenLastCalledWith(classId);
+  });
+  it("loads the first class when the URL names none", async () => {
+    populateClass();
+    await AdminPage({ searchParams: Promise.resolve({}) });
+    expect(mocks.assignments).toHaveBeenCalledExactlyOnceWith(expect.anything(), classId);
+    expect(mocks.lessonProgress).toHaveBeenCalledExactlyOnceWith(classId);
   });
   it("does not mask a class-list failure as no active classes", async () => {
     mocks.classes.mockResolvedValue({ data: null, error: { message: "private SQL details" } });
     await expect(render()).rejects.toThrow("We couldn't load your classes. Please try again.");
-    expect(mocks.assignments).not.toHaveBeenCalled();
   });
   it("does not read classroom data without a verified teacher", async () => {
     mocks.teacher.mockRejectedValue(new Error("private auth details"));

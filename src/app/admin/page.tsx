@@ -37,10 +37,26 @@ export default async function AdminPage({
     );
   }
 
-  const { data: classesData, error: classesError } = await listActiveClassesForTeacher(
-    supabase,
-    teacherId,
-  );
+  const loadClassDetails = (id: string) => Promise.all([
+    getClassActivities(supabase, id),
+    getTeacherClassLessonProgress(id).then(
+      (data) => ({ data, error: null as string | null }),
+      (error: unknown) => ({
+        data: null,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+    ),
+  ]);
+
+  // The class list, the catalog and the class named in the URL do not depend on
+  // each other, so they load together. Both class readers enforce ownership
+  // themselves, and their results are used only if that class turns out to be
+  // in this teacher's own list.
+  const [{ data: classesData, error: classesError }, catalogResult, requestedDetails] = await Promise.all([
+    listActiveClassesForTeacher(supabase, teacherId),
+    listActivityCatalog(supabase),
+    classId ? loadClassDetails(classId) : null,
+  ]);
 
   if (classesError || classesData === null) {
     throw new Error("We couldn't load your classes. Please try again.");
@@ -51,21 +67,12 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
-  const [catalogResult, assignmentsResult, lessonProgressResult] = await Promise.all([
-    listActivityCatalog(supabase),
-    selectedClass
-      ? getClassActivities(supabase, selectedClass.id)
-      : Promise.resolve({ data: [], error: null }),
-    selectedClass
-      ? getTeacherClassLessonProgress(selectedClass.id).then(
-          (data) => ({ data, error: null as string | null }),
-          (error: unknown) => ({
-            data: null,
-            error: error instanceof Error ? error.message : "Unknown error",
-          }),
-        )
-      : Promise.resolve({ data: null, error: null as string | null }),
-  ]);
+  const [assignmentsResult, lessonProgressResult] = !selectedClass
+    ? [{ data: [], error: null }, { data: null, error: null as string | null }]
+    : requestedDetails && selectedClass.id === classId
+      ? requestedDetails
+      // No class in the URL, or not one of the teacher's: load the fallback class.
+      : await loadClassDetails(selectedClass.id);
 
   const activities = catalogResult.data ?? [];
   const assignments = assignmentsResult.data ?? [];
