@@ -99,7 +99,7 @@ describe("role-aware navigation", () => {
   it.each([
     ["/student/assignments/assignment-1", "My assignments"],
     ["/student/quizzes/ionic", "My assignments"],
-    ["/student/labs/measurement/questions", "Practice labs"],
+    ["/student/labs/measurement", "Practice labs"],
   ])("marks the correct student destination active for %s", async (path, label) => {
     mocks.pathname = path;
     await signedIn();

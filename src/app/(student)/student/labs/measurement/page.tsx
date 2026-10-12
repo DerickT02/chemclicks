@@ -16,15 +16,6 @@ export default function MeasurementLabPage() {
           <Link href="/student/labs" className="text-sm text-foreground underline">Back to practice labs</Link>
           <p className="text-sm text-muted-foreground">Untracked practice — exploring here does not record assignment completion.</p>
           <h1 className="text-3xl font-semibold text-foreground">Measurement Lab</h1>
-          <p className="text-sm text-muted-foreground">
-            Ready to test yourself?{" "}
-            <Link
-              href="/student/labs/measurement/questions"
-              className="rounded-sm font-medium text-accent underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Practice measurement questions
-            </Link>
-          </p>
         </header>
 
         <article className="rounded-xl border border-border bg-card p-6">
