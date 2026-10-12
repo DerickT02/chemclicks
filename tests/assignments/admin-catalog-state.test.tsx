@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getActivityDefinition } from "@/lib/activities/registry";
 
-const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), roster: vi.fn(), lessonProgress: vi.fn(), user: vi.fn() }));
+const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), user: vi.fn() }));
 vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
   auth: { getUser: mocks.user },
@@ -11,7 +11,6 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
 vi.mock("@/lib/db/activities", () => ({ listActivityCatalog: mocks.catalog }));
 vi.mock("@/lib/db/class_activities", () => ({ getClassActivities: mocks.assignments }));
 vi.mock("@/lib/db/classes", () => ({ listActiveClassesForTeacher: mocks.classes }));
-vi.mock("@/lib/db/teacher-dashboard", () => ({ getTeacherRoster: mocks.roster }));
 vi.mock("@/lib/server/teacher-lesson-progress", () => ({ getTeacherClassLessonProgress: mocks.lessonProgress }));
 vi.mock("@/app/admin/assignments/AssignmentForm", () => ({ default: () => <p>New assignment form</p> }));
 vi.mock("@/app/admin/assignments/actions", () => ({ saveAssignment: vi.fn(), unassignActivity: vi.fn() }));
@@ -27,9 +26,8 @@ const render = async () => renderToStaticMarkup(await AdminPage({ searchParams: 
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.user.mockResolvedValue({ data: { user: { id: "teacher" } }, error: null });
-  mocks.roster.mockResolvedValue({ data: [], error: null });
   mocks.lessonProgress.mockResolvedValue({ classId, className: "Chemistry", students: [] });
-  mocks.classes.mockResolvedValue({ data: [{ id: classId, name: "Chemistry", section: "A", class_code: "ABC123" }], error: null });
+  mocks.classes.mockResolvedValue({ data: [{ id: classId, name: "Chemistry", section: "A", class_code: "ABC123", student_count: 0 }], error: null });
   mocks.catalog.mockResolvedValue({ data: [activity], error: null });
   mocks.assignments.mockResolvedValue({ data: [], error: null });
 });
@@ -37,7 +35,7 @@ beforeEach(() => {
 describe("teacher catalog safety states", () => {
   it("falls back to a remaining active class when a disabled class was selected", async () => {
     const remainingId = "22222222-2222-4222-8222-222222222222";
-    mocks.classes.mockResolvedValue({ data: [{ id: remainingId, name: "Remaining class", section: "B", class_code: "XYZ789" }], error: null });
+    mocks.classes.mockResolvedValue({ data: [{ id: remainingId, name: "Remaining class", section: "B", class_code: "XYZ789", student_count: 0 }], error: null });
     const html = await render();
     expect(html).toContain(`data-class-id="${remainingId}"`);
     expect(html).not.toContain(`data-class-id="${classId}"`);
@@ -119,7 +117,7 @@ const lessonStudent = {
   ],
 };
 function populateClass() {
-  mocks.roster.mockResolvedValue({ data: [student], error: null });
+  mocks.classes.mockResolvedValue({ data: [{ id: classId, name: "Chemistry", section: "A", class_code: "ABC123", student_count: 1 }], error: null });
   mocks.assignments.mockResolvedValue({ data: fiveAssignments, error: null });
   mocks.lessonProgress.mockResolvedValue({ classId, className: "Chemistry", students: [lessonStudent] });
 }
@@ -137,20 +135,11 @@ describe("teacher enrollment and lesson progress", () => {
     expect(html).not.toContain("Active students");
     expect(mocks.lessonProgress).toHaveBeenCalledWith(classId);
   });
-  it("shows a true empty roster only after a successful read", async () => {
+  it("shows the enrollment counts returned with the class list", async () => {
     const html = await render();
     expect(html).toContain("0 students enrolled");
+    expect(html).toContain("0 students · Code");
     expect(html).toContain("No students in this class yet.");
-    expect(html).not.toContain("Enrollment unavailable");
-  });
-  it("does not fabricate enrollment counts after a roster failure", async () => {
-    populateClass();
-    mocks.roster.mockResolvedValue({ data: null, error: { message: "private SQL details" } });
-    const html = await render();
-    expect(html).toContain("Enrollment unavailable");
-    expect(html).toContain("Enrollment count unavailable");
-    expect(html).not.toContain("0 students enrolled");
-    expect(html).not.toContain("private SQL");
   });
   it("keeps valid enrollment but reports a lesson-progress failure instead of an empty class", async () => {
     populateClass();
@@ -165,19 +154,17 @@ describe("teacher enrollment and lesson progress", () => {
   it("does not query a foreign class requested through the URL", async () => {
     populateClass();
     await AdminPage({ searchParams: Promise.resolve({ classId: "foreign-class" }) });
-    expect(mocks.roster).toHaveBeenCalledWith(expect.anything(), [classId]);
     expect(mocks.assignments).toHaveBeenCalledWith(expect.anything(), classId);
     expect(mocks.lessonProgress).toHaveBeenCalledWith(classId);
   });
   it("does not mask a class-list failure as no active classes", async () => {
     mocks.classes.mockResolvedValue({ data: null, error: { message: "private SQL details" } });
     await expect(render()).rejects.toThrow("We couldn't load your classes. Please try again.");
-    expect(mocks.roster).not.toHaveBeenCalled();
+    expect(mocks.assignments).not.toHaveBeenCalled();
   });
   it("does not read classroom data when verified authentication returns an error", async () => {
     mocks.user.mockResolvedValue({ data: { user: { id: "teacher" } }, error: { message: "private auth details" } });
     expect(await render()).toContain("Please sign in to view your classes");
     expect(mocks.classes).not.toHaveBeenCalled();
-    expect(mocks.roster).not.toHaveBeenCalled();
   });
 });

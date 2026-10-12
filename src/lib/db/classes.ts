@@ -15,26 +15,44 @@ export type Class = {
 
 export type InsertClass = Pick<Class, "teacher_id" | "name" | "section" | "class_code">;
 
-export type ClassListItem = Pick<Class, "id" | "name" | "section" | "class_code">;
+export type ClassListItem = Pick<Class, "id" | "name" | "section" | "class_code"> & {
+  /** Enrolled students, counted in the same read as the class list. */
+  student_count: number;
+};
+
+type ClassListRow = Pick<Class, "id" | "name" | "section" | "class_code"> & {
+  students: { count: number }[] | null;
+};
 
 /**
  * Lists active classes owned by the given teacher, newest first. Filters by
  * `teacher_id` explicitly (defense in depth alongside RLS) and `is_active`,
  * so a teacher's classroom list never includes another teacher's classes or
- * a class they've deactivated.
+ * a class they've deactivated. Each class carries its enrolled-student count
+ * so the dashboard does not need a second read of the roster.
  */
 export async function listActiveClassesForTeacher(
   supabase: SupabaseClient,
   teacherId: string,
 ): Promise<{ data: ClassListItem[] | null; error: PostgrestError | null }> {
-  return supabase
+  const { data, error } = await supabase
     .from("classes")
-    .select("id, name, section, class_code")
+    .select("id, name, section, class_code, students(count)")
     .eq("teacher_id", teacherId)
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .order("id")
-    .returns<ClassListItem[]>();
+    .returns<ClassListRow[]>();
+
+  if (error || data === null) return { data: null, error };
+
+  return {
+    data: data.map(({ students, ...classItem }) => ({
+      ...classItem,
+      student_count: students?.[0]?.count ?? 0,
+    })),
+    error: null,
+  };
 }
 
 /**

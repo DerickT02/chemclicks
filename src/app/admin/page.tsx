@@ -10,13 +10,10 @@ import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { listActivityCatalog } from "@/lib/db/activities";
 import { getClassActivities } from "@/lib/db/class_activities";
 import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
-import { listActiveClassesForTeacher, type ClassListItem } from "@/lib/db/classes";
-import { getTeacherRoster, type TeacherRosterStudent } from "@/lib/db/teacher-dashboard";
+import { listActiveClassesForTeacher } from "@/lib/db/classes";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import { LessonProgressList } from "@/app/admin/LessonProgressList";
 
-
-type ClassWithStudents = ClassListItem & { students: TeacherRosterStudent[] };
 
 export default async function AdminPage({
   searchParams,
@@ -47,18 +44,7 @@ export default async function AdminPage({
     throw new Error("We couldn't load your classes. Please try again.");
   }
 
-  const baseClasses = classesData ?? [];
-  const rosterResult = await getTeacherRoster(supabase, baseClasses.map(classItem => classItem.id));
-  const rosterLoadFailed = Boolean(rosterResult.error) || rosterResult.data === null;
-  const studentsByClass = new Map<string, TeacherRosterStudent[]>();
-  for (const student of rosterResult.data ?? []) {
-    const existing = studentsByClass.get(student.class_id) ?? [];
-    existing.push(student);
-    studentsByClass.set(student.class_id, existing);
-  }
-  const classes: ClassWithStudents[] = baseClasses.map(classItem => ({
-    ...classItem, students: studentsByClass.get(classItem.id) ?? [],
-  }));
+  const classes = classesData;
   const selectedClass =
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
@@ -129,7 +115,7 @@ export default async function AdminPage({
               ) : (
                 classes.map((classItem) => {
                   const isSelected = selectedClass?.id === classItem.id;
-                  const studentCount = classItem.students.length;
+                  const studentCount = classItem.student_count;
                   return (
                     <Link
                       key={classItem.id}
@@ -146,7 +132,7 @@ export default async function AdminPage({
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">{classItem.section}</p>
                       ) : null}
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {rosterLoadFailed ? "Enrollment unavailable" : `${studentCount} ${studentCount === 1 ? "student" : "students"}`} · Code{" "}
+                        {studentCount} {studentCount === 1 ? "student" : "students"} · Code{" "}
                         {classItem.class_code}
                       </p>
                     </Link>
@@ -188,7 +174,7 @@ export default async function AdminPage({
                   <p className="mt-2 text-sm text-muted-foreground">{selectedClass.section}</p>
                 ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {rosterLoadFailed ? "Enrollment count unavailable" : `${selectedClass.students.length} ${selectedClass.students.length === 1 ? "student" : "students"} enrolled`}
+                  {selectedClass.student_count} {selectedClass.student_count === 1 ? "student" : "students"} enrolled
                 </p>
                 <div className="mt-4"><CopyClassCode key={selectedClass.id} code={selectedClass.class_code} /></div>
                 <section className="mt-7 space-y-6">

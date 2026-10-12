@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { listActiveClassesForTeacher } from "@/lib/db/classes";
 import { getClassActivities } from "@/lib/db/class_activities";
-import { getTeacherRoster, getClassCurrentProgress } from "@/lib/db/teacher-dashboard";
+import { getClassCurrentProgress } from "@/lib/db/teacher-dashboard";
 
 type Call = { method: string; args: unknown[] };
 const classId = "11111111-1111-4111-8111-111111111111";
@@ -21,20 +21,6 @@ function clientFor(result: { data: unknown; error: unknown }) {
 const callsTo = (calls: Call[], method: string) => calls.filter(call => call.method === method).map(call => call.args);
 
 describe("dashboard reads", () => {
-  it("returns the roster in one query ordered by last name, first name, then id", async () => {
-    const data = [{ id: "a", class_id: classId, first_name: "A", last_name: "Alpha" }];
-    const mock = clientFor({ data, error: null });
-    expect(await getTeacherRoster(mock.client, [classId, "other-class", classId])).toEqual({ data, error: null });
-    expect(mock.from).toHaveBeenCalledTimes(1);
-    expect(mock.from).toHaveBeenCalledWith("students");
-    expect(callsTo(mock.calls, "in")).toEqual([["class_id", [classId, "other-class"]]]);
-    expect(callsTo(mock.calls, "order")).toEqual([["last_name"], ["first_name"], ["id"]]);
-  });
-  it("does not query students without owned active classes", async () => {
-    const mock = clientFor({ data: [], error: null });
-    expect(await getTeacherRoster(mock.client, [])).toEqual({ data: [], error: null });
-    expect(mock.from).not.toHaveBeenCalled();
-  });
   it("limits progress to the selected class on both the student and assignment relationships", async () => {
     const data = [{ student_id: "owned", class_activity_id: "assignment", status: "completed" }];
     const mock = clientFor({ data, error: null });
@@ -56,7 +42,6 @@ describe("dashboard reads", () => {
     expect(mock.from).not.toHaveBeenCalled();
   });
   it.each([
-    ["roster", (client: SupabaseClient) => getTeacherRoster(client, [classId])],
     ["progress", (client: SupabaseClient) => getClassCurrentProgress(client, classId)],
     ["assignments", (client: SupabaseClient) => getClassActivities(client, classId)],
     ["classes", (client: SupabaseClient) => listActiveClassesForTeacher(client, "teacher")],
