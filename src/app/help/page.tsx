@@ -7,7 +7,6 @@ export default function HelpPage() {
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-3xl space-y-8">
-        <Link href="/" className="underline">Back to home</Link>
         <h1 className="text-3xl font-semibold">Classroom help</h1>
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">For students</h2>
