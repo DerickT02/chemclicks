@@ -25,7 +25,6 @@ export default async function AssignmentHistoryPage({ params }: { params: Promis
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-4xl space-y-6">
-        <Link href="/student" className="text-foreground underline">Back to assignments</Link>
         <h1 className="text-3xl font-semibold">{assignment.activity.title} — saved history</h1>
         {readable ? <>
           <p className="text-sm text-muted-foreground">{status === "Closed" ? "This assignment is closed. No further work can be submitted." : "This is a read-only view of your saved exploration history."}</p>

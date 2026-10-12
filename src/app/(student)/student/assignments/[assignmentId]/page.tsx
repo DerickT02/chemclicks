@@ -1,4 +1,3 @@
-import Link from "next/link";
 import AttemptHistory from "@/components/assignments/AttemptHistory";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getAssignmentAttempts } from '@/lib/server/student-assignments';
@@ -37,7 +36,6 @@ export default async function AssignmentPage({ params }: {
   if (status === "Closed") redirect(`/student/assignments/${assignment.id}/history`);
   if (status !== "Open") return (
     <main className="min-h-screen-below-nav space-y-4 bg-background px-6 py-10 text-foreground">
-      <Link href="/student" className="underline">Back to assignments</Link>
       <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
       <p role="status">This activity is not available right now. Check its schedule on My assignments or ask your teacher.</p>
     </main>
@@ -55,7 +53,6 @@ export default async function AssignmentPage({ params }: {
   return (
     <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-5xl space-y-6">
-        <Link href="/student" className="text-accent underline">Back to assignments</Link>
         <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
         <AssignmentAccess key={assignment.id} closesAt={assignment.closes_at}>
           {hasActivityContent(type) && (
