@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import BohrModelsQuiz from "@/components/quiz/bohr/BohrModelsQuiz";
 import { getBohrQuizAccess } from "@/lib/assignments/bohr-quiz-access";
 import { BOHR_QUIZ_KEY, listQuizQuestions, type QuizQuestionsResult } from "@/lib/db/quiz-questions";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Bohr Models Quiz | ChemClicks",
@@ -36,10 +36,10 @@ export default async function BohrModelQuizPage() {
     );
   }
 
-  const supabase = await createClient();
+  // Client sessions cannot read these rows; load them only after access passes.
   let questionsResult: QuizQuestionsResult;
   try {
-    questionsResult = await listQuizQuestions(supabase, BOHR_QUIZ_KEY);
+    questionsResult = await listQuizQuestions(createAdminClient(), BOHR_QUIZ_KEY);
   } catch {
     questionsResult = { data: null, error: { code: "unavailable", message: LOAD_ERROR_MESSAGE } };
   }

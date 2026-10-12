@@ -251,7 +251,7 @@ export default function Navbar() {
       </button>
 
       <div className="absolute left-0 right-0 top-full">
-        <div id={menuId} hidden={!mobileOpen} className="space-y-1 border-t border-border bg-background px-4 pb-4 pt-2 md:hidden">
+        <div id={menuId} hidden={!mobileOpen} className="space-y-1 border-y border-border bg-background px-4 pb-4 pt-2 md:hidden">
           {mobileOpen ? <>{navigationLinks(true)}{authControl(true)}</> : null}
         </div>
         {accountMessage ? (
