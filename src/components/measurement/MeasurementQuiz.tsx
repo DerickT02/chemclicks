@@ -61,13 +61,11 @@ type PanelProps = {
    * just unmounted, so keyboard and screen reader users start at the top.
    */
   focusHeading: boolean;
-  /** An assigned attempt is graded and saved on the server; practice is not. */
-  tracked?: boolean;
   action?: ReactNode;
   children: ReactNode;
 };
 
-function Panel({ heading, focusHeading, tracked = false, action, children }: PanelProps) {
+function Panel({ heading, focusHeading, action, children }: PanelProps) {
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -91,9 +89,6 @@ function Panel({ heading, focusHeading, tracked = false, action, children }: Pan
         </h2>
         {action}
       </div>
-      {!tracked && (
-        <p className="mt-2 text-sm text-muted-foreground">Untracked practice — answers and results are not saved or visible to your teacher.</p>
-      )}
       {children}
     </section>
   );
@@ -135,7 +130,7 @@ function InstrumentChooser({ returned, assignedMode, pending = false, onStart }:
 
   if (mode) {
     return (
-      <Panel heading="Start your measurement quiz" focusHeading={returned} tracked>
+      <Panel heading="Start your measurement quiz" focusHeading={returned}>
         <p className="mt-2 text-sm text-muted-foreground">
           {`${mode.spec.name}: report each reading to ${describeDecimalPlaces(mode.spec.decimals)}.`}
         </p>
@@ -258,7 +253,6 @@ export function MeasurementQuestion({
     <Panel
       heading={`${spec.name} question ${question.questionIndex + 1} of ${questionCount}`}
       focusHeading
-      tracked={Boolean(assignedMode)}
       action={!assignedMode && (
         <button
           type="button"
@@ -397,7 +391,6 @@ export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInst
     <Panel
       heading={`${spec.name} results: ${results.score} of ${results.total} correct`}
       focusHeading
-      tracked={Boolean(assignedMode)}
     >
       <div className="mt-4">
         <Verdict

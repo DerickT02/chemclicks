@@ -113,8 +113,6 @@ describe("QuizShell", () => {
       screen.queryByRole("link", { name: "Continue to next section" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to assignments" })).toHaveAttribute("href", "/student");
-    // A saved attempt must not be described as unsaved.
-    expect(screen.queryByText("Quiz results are not saved or visible to your teacher.")).not.toBeInTheDocument();
   });
 
   it("shows a retry action when saving the final result fails", async () => {

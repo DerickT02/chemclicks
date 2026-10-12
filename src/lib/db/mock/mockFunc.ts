@@ -127,6 +127,7 @@ export async function getTeacherById(id: string): Promise<Teacher | null> {
 // GET /api/classes/:id
 // POST /api/classes
 // PATCH /api/classes/:id
+// DELETE /api/classes/:id
 
 export async function getClassesByTeacher(teacherId: string): Promise<Class[]> {
   return delay(mockClasses.filter(c => c.teacher_id === teacherId))
@@ -152,6 +153,13 @@ export async function updateClass(id: string, patch: Partial<Pick<Class, 'name' 
   if (idx === -1) return delay(null)
   mockClasses[idx] = { ...mockClasses[idx], ...patch }
   return delay(mockClasses[idx])
+}
+
+export async function deleteClass(id: string): Promise<boolean> {
+  const idx = mockClasses.findIndex(c => c.id === id)
+  if (idx === -1) return delay(false)
+  mockClasses.splice(idx, 1)
+  return delay(true)
 }
 
 // ─── Students ─────────────────────────────────────────────────────────────────

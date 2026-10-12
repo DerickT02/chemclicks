@@ -163,11 +163,6 @@ export default function QuizShell({
             ? `Passed — you needed ${passingThresholdPercent}% or higher.`
             : `Not passed — you need at least ${passingThresholdPercent}% to pass.`}
         </p>
-        {!result.attemptId && (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Quiz results are not saved or visible to your teacher.
-          </p>
-        )}
         <div className="mt-8 flex flex-wrap gap-4">
           <button
             type="button"
@@ -195,6 +190,11 @@ export default function QuizShell({
               Your passing result is saved. No next assigned section is
               currently available.
             </p>
+          )}
+          {result.passed && !onSubmit && (
+            <button type="button" className={primaryButtonClassName}>
+              Continue to next section
+            </button>
           )}
         </div>
       </article>
