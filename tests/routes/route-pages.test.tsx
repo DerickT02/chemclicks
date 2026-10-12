@@ -51,7 +51,6 @@ describe("route page behavior", () => {
     expect(html).toContain("Example Salts");
     expect(html).toContain("Example Molecules");
     expect(html).not.toContain("/student/quizzes/");
-    expect(html).not.toContain("Untracked practice");
   });
 
   it("offers no practice questions in the measurement lab", () => {

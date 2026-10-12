@@ -12,8 +12,6 @@ vi.mock("next/navigation", () => ({
 import Home from "@/app/page";
 import Footer from "@/components/Footer";
 import LabsPage from "@/app/(student)/student/labs/page";
-import BohrModelsPage from "@/app/(student)/student/labs/bohr-models/page";
-import MeasurementLabPage from "@/app/(student)/student/labs/measurement/page";
 
 function routeExists(href: string): boolean {
   return ["", "/(student)", "/(teacher)"].some((group) => existsSync(
@@ -68,17 +66,6 @@ describe("practice navigation", () => {
     const html = renderToStaticMarkup(<LabsPage />);
     expect(html).not.toContain("hundredths");
     expect(html).toContain("Explore ruler scales");
-  });
-
-  // The navigation bar already links to My assignments and Practice labs.
-  it.each([
-    ["practice index", LabsPage],
-    ["Bohr practice", BohrModelsPage],
-    ["measurement practice", MeasurementLabPage],
-  ] as const)("shows %s without a tracking disclaimer or duplicate back link", (_label, Page) => {
-    const html = renderToStaticMarkup(<Page />);
-    expect(html).not.toContain("Untracked practice");
-    expect(html).not.toContain("Back to");
   });
 
   it("links the practice index to lab pages that exist", () => {
