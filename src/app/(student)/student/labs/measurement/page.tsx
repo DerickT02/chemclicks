@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import MeasurementComparison from "@/components/measurement/MeasurementComparison";
+import MeasurementLab from "@/components/labs/MeasurementLab";
 
 export const metadata: Metadata = {
   title: "Measurement Lab | ChemClicks",
@@ -8,23 +8,5 @@ export const metadata: Metadata = {
 
 // Activities must be opened through a class assignment with server access checks.
 export default function MeasurementLabPage() {
-  return (
-    <div className="min-h-screen-below-nav bg-background px-4 py-10 md:px-8">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold text-foreground">Measurement Lab</h1>
-        </header>
-
-        <article className="rounded-xl border border-border bg-card p-6">
-          <h2 className="mb-4 font-semibold text-foreground">Ruler</h2>
-          <MeasurementComparison instrument="ruler" />
-        </article>
-
-        <article className="rounded-xl border border-border bg-card p-6">
-          <h2 className="mb-4 font-semibold text-foreground">Graduated Cylinder</h2>
-          <MeasurementComparison instrument="cylinder" />
-        </article>
-      </div>
-    </div>
-  );
+  return <MeasurementLab />;
 }
