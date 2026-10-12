@@ -43,5 +43,8 @@ describe('attempt lifecycle boundary', () => {
     expect(isSupportedExploration('measurement_graduated_cylinder')).toBe(true)
     expect(isSupportedExploration('measurement_ruler_tenths')).toBe(true)
     expect(isSupportedExploration('lewis_structures_ionic')).toBe(true)
+    expect(isSupportedExploration('bohr_model_intro')).toBe(true)
+    expect(isSupportedExploration('bohr_model_stability')).toBe(true)
+    expect(isSupportedExploration('future_activity')).toBe(false)
   })
 })

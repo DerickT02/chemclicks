@@ -4,6 +4,7 @@ import AttemptControls from './AttemptControls';
 import { notFound, redirect } from "next/navigation";
 import { getStudentAssignments } from "@/lib/db/student-assignments";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
+import BohrModelViewer from "@/components/bohr-models/BohrModelViewer";
 import MeasurementComparison from "@/components/measurement/MeasurementComparison";
 import LewisDotExplorer from "@/components/lewis/LewisDotExplorer";
 import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
@@ -55,6 +56,7 @@ export default async function AssignmentPage({ params }: {
             </section>
           )}
           <section className="rounded-xl border border-border bg-card p-6">
+            {(type === "bohr_model_intro" || type === "bohr_model_stability") && <BohrModelViewer />}
             {type === "lewis_diagram" && <LewisDotExplorer />}
             {type === "lewis_structures_ionic" && <IonicCompoundExplorer />}
             {type === "lewis_structures_covalent" && <CovalentBondExplorer />}
