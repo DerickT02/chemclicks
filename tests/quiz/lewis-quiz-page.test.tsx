@@ -76,7 +76,7 @@ describe.each([
     expect(listQuestions).toHaveBeenCalledWith(expect.anything(), quizKey);
     expect(html).toContain(`${title} with 3 questions`);
     expect(html).toContain("Your score is saved for your teacher when you finish.");
-    expect(html).toContain('href="/student"');
+    expect(html).not.toContain("Back to");
     expect(html).not.toContain("before moving on");
     expect(html).not.toContain('role="alert"');
   });

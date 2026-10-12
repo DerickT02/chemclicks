@@ -32,7 +32,6 @@ export default async function LewisQuizPage({ kind }: Props) {
     <div className="min-h-screen-below-nav bg-background px-4 py-10 md:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-2">
-          <Link href="/student" className="text-sm text-foreground underline">Back to assignments</Link>
           <h1 className="text-3xl font-semibold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground">
             Check your understanding. Your score is saved for your teacher when you finish.
