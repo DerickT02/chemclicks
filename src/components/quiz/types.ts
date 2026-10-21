@@ -2,6 +2,8 @@ export type QuizQuestion = {
   id: string;
   question: string;
   options: string[];
+  /** Optional covalent compound id used to render a question diagram. */
+  diagramKey?: string;
   /** Maps a displayed option index back to the authored/database index. */
   answerOrder?: number[];
 };
