@@ -191,7 +191,31 @@ describe("MeasurementQuestion", () => {
     expect(html).not.toContain(">Correct<");
     expect(html).toContain("Check answer");
     expect(html).toContain("Skip to next question");
-    expect(html).not.toContain("23.4 mL");
+    expect(html).toContain("expected reading of 23.4 mL");
+  });
+
+  it("draws the tenths ruler with whole-centimeter marks and its own tolerance", () => {
+    const html = render(rulerQuestion({ mode: "ruler_tenths", readings: [4.3, 6.6, 2.8, 7.1, 9.2] }));
+
+    expect(html).toContain("0–10 cm, marked every 1 cm");
+    expect(html).toContain("the nearest 0.1 cm (1 decimal place)");
+    expect(html).toContain("±0.2 cm");
+    expect(drawnPaths(html)).toEqual(
+      drawnPaths(renderToStaticMarkup(<PrecisionRuler lockedValue={4.3} precision="tenths" />)),
+    );
+    expect((html.match(/<line /g) ?? []).length).toBeLessThan(
+      (render(rulerQuestion()).match(/<line /g) ?? []).length,
+    );
+  });
+
+  it.each([
+    ["ruler_tenths", "ruler", [4.3, 6.6, 2.8, 7.1, 9.2], "4.3"],
+    ["ruler_hundredths", "ruler", [4.37, 6.62, 2.85, 7.18, 9.21], "4.37"],
+    ["cylinder_tenths", "cylinder", [23.4, 41.7, 8.6, 31.1, 17.2], "23.4"],
+  ] as const)("hides the %s reading until an answer is graded", (mode, instrument, readings, reading) => {
+    const html = render(rulerQuestion({ mode, instrument, readings: [...readings] }));
+    expect(html).not.toContain(reading);
+    expect(html).not.toContain("aria-value");
   });
 });
 
