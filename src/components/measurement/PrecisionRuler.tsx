@@ -3,6 +3,7 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import {
   RULER_SPEC,
+  RULER_TENTHS_SPEC,
   formatReading,
   quantizeReading,
 } from "@/lib/measurement/instruments";
@@ -25,7 +26,7 @@ const SCALE_CM = Array.from({ length: SPAN_CM + 1 }, (_, index) => RULER_MIN_CM 
 export type RulerPrecision = "tenths" | "hundredths";
 
 const RULER_SPECS = {
-  tenths: { ...RULER_SPEC, graduation: 1, step: 0.1, decimals: 1 },
+  tenths: RULER_TENTHS_SPEC,
   hundredths: RULER_SPEC,
 };
 

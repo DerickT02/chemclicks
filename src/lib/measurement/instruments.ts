@@ -27,7 +27,8 @@ export type InstrumentSpec = {
  * in any scale reading. An answer is marked correct when it is within ±2 in
  * that estimated digit, i.e. one fifth of a graduation, of the reading:
  *
- *   ruler               marks every 0.1 cm, report to 0.01 cm, accept ±0.02 cm
+ *   ruler (hundredths)  marks every 0.1 cm, report to 0.01 cm, accept ±0.02 cm
+ *   ruler (tenths)      marks every 1 cm,   report to 0.1 cm,  accept ±0.2 cm
  *   graduated cylinder  marks every 1 mL,   report to 0.1 mL,  accept ±0.2 mL
  *
  * Answers must also be written to exactly `decimals` places, because the number
@@ -45,6 +46,15 @@ export const RULER_SPEC: InstrumentSpec = {
   decimals: 2,
   tolerance: 0.02,
   defaultReading: 5,
+};
+
+/** The same ruler with only whole-centimeter marks, so the tenths digit is the estimated one. */
+export const RULER_TENTHS_SPEC: InstrumentSpec = {
+  ...RULER_SPEC,
+  graduation: 1,
+  step: 0.1,
+  decimals: 1,
+  tolerance: 0.2,
 };
 
 export const CYLINDER_SPEC: InstrumentSpec = {

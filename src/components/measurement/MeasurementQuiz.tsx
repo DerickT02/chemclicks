@@ -222,9 +222,8 @@ export function MeasurementQuestion({
   onSubmit,
   onContinue,
 }: QuestionProps) {
-  const spec = question.mode
-    ? getMeasurementQuizMode(question.mode).spec
-    : INSTRUMENTS[question.instrument];
+  const mode = question.mode ? getMeasurementQuizMode(question.mode) : null;
+  const spec = mode ? mode.spec : INSTRUMENTS[question.instrument];
   const reading = currentReading(question);
   const questionCount = question.readings.length;
   const isLastQuestion = question.questionIndex === questionCount - 1;
@@ -290,7 +289,7 @@ export function MeasurementQuestion({
 
       <div className="mt-6">
         {question.instrument === "ruler" ? (
-          <PrecisionRuler lockedValue={reading} />
+          <PrecisionRuler lockedValue={reading} precision={mode?.precision ?? "hundredths"} />
         ) : (
           <GraduatedCylinder lockedValue={reading} />
         )}
