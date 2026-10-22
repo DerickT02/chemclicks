@@ -70,6 +70,10 @@ BEGIN
 
   SET LOCAL ROLE service_role;
 
+  PERFORM public.student_quiz_start(
+    student, classroom, assignment, 'bohr_models'
+  );
+
   SELECT * INTO first_attempt
     FROM public.student_quiz_submit(
       student, classroom, assignment, 'bohr_models', 'quiz-submit-1', pass_answers
