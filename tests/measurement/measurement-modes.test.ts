@@ -130,7 +130,7 @@ describe("first-answer scoring in each mode", () => {
       { type: "edit-answer", answer: outside }, { type: "submit" },
       { type: "edit-answer", answer: edge }, { type: "submit" },
     ));
-    expect(firstWrong).toMatchObject({ firstTryCorrect: false, score: 0, result: { status: "correct" } });
+    expect(firstWrong).toMatchObject({ firstTryCorrect: false, score: 0, result: { status: "incorrect" } });
 
     const firstRight = asQuestion(run(started, { type: "edit-answer", answer: edge }, { type: "submit" }));
     expect(firstRight).toMatchObject({ firstTryCorrect: true, score: 1 });

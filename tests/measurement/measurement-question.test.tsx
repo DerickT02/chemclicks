@@ -64,7 +64,7 @@ describe("MeasurementQuiz", () => {
 
     expect(html).toContain("Choose an instrument");
     expect(html).toContain("5 random questions");
-    expect(html).toContain("at least 4 correctly on your first try to pass");
+    expect(html).toContain("You get one try per question. Answer at least 4 correctly to pass.");
     expect(html).toContain("Start ruler questions");
     expect(html).toContain("Start graduated cylinder questions");
     expect(html.match(/<button type="button"/g)).toHaveLength(2);
@@ -97,7 +97,7 @@ describe("MeasurementQuestion", () => {
   it("explains the scoring rule and the pass mark", () => {
     const html = render(rulerQuestion());
 
-    expect(html).toContain("Only your first answer to each question is scored.");
+    expect(html).toContain("You get one try per question.");
     expect(html).toContain("Get 4 of 5 right to pass.");
   });
 
@@ -163,14 +163,6 @@ describe("MeasurementQuestion", () => {
     expect(html).not.toContain("change your score");
   });
 
-  it("tells the student a correct retry doesn't change their score", () => {
-    const result = evaluateAnswer("4.37", 4.37, RULER_SPEC);
-    const html = render(rulerQuestion({ answer: "4.37", result, attempt: 2, firstTryCorrect: false }));
-
-    expect(html).toContain("Correct");
-    expect(html).toContain("Only your first answer is scored, so this one doesn&#x27;t change your score.");
-  });
-
   it("offers See results on the last question", () => {
     const result = evaluateAnswer("17.2", 17.2, CYLINDER_SPEC);
     const html = render(
@@ -181,7 +173,7 @@ describe("MeasurementQuestion", () => {
     expect(html).toContain("See results");
   });
 
-  it("shows incorrect feedback with options to retry or skip", () => {
+  it("locks an incorrect answer and only offers the next question", () => {
     const result = evaluateAnswer("30.0", 23.4, CYLINDER_SPEC);
     const html = render(
       cylinderQuestion({ answer: "30.0", result, attempt: 1, firstTryCorrect: false }),
@@ -189,9 +181,11 @@ describe("MeasurementQuestion", () => {
 
     expect(html).toContain("Incorrect");
     expect(html).not.toContain(">Correct<");
-    expect(html).toContain("Check answer");
-    expect(html).toContain("Skip to next question");
     expect(html).toContain("expected reading of 23.4 mL");
+    expect(html).toContain("readOnly");
+    expect(html).not.toContain("Check answer");
+    expect(html).not.toContain("Skip");
+    expect(html).toContain("Next question");
   });
 
   it("draws the tenths ruler with whole-centimeter marks and its own tolerance", () => {

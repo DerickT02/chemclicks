@@ -25,6 +25,7 @@ import {
   QUESTIONS_PER_ATTEMPT,
   currentReading,
   hasPassed,
+  isAnswerLocked,
   passingScore,
   pickReadings,
   quizReducer,
@@ -150,7 +151,7 @@ function InstrumentChooser({ returned, assignedMode, pending = false, onStart }:
   return (
     <Panel heading="Choose an instrument" focusHeading={returned}>
       <p className="mt-2 text-sm text-muted-foreground">
-        {`Each attempt asks ${QUESTIONS_PER_ATTEMPT} random questions about one instrument, shown without its readout. Answer at least ${passingScore(QUESTIONS_PER_ATTEMPT)} correctly on your first try to pass.`}
+        {`Each attempt asks ${QUESTIONS_PER_ATTEMPT} random questions about one instrument, shown without its readout. You get one try per question. Answer at least ${passingScore(QUESTIONS_PER_ATTEMPT)} correctly to pass.`}
       </p>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -180,10 +181,9 @@ function InstrumentChooser({ returned, assignedMode, pending = false, onStart }:
 
 type FeedbackProps = {
   result: AnswerResult;
-  countedInScore: boolean;
 };
 
-function Feedback({ result, countedInScore }: FeedbackProps) {
+function Feedback({ result }: FeedbackProps) {
   if (result.status === "invalid") {
     return <p className="text-sm font-medium text-destructive">{result.message}</p>;
   }
@@ -195,13 +195,7 @@ function Feedback({ result, countedInScore }: FeedbackProps) {
       success={isCorrect}
       title={isCorrect ? "Correct" : "Incorrect"}
       message={result.message}
-    >
-      {isCorrect && !countedInScore && (
-        <p className="mt-1 text-sm text-muted-foreground">
-          Only your first answer is scored, so this one doesn&apos;t change your score.
-        </p>
-      )}
-    </Verdict>
+    />
   );
 }
 
@@ -228,7 +222,7 @@ export function MeasurementQuestion({
   const questionCount = question.readings.length;
   const isLastQuestion = question.questionIndex === questionCount - 1;
   const { result } = question;
-  const isCorrect = result?.status === "correct";
+  const locked = isAnswerLocked(question);
 
   const idPrefix = useId();
   const inputId = `${idPrefix}-answer`;
@@ -238,9 +232,9 @@ export function MeasurementQuestion({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
-    // Invalid and incorrect answers keep the student on the input to retry. A
-    // correct answer mounts the Next button, which takes focus with autoFocus.
+    if (pending || locked) return;
+    // Invalid answers keep the student on the input to fix them. A graded answer
+    // mounts the Next button, which takes focus with autoFocus.
     inputRef.current?.focus();
     if (onSubmit) onSubmit(question);
     else dispatch({ type: "submit" });
@@ -265,7 +259,7 @@ export function MeasurementQuestion({
     >
       <p className="mt-2 text-foreground">{PROMPTS[question.instrument]}</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        {`Only your first answer to each question is scored. Get ${passingScore(questionCount)} of ${questionCount} right to pass.`}
+        {`You get one try per question. Get ${passingScore(questionCount)} of ${questionCount} right to pass.`}
       </p>
 
       <dl className="mt-4 grid gap-4 rounded-lg border border-border bg-muted p-4 text-sm sm:grid-cols-3">
@@ -313,7 +307,7 @@ export function MeasurementQuestion({
                 dispatch({ type: "edit-answer", answer: event.target.value })
               }
               // Read-only, not disabled, while an answer saves: a disabled input drops focus.
-              readOnly={isCorrect || pending}
+              readOnly={locked || pending}
               aria-invalid={result?.status === "invalid"}
               aria-describedby={`${hintId} ${feedbackId}`}
               className="w-32 rounded-md border border-border bg-background px-3 py-2 font-mono text-foreground outline-none read-only:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive"
@@ -322,7 +316,7 @@ export function MeasurementQuestion({
               {spec.unit}
             </span>
           </div>
-          {!isCorrect && (
+          {!locked && (
             <button type="submit" disabled={pending} className={PRIMARY_BUTTON_CLASS}>
               Check answer
             </button>
@@ -335,37 +329,20 @@ export function MeasurementQuestion({
 
       <div id={feedbackId} role="status" aria-live="polite" className="mt-4">
         {result && (
-          <Feedback
-            key={question.attempt}
-            result={result}
-            countedInScore={question.firstTryCorrect === true}
-          />
+          <Feedback key={question.attempt} result={result} />
         )}
       </div>
 
-      {result && result.status !== "invalid" && (
+      {locked && (
         <div className="mt-4 flex flex-wrap gap-3">
-          {/* Distinct keys so a correct retry mounts a new button and autoFocus fires. */}
-          {isCorrect ? (
-            <button
-              key="next"
-              type="button"
-              autoFocus
-              onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
-              className={PRIMARY_BUTTON_CLASS}
-            >
-              {continueLabel}
-            </button>
-          ) : (
-            <button
-              key="skip"
-              type="button"
-              onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
-              className={SECONDARY_BUTTON_CLASS}
-            >
-              {isLastQuestion ? "Skip and see results" : "Skip to next question"}
-            </button>
-          )}
+          <button
+            type="button"
+            autoFocus
+            onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
+            className={PRIMARY_BUTTON_CLASS}
+          >
+            {continueLabel}
+          </button>
         </div>
       )}
     </Panel>

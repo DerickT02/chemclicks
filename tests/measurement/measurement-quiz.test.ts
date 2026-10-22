@@ -13,6 +13,7 @@ import {
   canContinue,
   currentReading,
   hasPassed,
+  isAnswerLocked,
   passingScore,
   pickReadings,
   quizReducer,
@@ -185,19 +186,45 @@ describe("quizReducer", () => {
     });
   });
 
-  it("lets the student retry or skip after a wrong answer, without scoring the retry", () => {
+  it("locks a wrong answer so the student can only move on", () => {
     const wrong = asQuestion(run(INITIAL_QUIZ_STATE, start("cylinder"), ...answer("30.0")));
 
     expect(wrong.result?.status).toBe("incorrect");
     expect(wrong).toMatchObject({ questionIndex: 0, firstTryCorrect: false, score: 0 });
+    expect(isAnswerLocked(wrong)).toBe(true);
     expect(canContinue(wrong)).toBe(true);
 
-    const retried = asQuestion(run(wrong, ...answer("23.4")));
-    expect(retried.result?.status).toBe("correct");
-    expect(retried).toMatchObject({ attempt: 2, firstTryCorrect: false, score: 0 });
+    expect(quizReducer(wrong, { type: "submit" })).toBe(wrong);
+    expect(run(wrong, ...answer("23.4"))).toMatchObject({
+      attempt: 1,
+      firstTryCorrect: false,
+      score: 0,
+      result: { status: "incorrect" },
+    });
 
-    const skipped = asQuestion(quizReducer(wrong, { type: "next" }));
-    expect(skipped).toMatchObject({ questionIndex: 1, score: 0 });
+    const next = asQuestion(quizReducer(wrong, { type: "next" }));
+    expect(next).toMatchObject({ questionIndex: 1, score: 0 });
+  });
+
+  it("ignores a server result for a question that is already graded", () => {
+    const wrong = asQuestion(run(INITIAL_QUIZ_STATE, start("cylinder"), ...answer("30.0")));
+    const late = quizReducer(wrong, {
+      type: "server-submit",
+      result: { status: "correct", message: "The reading is 23.4 mL." },
+      counted: false,
+      firstTryCorrect: false,
+    });
+
+    expect(late).toBe(wrong);
+  });
+
+  it("lets a graded answer follow an invalid one", () => {
+    const invalid = asQuestion(run(INITIAL_QUIZ_STATE, start("cylinder"), ...answer("abc")));
+    expect(isAnswerLocked(invalid)).toBe(false);
+
+    const graded = asQuestion(run(invalid, ...answer("30.0")));
+    expect(graded.result?.status).toBe("incorrect");
+    expect(isAnswerLocked(graded)).toBe(true);
   });
 
   it("does not use up the first try on blank or malformed input", () => {

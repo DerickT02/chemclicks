@@ -145,6 +145,11 @@ export function canContinue(question: QuestionState): boolean {
   return question.result !== null && question.result.status !== "invalid";
 }
 
+/** One try per question: a graded answer, right or wrong, can't be changed. */
+export function isAnswerLocked(question: QuestionState): boolean {
+  return question.result !== null && question.result.status !== "invalid";
+}
+
 export function quizReducer(state: QuizState, action: QuizAction): QuizState {
   if (action.type === "start") return startQuestion(
     action.instrument,
@@ -175,7 +180,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       return { ...state, answer: action.answer };
 
     case "submit": {
-      if (state.result?.status === "correct") return state;
+      if (isAnswerLocked(state)) return state;
 
       const spec = state.mode
         ? getMeasurementQuizMode(state.mode).spec
@@ -196,6 +201,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
     }
 
     case "server-submit": {
+      if (isAnswerLocked(state)) return state;
       const addsPoint = action.counted && action.firstTryCorrect === true;
       return {
         ...state,
