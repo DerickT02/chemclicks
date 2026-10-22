@@ -87,6 +87,19 @@ BEGIN
     RAISE EXCEPTION 'Passing quiz attempt was not persisted correctly';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM public.student_progress
+    WHERE id = first_attempt.progress_id
+      AND status = 'completed'
+      AND completed_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'Passing Bohr quiz did not complete assignment progress';
+  END IF;
+
+  PERFORM public.student_quiz_start(
+    student, classroom, assignment, 'bohr_models'
+  );
+
   SELECT * INTO replayed_attempt
     FROM public.student_quiz_submit(
       student, classroom, assignment, 'bohr_models', 'quiz-submit-1', pass_answers
@@ -107,6 +120,15 @@ BEGIN
      OR failed_attempt.passed IS NOT FALSE
      OR failed_attempt.status <> 'completed' THEN
     RAISE EXCEPTION 'Failed retry was not persisted as a new attempt';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.student_progress
+    WHERE id = failed_attempt.progress_id
+      AND status = 'in_progress'
+      AND completed_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Failed Bohr quiz incorrectly completed assignment progress';
   END IF;
 
   SELECT * INTO failed_replay
