@@ -110,7 +110,7 @@ describe("student assignment pages", () => {
     const html = renderToStaticMarkup(await page("bohr"));
     expect(html).toContain("Bohr exercise");
     expect(html).toContain("Start exploration");
-    expect(html).toContain('href="/student/quizzes/bohr"');
+    expect(html).toContain('href="/student/quizzes/bohr?assignmentId=bohr"');
     expect(html).not.toContain("Lewis exercise");
     expect(html).not.toContain("not available yet");
     expect(renderToStaticMarkup(await StudentPage())).toContain("/student/assignments/bohr");

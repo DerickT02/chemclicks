@@ -57,6 +57,23 @@ describe("Bohr quiz page", () => {
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
+  it("renders an assignment choice for ambiguous generic entry", async () => {
+    getAccess.mockResolvedValue({
+      status: "selection",
+      assignments: [
+        { id: "intro", activity: { title: "Introduction" } },
+        { id: "stability", activity: { title: "Stability" } },
+      ],
+    });
+
+    const html = renderToStaticMarkup(await BohrModelQuizPage());
+
+    expect(html).toContain("Choose the Bohr assignment you want to take.");
+    expect(html).toContain("assignmentId=intro");
+    expect(html).toContain("assignmentId=stability");
+    expect(listQuestions).not.toHaveBeenCalled();
+  });
+
   it("loads the questions from the database and hands them to the quiz", async () => {
     listQuestions.mockResolvedValue({ data: [question, question], error: null });
 

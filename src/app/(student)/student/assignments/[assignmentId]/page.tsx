@@ -124,7 +124,7 @@ export default async function AssignmentPage({ params }: {
         {explorer === "bohr" && (
           <section className="space-y-3 rounded-xl border border-border bg-card p-6">
             <h2 className="text-lg font-semibold">Bohr Models Quiz</h2>
-            <Link href="/student/quizzes/bohr" prefetch={false}
+            <Link href={`/student/quizzes/bohr?assignmentId=${encodeURIComponent(assignmentId)}`} prefetch={false}
               className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
               Start quiz
             </Link>
