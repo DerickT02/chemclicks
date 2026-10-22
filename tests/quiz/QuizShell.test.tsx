@@ -58,6 +58,12 @@ async function answerQuestion(
 }
 
 describe("QuizShell", () => {
+  it("does not render a blank diagram for text-only questions", () => {
+    renderQuiz();
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
   it("allows answer selection without exposing correctness", async () => {
     const { user } = renderQuiz();
 

@@ -89,6 +89,41 @@ describe("attempt question snapshots", () => {
     // A retry is a new attempt, so it must not reuse the first submission's idempotency key.
     expect(submit.mock.calls[1][0].submissionKey).not.toBe(submit.mock.calls[0][0].submissionKey);
   });
+  it("submits a diagram question through the existing server-graded flow", async () => {
+    const user = userEvent.setup();
+    submit.mockResolvedValue({
+      score: 1,
+      total: 1,
+      percent: 100,
+      passed: true,
+      attemptId: "attempt-diagram",
+      attemptNumber: 1,
+      nextDestination: null,
+    });
+    render(
+      <RandomizedQuiz
+        title="Covalent Quiz"
+        pool={[{
+          id: "lewis-diagram-n2-bond-order",
+          question: "Which type of bond is shown?",
+          options: ["Triple bond", "Double bond"],
+          diagramKey: "n2",
+        }]}
+        questionsPerAttempt={1}
+        {...linked}
+      />,
+    );
+
+    expect(await screen.findByRole("img", { name: /Nitrogen gas before bonding/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Triple bond" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(submit).toHaveBeenCalledWith({
+      ...linked,
+      submissionKey: expect.any(String),
+      answers: [{ questionId: "lewis-diagram-n2-bond-order", selectedIndex: 0 }],
+    });
+  });
   it("keeps the snapshot independent of in-place source mutations", async () => {
     const original = pool();
     const view = render(<RandomizedQuiz title="Quiz" pool={original} questionsPerAttempt={2} />);
