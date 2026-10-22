@@ -15,7 +15,7 @@ export default function CovalentQuizDiagram({ diagramKey }: Props) {
   return (
     <section
       aria-label={`${compound.name} diagram`}
-      className="mt-6 rounded-xl border border-border bg-muted/30 p-4 sm:p-6"
+      className="mt-6 rounded-xl border border-border bg-muted/30 p-4 sm:p-6 [&_figcaption]:hidden"
     >
       <CovalentSharingDiagram key={compound.id} compound={compound} />
     </section>

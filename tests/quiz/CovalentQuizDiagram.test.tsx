@@ -9,10 +9,11 @@ afterEach(() => cleanup());
 
 describe("CovalentQuizDiagram", () => {
   it("renders the live diagram for a known compound key", () => {
-    render(<CovalentQuizDiagram diagramKey="n2" />);
+    const { container } = render(<CovalentQuizDiagram diagramKey="n2" />);
 
     expect(screen.getByRole("region", { name: "Nitrogen gas diagram" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Nitrogen gas before bonding/ })).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass("[&_figcaption]:hidden");
   });
 
   it("renders nothing for an unknown key instead of a blank diagram", () => {
