@@ -13,7 +13,7 @@ vi.mock("@/lib/auth/student-supabase-auth", () => ({ createStudentSupabaseSessio
 
 import { loginStudent } from "@/app/login/student/actions";
 
-const student = { id: "student-row", auth_user_id: null };
+const student = { id: "student-row", auth_user_id: null, verified: true };
 const failure = { ok: false, field: "form", message: SESSION_RETRY_MESSAGE };
 
 beforeEach(() => {
@@ -74,6 +74,21 @@ describe("student login action", () => {
     mocks.studentLookup.mockResolvedValue({ data: null, error: null });
     expect((await loginStudent("DEMO1", "ABC123")).ok).toBe(false);
     expect(mocks.createSession).not.toHaveBeenCalled();
+  });
+
+  it.each([false, null, undefined])("refuses pending or missing approval (%s) without creating an Auth user or session", async verified => {
+    mocks.studentLookup.mockResolvedValue({ data: { ...student, verified }, error: null });
+    expect(await loginStudent("DEMO1", "ABC123")).toEqual({
+      ok: false, field: "approval", message: expect.stringContaining("awaiting teacher approval"),
+    });
+    expect(mocks.createSession).not.toHaveBeenCalled();
+  });
+
+  it("allows login after approval is persisted on the same student", async () => {
+    mocks.studentLookup.mockResolvedValueOnce({ data: { ...student, verified: false }, error: null });
+    expect((await loginStudent("DEMO1", "ABC123")).ok).toBe(false);
+    expect(await loginStudent("DEMO1", "ABC123")).toEqual({ ok: true });
+    expect(mocks.createSession).toHaveBeenCalledExactlyOnceWith(expect.anything(), student);
   });
 
   it("rejects invalid input before database access", async () => {

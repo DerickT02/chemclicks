@@ -75,7 +75,7 @@ export default function StudentCreateAccountPage() {
   if (joined) return (
     <AuthPageLayout>
       <AuthCard title="You joined the class">
-        <p role="status" className="text-sm text-muted-foreground">Your student account is ready. Sign in with your Student ID and classroom code.</p>
+        <p role="status" className="text-sm text-muted-foreground">Your account is awaiting teacher approval. After your teacher approves it, sign in with your Student ID and classroom code.</p>
         <Link href="/login/student" className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground">Sign in as a student</Link>
       </AuthCard>
     </AuthPageLayout>

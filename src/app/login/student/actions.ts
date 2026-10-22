@@ -13,7 +13,7 @@ import { validateStudentCode, validateStudentID } from "@/lib/auth/validate-stud
 
 export async function loginStudent(studentID: string, classroomCode: string): Promise<
   | { ok: true }
-  | { ok: false; field: "studentID" | "code" | "form"; message: string }
+  | { ok: false; field: "studentID" | "code" | "form" | "approval"; message: string }
 > {
   const normalizedStudentID = studentID.trim();
   const normalizedCode = classroomCode.trim().toUpperCase();
@@ -62,7 +62,7 @@ async function establishStudentSession(
 
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("id, auth_user_id")
+    .select("id, auth_user_id, verified")
     .eq("class_id", classRow.id)
     .eq("student_id", normalizedStudentID)
     .maybeSingle();
@@ -77,6 +77,10 @@ async function establishStudentSession(
       field: "studentID",
       message: INVALID_STUDENT_ID_MESSAGE,
     };
+  }
+
+  if (student.verified !== true) {
+    return { ok: false, field: "approval", message: "Your account is awaiting teacher approval. Please contact your teacher before signing in." };
   }
 
   const sessionError = await createStudentSupabaseSession(supabase, student);

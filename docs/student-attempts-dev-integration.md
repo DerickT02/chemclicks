@@ -22,8 +22,8 @@ Existing revocations on database writes are still in place. To preserve those
 restrictions without breaking dev's forms, signup writes use a server action,
 and teacher class/assignment writes use the shared admin client after teacher
 and ownership checks. Class and teacher RLS settings are not changed. Signup
-still creates an unverified row; dev's Supabase login does not use that legacy
-flag as a condition for student access.
+still creates an unverified row; login and every protected student session now
+require a teacher to approve it (`verified = true`).
 
 ## Required database compatibility migration
 
