@@ -41,6 +41,16 @@ describe("pickRandomQuestions", () => {
       expect(drawn.answerOrder?.sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
     }
   });
+
+  it("preserves diagram metadata while drawing and shuffling questions", () => {
+    const pool = makePool(2);
+    pool[0].diagramKey = "n2";
+
+    const drawn = pickRandomQuestions(pool, 2);
+    const diagramQuestion = drawn.find((question) => question.id === "q-1");
+
+    expect(diagramQuestion?.diagramKey).toBe("n2");
+  });
 });
 
 describe("shuffleQuestionOptions", () => {
