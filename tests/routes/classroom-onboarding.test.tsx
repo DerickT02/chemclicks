@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ signup: vi.fn(), create: vi.fn(), push: vi.fn(), copy: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("@/app/create-account/student/actions", () => ({ signupStudent: mocks.signup }));
+vi.mock("@/app/login/student/actions", () => ({ loginStudent: vi.fn() }));
 vi.mock("@/app/admin/create-class/actions", () => ({ createClass: mocks.create }));
 import StudentSignup from "@/app/create-account/student/page";
 import CreateClass from "@/app/admin/create-class/page";

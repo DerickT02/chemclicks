@@ -80,7 +80,7 @@ async function establishStudentSession(
   }
 
   if (student.verified !== true) {
-    return { ok: false, field: "approval", message: "Your account is awaiting teacher approval. Please contact your teacher before signing in." };
+    return { ok: false, field: "approval", message: "Your account is awaiting teacher approval. Keep this page open and you will be signed in once your teacher approves it." };
   }
 
   const sessionError = await createStudentSupabaseSession(supabase, student);

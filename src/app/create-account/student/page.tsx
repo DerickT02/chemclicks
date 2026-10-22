@@ -11,6 +11,7 @@ import {
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentSignup } from "@/lib/auth/validate-student-signup";
 import { signupStudent } from "@/app/create-account/student/actions";
+import { useApprovalSignIn } from "@/app/login/student/use-approval-sign-in";
 
 export default function StudentCreateAccountPage() {
   const [firstName, setFirstName] = useState("");
@@ -24,6 +25,7 @@ export default function StudentCreateAccountPage() {
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [joined, setJoined] = useState(false);
+  const approved = useApprovalSignIn(studentID, code, joined);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -75,7 +77,11 @@ export default function StudentCreateAccountPage() {
   if (joined) return (
     <AuthPageLayout>
       <AuthCard title="You joined the class">
-        <p role="status" className="text-sm text-muted-foreground">Your account is awaiting teacher approval. After your teacher approves it, sign in with your Student ID and classroom code.</p>
+        <p role="status" className="text-sm text-muted-foreground">
+          {approved
+            ? "Your teacher approved your account. Opening your assignments..."
+            : "Your account is awaiting teacher approval. Keep this page open and you will be signed in once your teacher approves it, or sign in later with your Student ID and classroom code."}
+        </p>
         <Link href="/login/student" className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground">Sign in as a student</Link>
       </AuthCard>
     </AuthPageLayout>
