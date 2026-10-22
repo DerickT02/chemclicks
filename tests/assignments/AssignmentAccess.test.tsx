@@ -9,7 +9,10 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 const router = { refresh: mocks.refresh };
 // Client-component tests should not execute the Next.js server action module.
-vi.mock("@/app/(student)/student/quizzes/actions", () => ({ submitQuizAction: vi.fn() }));
+vi.mock("@/app/(student)/student/quizzes/actions", () => ({
+  submitQuizAction: vi.fn(),
+  startQuizAction: vi.fn().mockResolvedValue({ status: "in_progress" }),
+}));
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 import RandomizedQuiz from "@/components/quiz/RandomizedQuiz";
 import type { QuizQuestion } from "@/components/quiz/types";
