@@ -9,16 +9,15 @@ import {
   calculateIonicCharge,
   clampElectronCount,
   clampProtonCount,
-  describeChargeRule,
   describeIonicCharge,
   describeNeutralChargeStability,
   describeNobleGasStability,
   describeProtonElectronDifference,
+  chargeFromParticlesPanelText,
   evaluateNobleGasRule,
-  neutralChargeStabilityPanelExplanation,
-  neutralChargeStabilityPanelLabel,
-  nobleGasStabilityPanelExplanation,
-  nobleGasStabilityPanelLabel,
+  neutralChargeStabilityPanelText,
+  nobleGasStabilityPanelText,
+  outerShellRulePanelText,
 } from "@/lib/chemistry/bohr-explorer";
 import { BOHR_ION_INFO } from "@/lib/chemistry/bohr-ions";
 import { ELEMENTS } from "@/lib/chemistry/elements";
@@ -71,7 +70,7 @@ function BohrModelDiagram({
         viewBox={`0 0 ${BOHR_SIZE} ${BOHR_SIZE}`}
         className="w-full h-full"
         role="img"
-        aria-label={`Bohr model for ${symbol} (atomic number ${atomicNumber}): ${atomicNumber} ${atomicNumber === 1 ? "proton" : "protons"}, ${electronCount} ${electronCount === 1 ? "electron" : "electrons"}, ionic charge ${chargeDescription}; ${stabilitySummary}`}
+        aria-label={`Bohr model for ${symbol} (atomic number ${atomicNumber}): nucleus shows p+ ${atomicNumber}, ${atomicNumber} ${atomicNumber === 1 ? "proton" : "protons"}, ${electronCount} ${electronCount === 1 ? "electron" : "electrons"}, ionic charge ${chargeDescription}; ${stabilitySummary}`}
       >
         {/* ── Orbit rings — same style as LewisDotExplorer ── */}
         {shells.map((_, shellIdx) => {
@@ -154,19 +153,28 @@ function BohrModelDiagram({
           );
         })}
 
-        {/* ── Nucleus — same red fill as LewisDotExplorer ── */}
-        <circle cx={BOHR_CENTER} cy={BOHR_CENTER} r={32} fill="#f87171" />
+        {/* ── Nucleus — element symbol (primary) and p⁺ Z on one line (charter) ── */}
+        <circle cx={BOHR_CENTER} cy={BOHR_CENTER} r={36} fill="#f87171" />
         <text
           x={BOHR_CENTER}
           y={BOHR_CENTER}
           textAnchor="middle"
           dominantBaseline="central"
           fill="white"
-          fontSize="20"
-          fontWeight="bold"
           fontFamily="sans-serif"
+          aria-hidden="true"
         >
-          {symbol}
+          <tspan x={BOHR_CENTER} dy="-0.35em" fontSize="19" fontWeight="bold">
+            {symbol}
+          </tspan>
+          <tspan x={BOHR_CENTER} dy="1.15em" fontSize="13" fontWeight="600">
+            p
+            <tspan dy="-0.45em" fontSize="9" fontWeight="700">
+              +
+            </tspan>
+            <tspan dy="0.45em"> </tspan>
+            <tspan>{atomicNumber}</tspan>
+          </tspan>
         </text>
       </svg>
     </div>
@@ -183,6 +191,37 @@ type ParticleControlProps = {
   max: number;
   onChange: (value: number) => void;
 };
+
+function StabilityInsight({
+  title,
+  met,
+  headline,
+  hint,
+}: {
+  title: string;
+  met?: boolean;
+  headline: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="text-sm font-medium text-foreground">{title}</span>
+        {met !== undefined ? (
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+              met ? "bg-accent/15 text-accent" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {met ? "Met" : "Not met"}
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-foreground">{headline}</p>
+      {hint ? <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
 
 function ParticleControl({ label, particle, value, min, max, onChange }: ParticleControlProps) {
   return (
@@ -262,15 +301,10 @@ export default function BohrModelViewer() {
   const charge = calculateIonicCharge(protons, electronCount);
   const chargeDescription = charge === null ? "unavailable" : describeIonicCharge(charge);
   const chargeDifference = describeProtonElectronDifference(protons, electronCount);
-  const chargeRule = describeChargeRule(charge);
   const nobleGasStability = describeNobleGasStability(electronCount);
   const neutralChargeStability = describeNeutralChargeStability(protons, electronCount);
   const shellRule = evaluateNobleGasRule(electronCount);
-  const shellRuleSummary = !shellRule
-    ? "Shell status unavailable"
-    : shellRule.meetsRule
-      ? `${shellRule.rule} rule met`
-      : `${shellRule.rule} rule not met`;
+  const chargePanelText = chargeFromParticlesPanelText(protons, electronCount, charge);
   const accessibilitySummary = `${nobleGasStability.label}; ${neutralChargeStability.label}; ${chargeDifference ?? "charge unavailable"}`;
   const ionContextHeading = selectedIon
     ? "Common ion example"
@@ -332,12 +366,14 @@ export default function BohrModelViewer() {
                 aria-pressed={isResetAnchor}
                 aria-label={elementLabel}
                 onClick={() => handleElementSelect(el)}
-                className={`min-h-9 rounded-md border px-2 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
-                  isResetAnchor
-                    ? "border-accent bg-accent/15 text-foreground"
-                    : isProtonCount
-                      ? "border-[#60a5fa] bg-[#60a5fa]/10 text-foreground ring-2 ring-[#60a5fa]/55 hover:border-[#60a5fa]"
-                      : "border-border bg-muted text-foreground hover:border-accent"
+                className={`min-h-9 rounded-md border bg-muted px-2 py-1.5 text-xs font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+                  isResetAnchor && isProtonCount
+                    ? "border-green-500 ring-2 ring-green-500/70 hover:border-green-500"
+                    : isResetAnchor
+                      ? "border-green-500/80 ring-2 ring-green-500 hover:border-green-500"
+                      : isProtonCount
+                        ? "border-[#60a5fa] ring-2 ring-[#60a5fa]/55 hover:border-[#60a5fa]"
+                        : "border-border hover:border-accent"
                 }`}
               >
                 {el.symbol}
@@ -346,7 +382,9 @@ export default function BohrModelViewer() {
           })}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Accent fill: reset target. Blue ring: element matching the current proton count.
+          Green ring: reset target.
+          <br />
+          Blue ring: element matching the current proton count.
         </p>
       </div>
 
@@ -425,28 +463,28 @@ export default function BohrModelViewer() {
             </div>
             <div className="mt-3 rounded-xl border border-border bg-muted/50 p-4" aria-live="polite" aria-atomic="true">
               <h3 className="text-sm font-semibold text-foreground">Charge and stability</h3>
-              <dl className="mt-2 space-y-2 text-sm">
-                <div>
-                  <dt className="font-medium text-foreground">{nobleGasStabilityPanelLabel(nobleGasStability)}</dt>
-                  <dd className="text-xs text-muted-foreground">
-                    {nobleGasStabilityPanelExplanation(electronCount, nobleGasStability)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-foreground">{neutralChargeStabilityPanelLabel(neutralChargeStability)}</dt>
-                  <dd className="text-xs text-muted-foreground">
-                    {neutralChargeStabilityPanelExplanation(protons, electronCount, neutralChargeStability)}
-                  </dd>
-                </div>
-              </dl>
-              <p className="mt-3 text-xs text-muted-foreground">{chargeRule}</p>
-              <p className="mt-3 text-xs font-medium text-foreground">
-                Outer-shell rule (duet/octet): {shellRuleSummary}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {shellRule?.explanation ?? "Counts are outside the supported range."}
-                {shellRule?.meetsRule && charge !== 0 && " This electron arrangement does not prove the ion is stable on its own."}
-              </p>
+              <div className="mt-3 flex flex-col gap-2.5">
+                <StabilityInsight
+                  title="Noble-gas electron stability"
+                  met={nobleGasStability.met}
+                  {...nobleGasStabilityPanelText(electronCount, nobleGasStability)}
+                />
+                <StabilityInsight
+                  title="Neutral charge stability"
+                  met={neutralChargeStability.met}
+                  {...neutralChargeStabilityPanelText(protons, electronCount, neutralChargeStability)}
+                />
+                <StabilityInsight
+                  title="Charge from protons and electrons"
+                  headline={chargePanelText.headline}
+                  hint={chargePanelText.hint}
+                />
+                <StabilityInsight
+                  title="Outer-shell rule (duet/octet)"
+                  met={shellRule?.meetsRule ?? false}
+                  {...outerShellRulePanelText(electronCount, charge)}
+                />
+              </div>
             </div>
             <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4" role="status" aria-live="polite">
               <h4 className="text-sm font-semibold text-foreground">{ionContextHeading}</h4>

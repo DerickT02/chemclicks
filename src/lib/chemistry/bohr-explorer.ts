@@ -84,19 +84,29 @@ export function describeNeutralChargeStability(
   };
 }
 
-/** Full-word labels for the Charge and stability panel (diagram a11y keeps NGS/NCS abbreviations). */
+/** Scannable copy for the Charge and stability panel (diagram a11y keeps NGS/NCS abbreviations). */
+export type StabilityPanelText = {
+  headline: string;
+  hint?: string;
+};
+
 export function nobleGasStabilityPanelLabel(indicator: StabilityIndicator): string {
   return indicator.met
     ? "Noble-gas electron stability: met"
     : "Noble-gas electron stability: not met";
 }
 
-export function nobleGasStabilityPanelExplanation(
+export function nobleGasStabilityPanelText(
   electrons: number,
   indicator: StabilityIndicator,
-): string {
-  if (indicator.met) return indicator.explanation;
-  return `Noble-gas electron stability is met when an atom or ion has 2, 10, or 18 electrons total; this model has ${electrons}.`;
+): StabilityPanelText {
+  if (indicator.met) {
+    return { headline: indicator.explanation };
+  }
+  return {
+    headline: `${electrons} electrons in this model.`,
+    hint: "Noble-gas stability needs 2, 10, or 18 electrons total.",
+  };
 }
 
 export function neutralChargeStabilityPanelLabel(indicator: StabilityIndicator): string {
@@ -105,13 +115,73 @@ export function neutralChargeStabilityPanelLabel(indicator: StabilityIndicator):
     : "Neutral charge stability: not met";
 }
 
-export function neutralChargeStabilityPanelExplanation(
+export function neutralChargeStabilityPanelText(
   protons: number,
   electrons: number,
   indicator: StabilityIndicator,
-): string {
-  if (indicator.met) return indicator.explanation;
-  return `Neutral charge stability is met when protons equal electrons; here ${protons} ${protons === 1 ? "proton" : "protons"} and ${electrons} ${electrons === 1 ? "electron" : "electrons"}.`;
+): StabilityPanelText {
+  if (indicator.met) {
+    return { headline: indicator.explanation };
+  }
+  const protonWord = protons === 1 ? "proton" : "protons";
+  const electronWord = electrons === 1 ? "electron" : "electrons";
+  return {
+    headline: `${protons} ${protonWord} and ${electrons} ${electronWord} — counts differ.`,
+    hint: "Neutral charge stability requires equal protons and electrons.",
+  };
+}
+
+export function chargeFromParticlesPanelText(
+  protons: number,
+  electrons: number,
+  charge: number | null,
+): StabilityPanelText {
+  if (charge === null) {
+    return { headline: describeChargeRule(null) };
+  }
+  const arithmetic = describeProtonElectronDifference(protons, electrons);
+  if (charge === 0) {
+    return {
+      headline: arithmetic ?? "Protons and electrons match.",
+      hint: describeChargeRule(0),
+    };
+  }
+  return {
+    headline: arithmetic ?? describeChargeRule(charge),
+    hint: describeChargeRule(charge),
+  };
+}
+
+export function outerShellRulePanelText(
+  electrons: number,
+  charge: number | null,
+): StabilityPanelText {
+  const rule = evaluateNobleGasRule(electrons);
+  if (!rule) {
+    return { headline: "Counts are outside the supported range." };
+  }
+
+  if (rule.meetsRule) {
+    let headline = rule.explanation;
+    if (charge !== null && charge !== 0) {
+      headline += " This electron arrangement does not prove the ion is stable on its own.";
+    }
+    return { headline };
+  }
+
+  const shells = getElectronShells(electrons);
+  if (shells.length === 0) {
+    return { headline: rule.explanation };
+  }
+
+  const outerIndex = shells.length - 1;
+  const outerCount = shells[outerIndex];
+  const target = rule.rule === "duet" ? 2 : 8;
+  const shellName = SHELL_NAMES[outerIndex];
+  return {
+    headline: `${shellName} shell: ${outerCount} of ${target} electrons (${rule.rule} rule).`,
+    hint: `The ${rule.rule} rule calls for ${target} electrons in the outer shell.`,
+  };
 }
 
 /** Protons minus electrons with signed result, e.g. "11 − 10 = +1". */
