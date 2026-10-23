@@ -29,7 +29,7 @@ const classId = "22222222-2222-4222-8222-222222222222";
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.claims.mockResolvedValue({ data: { claims: { sub: authUserId } }, error: null });
-  mocks.student.mockResolvedValue({ data: { id: studentId, class_id: classId }, error: null });
+  mocks.student.mockResolvedValue({ data: { id: studentId, class_id: classId, verified: true }, error: null });
   mocks.classroom.mockResolvedValue({ data: { id: classId }, error: null });
 });
 
@@ -47,6 +47,12 @@ describe("Supabase student sessions", () => {
   it("rejects users not linked to a student", async () => {
     mocks.student.mockResolvedValue({ data: null, error: null });
     expect(await getStudentSession()).toBeNull();
+  });
+
+  it.each([false, null, undefined])("rejects an existing session when approval is not true (%s)", async verified => {
+    mocks.student.mockResolvedValue({ data: { id: studentId, class_id: classId, verified }, error: null });
+    expect(await getStudentSession()).toBeNull();
+    expect(mocks.classroom).not.toHaveBeenCalled();
   });
 
   it("rejects students in inactive classrooms", async () => {

@@ -48,7 +48,7 @@ describe("verified navigation identity", () => {
   });
 
   it("uses student linking before teacher membership, including conflicting legacy profiles", async () => {
-    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "student-class" }, error: null });
+    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "student-class", verified: true }, error: null });
     mocks.teacher.mockResolvedValue({ data: { id: "current-user" }, error: null });
     expect(await getNavigationIdentity()).toEqual({ status: "signed-in", role: "student" });
     expect(mocks.studentFrom).toHaveBeenCalledWith("students");
@@ -59,14 +59,14 @@ describe("verified navigation identity", () => {
     expect(mocks.teacherFrom).not.toHaveBeenCalled();
   });
 
-  it("does not impose teacher email-verification or enrollment-approval rules on students", async () => {
+  it("does not impose teacher email verification on approved students", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: "student-user" } }, error: null });
-    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "student-class" }, error: null });
+    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "student-class", verified: true }, error: null });
     expect(await getNavigationIdentity()).toEqual({ status: "signed-in", role: "student" });
   });
 
   it("withholds dashboard access for disabled/missing classes without offering teacher navigation", async () => {
-    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "disabled-class" }, error: null });
+    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "disabled-class", verified: true }, error: null });
     mocks.classroom.mockResolvedValue({ data: null, error: null });
     mocks.teacher.mockResolvedValue({ data: { id: "current-user" }, error: null });
     expect(await getNavigationIdentity()).toEqual({
@@ -78,12 +78,22 @@ describe("verified navigation identity", () => {
   });
 
   it.each(["returned", "thrown"])("fails closed on %s class lookup errors while preserving sign out", async (failure) => {
-    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "student-class" }, error: null });
+    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "student-class", verified: true }, error: null });
     if (failure === "returned") mocks.classroom.mockResolvedValue({ data: null, error: { message: "private error" } });
     else mocks.classroom.mockRejectedValue(new Error("private error"));
     expect(await getNavigationIdentity()).toEqual({
       status: "signed-in", role: null, message: "Your dashboard could not be loaded. Please try again.",
     });
+    expect(mocks.teacherFrom).not.toHaveBeenCalled();
+  });
+
+  it("withholds student and legacy teacher dashboards while approval is pending", async () => {
+    mocks.student.mockResolvedValue({ data: { id: "student-row", class_id: "student-class", verified: false }, error: null });
+    mocks.teacher.mockResolvedValue({ data: { id: "current-user" }, error: null });
+    expect(await getNavigationIdentity()).toEqual({
+      status: "signed-in", role: null, message: expect.stringContaining("awaiting teacher approval"),
+    });
+    expect(mocks.classroom).not.toHaveBeenCalled();
     expect(mocks.teacherFrom).not.toHaveBeenCalled();
   });
 

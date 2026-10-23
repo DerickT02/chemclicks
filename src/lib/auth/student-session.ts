@@ -17,10 +17,11 @@ export async function getStudentSession(): Promise<StudentSession | null> {
     // student data on the server, exactly as before this session migration.
     const admin = createAdminClient();
     const { data: student, error: studentError } = await admin.from("students")
-      .select("id, class_id")
+      .select("id, class_id, verified")
       .eq("auth_user_id", authUserId)
       .maybeSingle();
-    if (studentError || !student) return null;
+    // Recheck approval on every request, including sessions issued before this gate.
+    if (studentError || !student || student.verified !== true) return null;
 
     const { data: classroom, error: classError } = await admin.from("classes")
       .select("id")

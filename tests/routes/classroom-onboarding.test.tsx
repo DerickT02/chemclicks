@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ signup: vi.fn(), create: vi.fn(), push: vi.fn(), copy: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("@/app/create-account/student/actions", () => ({ signupStudent: mocks.signup }));
+vi.mock("@/app/login/student/actions", () => ({ loginStudent: vi.fn() }));
 vi.mock("@/app/admin/create-class/actions", () => ({ createClass: mocks.create }));
 import StudentSignup from "@/app/create-account/student/page";
 import CreateClass from "@/app/admin/create-class/page";
@@ -29,7 +30,7 @@ async function join() {
 describe("bounded classroom onboarding", () => {
   it("finishes student joining inline with a sign-in destination, without navigating or claiming login", async () => {
     render(<StudentSignup />); await join();
-    expect(await screen.findByRole("status")).toHaveTextContent("Sign in with your Student ID and classroom code");
+    expect(await screen.findByRole("status")).toHaveTextContent("awaiting teacher approval");
     expect(screen.getByRole("link", { name: "Sign in as a student" })).toHaveAttribute("href", "/login/student");
     expect(screen.queryByRole("form")).not.toBeInTheDocument();
     expect(mocks.push).not.toHaveBeenCalled();

@@ -15,6 +15,8 @@ import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import { LessonProgressList } from "@/app/admin/LessonProgressList";
+import StudentRoster from "@/app/admin/classes/StudentRoster";
+import { getOwnedStudentRoster } from "@/lib/server/student-roster";
 
 
 export default async function AdminPage({
@@ -40,6 +42,10 @@ export default async function AdminPage({
 
   const loadClassDetails = (id: string) => Promise.all([
     getClassActivities(supabase, id),
+    getOwnedStudentRoster(id).then(
+      (data) => ({ data, error: false }),
+      () => ({ data: null, error: true }),
+    ),
     getTeacherClassLessonProgress(id).then(
       (data) => ({ data, error: null as string | null }),
       (error: unknown) => ({
@@ -71,8 +77,8 @@ export default async function AdminPage({
     classes.find((item) => item.id === classId) ??
     (classes.length > 0 ? classes[0] : undefined);
 
-  const [assignmentsResult, lessonProgressResult] = !selectedClass
-    ? [{ data: [], error: null }, { data: null, error: null as string | null }]
+  const [assignmentsResult, rosterResult, lessonProgressResult] = !selectedClass
+    ? [{ data: [], error: null }, { data: null, error: false }, { data: null, error: null as string | null }]
     : requestedDetails && selectedClass.id === classId
       ? requestedDetails
       // No class in the URL, or not one of the teacher's: load the fallback class.
@@ -190,6 +196,15 @@ export default async function AdminPage({
                   {selectedClass.student_count} {selectedClass.student_count === 1 ? "student" : "students"} enrolled
                 </p>
                 <div className="mt-4"><CopyClassCode key={selectedClass.id} code={selectedClass.class_code} /></div>
+                {rosterResult.error || !rosterResult.data ? (
+                  <section aria-label="Students & approvals" className="mt-7 space-y-3">
+                    <h3 className="text-lg font-semibold">Students & approvals</h3>
+                    <p role="alert" className="text-sm text-destructive">Student roster could not be loaded. Please try again.</p>
+                    <RefreshAssignments label="Retry student roster" />
+                  </section>
+                ) : (
+                  <StudentRoster key={selectedClass.id} classId={selectedClass.id} roster={rosterResult.data} />
+                )}
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
