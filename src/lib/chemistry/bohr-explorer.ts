@@ -1,8 +1,20 @@
 import { ELEMENTS } from "@/lib/chemistry/elements";
 import { getElectronShells } from "@/lib/chemistry/lewis";
 
-const MAX_ELECTRONS = ELEMENTS.length;
+export const MIN_PROTON_COUNT = 1;
+export const MAX_PROTON_COUNT = ELEMENTS.length;
+export const MIN_ELECTRON_COUNT = 0;
+export const MAX_ELECTRON_COUNT = ELEMENTS.length;
+const MAX_ELECTRONS = MAX_ELECTRON_COUNT;
 const SHELL_NAMES = ["K", "L", "M", "N"] as const;
+
+export function clampProtonCount(count: number): number {
+  return Math.min(MAX_PROTON_COUNT, Math.max(MIN_PROTON_COUNT, Math.trunc(count)));
+}
+
+export function clampElectronCount(count: number): number {
+  return Math.min(MAX_ELECTRON_COUNT, Math.max(MIN_ELECTRON_COUNT, Math.trunc(count)));
+}
 
 /** Noble-gas stable (NGS) electron counts for this curriculum (He, Ne, Ar). */
 export const NOBLE_GAS_STABLE_ELECTRON_COUNTS = [2, 10, 18] as const;
@@ -70,6 +82,36 @@ export function describeNeutralChargeStability(
       ? "Protons equal electrons (neutral charge stability)."
       : `NCS is met when protons equal electrons; here ${protons} ${protons === 1 ? "proton" : "protons"} and ${electrons} ${electrons === 1 ? "electron" : "electrons"}.`,
   };
+}
+
+/** Full-word labels for the Charge and stability panel (diagram a11y keeps NGS/NCS abbreviations). */
+export function nobleGasStabilityPanelLabel(indicator: StabilityIndicator): string {
+  return indicator.met
+    ? "Noble-gas electron stability: met"
+    : "Noble-gas electron stability: not met";
+}
+
+export function nobleGasStabilityPanelExplanation(
+  electrons: number,
+  indicator: StabilityIndicator,
+): string {
+  if (indicator.met) return indicator.explanation;
+  return `Noble-gas electron stability is met when an atom or ion has 2, 10, or 18 electrons total; this model has ${electrons}.`;
+}
+
+export function neutralChargeStabilityPanelLabel(indicator: StabilityIndicator): string {
+  return indicator.met
+    ? "Neutral charge stability: met"
+    : "Neutral charge stability: not met";
+}
+
+export function neutralChargeStabilityPanelExplanation(
+  protons: number,
+  electrons: number,
+  indicator: StabilityIndicator,
+): string {
+  if (indicator.met) return indicator.explanation;
+  return `Neutral charge stability is met when protons equal electrons; here ${protons} ${protons === 1 ? "proton" : "protons"} and ${electrons} ${electrons === 1 ? "electron" : "electrons"}.`;
 }
 
 /** Protons minus electrons with signed result, e.g. "11 − 10 = +1". */

@@ -1,15 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import Dropdown from "@/components/ui/Dropdown";
 import {
+  MAX_ELECTRON_COUNT,
+  MAX_PROTON_COUNT,
+  MIN_ELECTRON_COUNT,
+  MIN_PROTON_COUNT,
   calculateIonicCharge,
+  clampElectronCount,
+  clampProtonCount,
   describeChargeRule,
   describeIonicCharge,
   describeNeutralChargeStability,
   describeNobleGasStability,
   describeProtonElectronDifference,
   evaluateNobleGasRule,
+  neutralChargeStabilityPanelExplanation,
+  neutralChargeStabilityPanelLabel,
+  nobleGasStabilityPanelExplanation,
+  nobleGasStabilityPanelLabel,
 } from "@/lib/chemistry/bohr-explorer";
 import { BOHR_ION_INFO } from "@/lib/chemistry/bohr-ions";
 import { ELEMENTS } from "@/lib/chemistry/elements";
@@ -209,25 +218,37 @@ function ParticleControl({ label, particle, value, min, max, onChange }: Particl
 const SHELL_CAPACITIES_MAP = SHELL_CAPACITIES;
 
 export default function BohrModelViewer() {
-  const [element, setElement] = useState(ELEMENTS[0]);
+  const [selectedElement, setSelectedElement] = useState(ELEMENTS[0]);
+  const [protonCount, setProtonCount] = useState(ELEMENTS[0].atomicNumber);
   const [electronCount, setElectronCount] = useState(ELEMENTS[0].atomicNumber);
   const [activeShell, setActiveShell] = useState<number | null>(null);
 
+  const element = ELEMENTS[protonCount - 1];
   const shells = getElectronShells(electronCount);
-  const ionInfo = BOHR_ION_INFO[element.atomicNumber];
-  const selectedIon = ionInfo.ions.find((ion) => element.atomicNumber - ion.charge === electronCount);
+  const ionInfo = BOHR_ION_INFO[protonCount];
+  const selectedIon = ionInfo.ions.find((ion) => protonCount - ion.charge === electronCount);
+  const isNeutral = protonCount === electronCount;
 
   const handleElementSelect = (el: typeof ELEMENTS[number]) => {
-    setElement(el);
+    setSelectedElement(el);
+    setProtonCount(el.atomicNumber);
     setElectronCount(el.atomicNumber);
     setActiveShell(null);
   };
 
+  const handleProtonChange = (count: number) => {
+    setProtonCount(clampProtonCount(count));
+    setActiveShell(null);
+  };
+
   const handleElectronChange = (count: number) => {
-    if (count !== element.atomicNumber && !ionInfo.ions.some((ion) => element.atomicNumber - ion.charge === count)) {
-      return;
-    }
-    setElectronCount(count);
+    setElectronCount(clampElectronCount(count));
+    setActiveShell(null);
+  };
+
+  const handleResetNeutral = () => {
+    setProtonCount(selectedElement.atomicNumber);
+    setElectronCount(selectedElement.atomicNumber);
     setActiveShell(null);
   };
 
@@ -237,7 +258,7 @@ export default function BohrModelViewer() {
 
   const valenceCount      = shells[shells.length - 1] ?? 0;
   const totalElectrons    = shells.reduce((a, b) => a + b, 0);
-  const protons = element.atomicNumber;
+  const protons = protonCount;
   const charge = calculateIonicCharge(protons, electronCount);
   const chargeDescription = charge === null ? "unavailable" : describeIonicCharge(charge);
   const chargeDifference = describeProtonElectronDifference(protons, electronCount);
@@ -251,6 +272,16 @@ export default function BohrModelViewer() {
       ? `${shellRule.rule} rule met`
       : `${shellRule.rule} rule not met`;
   const accessibilitySummary = `${nobleGasStability.label}; ${neutralChargeStability.label}; ${chargeDifference ?? "charge unavailable"}`;
+  const ionContextHeading = selectedIon
+    ? "Common ion example"
+    : isNeutral
+      ? "Neutral atom"
+      : "Exploration (not a listed common ion)";
+  const ionContextBody = selectedIon
+    ? `${selectedIon.name}: ${selectedIon.note}`
+    : isNeutral
+      ? ionInfo.neutralNote
+      : "Charge and shells still update as you explore. This configuration is not one of the common ions highlighted in class.";
 
   return (
     <div className="flex flex-col gap-8">
@@ -277,30 +308,46 @@ export default function BohrModelViewer() {
       </section>
 
       {/* ── Element Selector ───────────────────────────────────────────── */}
-      <div
-        role="group"
-        aria-label="Choose an element"
-        className="grid grid-cols-5 sm:grid-cols-10 gap-1.5"
-      >
-        {ELEMENTS.map((el) => {
-          const isSelected = el.atomicNumber === element.atomicNumber;
-          return (
-            <button
-              key={el.atomicNumber}
-              type="button"
-              aria-pressed={isSelected}
-              aria-label={`${el.name}, ${el.symbol}`}
-              onClick={() => handleElementSelect(el)}
-              className={`min-h-9 rounded-md border px-2 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
-                isSelected
-                  ? "border-accent bg-accent/15 text-foreground"
-                  : "border-border bg-muted text-foreground hover:border-accent"
-              }`}
-            >
-              {el.symbol}
-            </button>
-          );
-        })}
+      <div>
+        <div
+          role="group"
+          aria-label="Choose an element"
+          className="grid grid-cols-5 sm:grid-cols-10 gap-1.5"
+        >
+          {ELEMENTS.map((el) => {
+            const isResetAnchor = el.atomicNumber === selectedElement.atomicNumber;
+            const isProtonCount = el.atomicNumber === protonCount;
+            const elementLabel =
+              isResetAnchor && isProtonCount
+                ? `${el.name}, ${el.symbol}, reset target and protons in this model`
+                : isResetAnchor
+                  ? `${el.name}, ${el.symbol}, reset target`
+                  : isProtonCount
+                    ? `${el.name}, ${el.symbol}, protons in this model`
+                    : `${el.name}, ${el.symbol}`;
+            return (
+              <button
+                key={el.atomicNumber}
+                type="button"
+                aria-pressed={isResetAnchor}
+                aria-label={elementLabel}
+                onClick={() => handleElementSelect(el)}
+                className={`min-h-9 rounded-md border px-2 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+                  isResetAnchor
+                    ? "border-accent bg-accent/15 text-foreground"
+                    : isProtonCount
+                      ? "border-[#60a5fa] bg-[#60a5fa]/10 text-foreground ring-2 ring-[#60a5fa]/55 hover:border-[#60a5fa]"
+                      : "border-border bg-muted text-foreground hover:border-accent"
+                }`}
+              >
+                {el.symbol}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Accent fill: reset target. Blue ring: element matching the current proton count.
+        </p>
       </div>
 
       {/* ── Bohr Diagram + Info ────────────────────────────────────────── */}
@@ -380,12 +427,16 @@ export default function BohrModelViewer() {
               <h3 className="text-sm font-semibold text-foreground">Charge and stability</h3>
               <dl className="mt-2 space-y-2 text-sm">
                 <div>
-                  <dt className="font-medium text-foreground">{nobleGasStability.label}</dt>
-                  <dd className="text-xs text-muted-foreground">{nobleGasStability.explanation}</dd>
+                  <dt className="font-medium text-foreground">{nobleGasStabilityPanelLabel(nobleGasStability)}</dt>
+                  <dd className="text-xs text-muted-foreground">
+                    {nobleGasStabilityPanelExplanation(electronCount, nobleGasStability)}
+                  </dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-foreground">{neutralChargeStability.label}</dt>
-                  <dd className="text-xs text-muted-foreground">{neutralChargeStability.explanation}</dd>
+                  <dt className="font-medium text-foreground">{neutralChargeStabilityPanelLabel(neutralChargeStability)}</dt>
+                  <dd className="text-xs text-muted-foreground">
+                    {neutralChargeStabilityPanelExplanation(protons, electronCount, neutralChargeStability)}
+                  </dd>
                 </div>
               </dl>
               <p className="mt-3 text-xs text-muted-foreground">{chargeRule}</p>
@@ -397,9 +448,10 @@ export default function BohrModelViewer() {
                 {shellRule?.meetsRule && charge !== 0 && " This electron arrangement does not prove the ion is stable on its own."}
               </p>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
-              {selectedIon ? `${selectedIon.name}: ${selectedIon.note}` : ionInfo.neutralNote}
-            </p>
+            <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4" role="status" aria-live="polite">
+              <h4 className="text-sm font-semibold text-foreground">{ionContextHeading}</h4>
+              <p className="mt-1 text-sm text-muted-foreground">{ionContextBody}</p>
+            </div>
           </div>
 
           <div className="grow rounded-2xl border border-border bg-card p-5">
@@ -408,33 +460,31 @@ export default function BohrModelViewer() {
               <ParticleControl
                 label="Protons"
                 particle="a proton"
-                value={element.atomicNumber}
-                min={1}
-                max={ELEMENTS.length}
-                onChange={(count) => handleElementSelect(ELEMENTS[count - 1])}
+                value={protonCount}
+                min={MIN_PROTON_COUNT}
+                max={MAX_PROTON_COUNT}
+                onChange={handleProtonChange}
               />
-              <div className="rounded-xl border border-border bg-muted/50 px-4 py-3">
-                <Dropdown
-                  label="Electrons"
-                  value={String(electronCount)}
-                  disabled={ionInfo.ions.length === 0}
-                  onChange={(value) => handleElectronChange(Number(value))}
-                  options={[
-                    {
-                      value: String(element.atomicNumber),
-                      label: "Neutral atom",
-                      description: `${element.atomicNumber} ${element.atomicNumber === 1 ? "electron" : "electrons"}`,
-                    },
-                    ...ionInfo.ions.map((ion) => {
-                      const count = element.atomicNumber - ion.charge;
-                      return { value: String(count), label: ion.name, description: `${count} ${count === 1 ? "electron" : "electrons"}` };
-                    }),
-                  ]}
-                />
-              </div>
+              <ParticleControl
+                label="Electrons"
+                particle="an electron"
+                value={electronCount}
+                min={MIN_ELECTRON_COUNT}
+                max={MAX_ELECTRON_COUNT}
+                onChange={handleElectronChange}
+              />
             </div>
+            <button
+              type="button"
+              onClick={handleResetNeutral}
+              disabled={protonCount === selectedElement.atomicNumber && electronCount === selectedElement.atomicNumber}
+              className="mt-3 w-full rounded-md border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Reset to neutral {selectedElement.name} ({selectedElement.symbol})
+            </button>
             <p className="mt-3 text-xs text-muted-foreground">
-              Options show ions documented in compounds, not a guarantee of stability as free ions.
+              Choose an element above to pick a reset target, or adjust protons and electrons independently.
+              Common-ion notes appear when counts match documented examples.
             </p>
           </div>
         </div>
