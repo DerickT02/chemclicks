@@ -110,7 +110,7 @@ describe("student assignment pages", () => {
     const html = renderToStaticMarkup(await page("bohr"));
     expect(html).toContain("Bohr exercise");
     expect(html).toContain("Start exploration");
-    expect(html).toContain('href="/student/quizzes/bohr"');
+    expect(html).toContain('href="/student/quizzes/bohr?assignmentId=bohr"');
     expect(html).not.toContain("Lewis exercise");
     expect(html).not.toContain("not available yet");
     expect(renderToStaticMarkup(await StudentPage())).toContain("/student/assignments/bohr");
@@ -126,6 +126,21 @@ describe("student assignment pages", () => {
     expect(html).toContain("Start exploration");
     expect(html).toContain("Saved exploration history (0)");
     expect(html).toContain("4 of 5 correct");
+  });
+  it("shows Bohr quiz history on the originating assignment", async () => {
+    const bohr = { ...assignment, id: "bohr", activity: { ...assignment.activity, type: "bohr_model_stability" } };
+    reader.mockResolvedValue({ status: "ok", assignments: [bohr] });
+    attempts.mockResolvedValue([{
+      id: "bohr-quiz", attempt_number: 1, quiz_key: "bohr_models", instrument: null, precision_mode: null,
+      status: "completed", score: 10, question_total: 12, passed: true,
+      started_at: "2026-10-01T12:00:00Z", completed_at: "2026-10-01T12:05:00Z",
+    }]);
+
+    const html = renderToStaticMarkup(await AssignmentPage({ params: Promise.resolve({ assignmentId: "bohr" }) }));
+
+    expect(html).toContain("Bohr quiz history");
+    expect(html).toContain("10 of 12 correct");
+    expect(html).toContain("Passed");
   });
   it("refuses a Bohr assignment the authorized reader does not return", async () => {
     // Closed, archived and other-class rows never leave getStudentAssignments.

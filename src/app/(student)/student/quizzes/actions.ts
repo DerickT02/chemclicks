@@ -1,6 +1,7 @@
 "use server";
 
 import { submitStudentQuiz } from "@/lib/server/student-quizzes";
+import { startStudentQuiz } from "@/lib/server/student-quiz-start";
 import { getQuizProgression } from "@/lib/assignments/prerequisites";
 import type { QuizAnswer, QuizCompleteResult } from "@/components/quiz/types";
 
@@ -10,6 +11,14 @@ type SubmitQuizInput = {
   submissionKey: string;
   answers: QuizAnswer[];
 };
+
+export async function startQuizAction(
+  assignmentId: string,
+  quizKey: string,
+): Promise<{ status: "in_progress" }> {
+  const result = await startStudentQuiz(assignmentId, quizKey);
+  return { status: result.status };
+}
 
 export async function submitQuizAction(
   input: SubmitQuizInput,

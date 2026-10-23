@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AttemptHistory from "@/components/assignments/AttemptHistory";
+import QuizAttemptHistory from "@/components/assignments/QuizAttemptHistory";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getAssignmentAttempts } from '@/lib/server/student-assignments';
 import AttemptControls from './AttemptControls';
@@ -50,6 +51,7 @@ export default async function AssignmentPage({ params }: {
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
   // Quiz attempts share the table; exploration rows carry no quiz key.
   const explorationAttempts = attempts.filter((attempt) => !attempt.quiz_key);
+  const bohrQuizAttempts = attempts.filter((attempt) => attempt.quiz_key === "bohr_models");
   const measurementAttempts = attempts.filter((attempt) => attempt.instrument !== null && attempt.instrument !== undefined);
   const latest = explorationAttempts[0];
   return (
@@ -85,6 +87,7 @@ export default async function AssignmentPage({ params }: {
             <AttemptControls key={latest.id} assignmentId={assignmentId} attemptId={latest.id} completed={false} />
           </section>}
           {hasActivityContent(type) && <AttemptHistory attempts={explorationAttempts} />}
+          {explorer === "bohr" && <QuizAttemptHistory title="Bohr quiz" attempts={bohrQuizAttempts} />}
           {measurementQuizMode && (
             <>
               <section aria-label="Measurement quiz history" className="rounded-xl border border-border bg-card p-6">
@@ -124,7 +127,7 @@ export default async function AssignmentPage({ params }: {
         {explorer === "bohr" && (
           <section className="space-y-3 rounded-xl border border-border bg-card p-6">
             <h2 className="text-lg font-semibold">Bohr Models Quiz</h2>
-            <Link href="/student/quizzes/bohr" prefetch={false}
+            <Link href={`/student/quizzes/bohr?assignmentId=${encodeURIComponent(assignmentId)}`} prefetch={false}
               className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
               Start quiz
             </Link>
