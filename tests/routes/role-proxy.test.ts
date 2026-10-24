@@ -1,3 +1,5 @@
+import { readdirSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -18,6 +20,23 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 import proxy from "@/proxy";
 
 const request = (path: string) => new NextRequest(new URL(path, "https://chemclicks.test"));
+
+// Every page.tsx under a protected segment, as a URL. Route groups are dropped
+// and dynamic segments get a sample value, so new pages are covered automatically.
+function pageRoutes(segmentDir: string): string[] {
+  const appDir = join(process.cwd(), "src", "app");
+  return readdirSync(join(appDir, segmentDir), { recursive: true, encoding: "utf8" })
+    .filter((file) => file.split(sep).at(-1) === "page.tsx")
+    .map((file) => relative(appDir, join(appDir, segmentDir, file)).split(sep).slice(0, -1))
+    .map((parts) => "/" + parts
+      .filter((part) => !/^\(.*\)$/.test(part))
+      .map((part) => part.replace(/^\[(.+)\]$/, "sample-$1"))
+      .join("/"))
+    .sort();
+}
+
+const adminPages = pageRoutes("admin");
+const studentPages = pageRoutes("(student)");
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -91,5 +110,42 @@ describe("student route proxy", () => {
     mocks.teacher.mockResolvedValue({ data: null, error: null });
     const response = await proxy(request("/student"));
     expect(response.headers.get("location")).toBeNull();
+  });
+});
+
+describe("role redirects for every protected page", () => {
+  it("finds the protected pages", () => {
+    expect(adminPages).toContain("/admin");
+    expect(adminPages).toContain("/admin/classes/sample-classId/attempts");
+    expect(studentPages).toContain("/student");
+    expect(studentPages).toContain("/student/assignments/sample-assignmentId/history");
+  });
+
+  describe("student", () => {
+    beforeEach(() => {
+      mocks.student.mockResolvedValue({ data: { id: "student-row" }, error: null });
+    });
+
+    it.each(adminPages)("is redirected from %s to /student", async (path) => {
+      const response = await proxy(request(path));
+      expect(response.headers.get("location")).toBe("https://chemclicks.test/student");
+    });
+
+    it.each(studentPages)("can open %s", async (path) => {
+      const response = await proxy(request(path));
+      expect(response.headers.get("location")).toBeNull();
+    });
+  });
+
+  describe("teacher", () => {
+    it.each(studentPages)("is redirected from %s to /admin", async (path) => {
+      const response = await proxy(request(path));
+      expect(response.headers.get("location")).toBe("https://chemclicks.test/admin");
+    });
+
+    it.each(adminPages)("can open %s", async (path) => {
+      const response = await proxy(request(path));
+      expect(response.headers.get("location")).toBeNull();
+    });
   });
 });
