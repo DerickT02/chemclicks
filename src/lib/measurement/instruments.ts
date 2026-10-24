@@ -29,7 +29,8 @@ export type InstrumentSpec = {
  *
  *   ruler (hundredths)  marks every 0.1 cm, report to 0.01 cm, accept ±0.02 cm
  *   ruler (tenths)      marks every 1 cm,   report to 0.1 cm,  accept ±0.2 cm
- *   graduated cylinder  marks every 1 mL,   report to 0.1 mL,  accept ±0.2 mL
+ *   cylinder (tenths)   marks every 1 mL,   report to 0.1 mL,  accept ±0.2 mL
+ *   cylinder (whole)    marks every 10 mL,  report to 1 mL,    accept ±2 mL
  *
  * Answers must also be written to exactly `decimals` places, because the number
  * of digits reported is what communicates the precision of a measurement.
@@ -70,6 +71,15 @@ export const CYLINDER_SPEC: InstrumentSpec = {
   defaultReading: 32,
 };
 
+/** The same cylinder with only 10 mL marks, so the ones digit is the estimated one. */
+export const CYLINDER_WHOLE_SPEC: InstrumentSpec = {
+  ...CYLINDER_SPEC,
+  graduation: 10,
+  step: 1,
+  decimals: 0,
+  tolerance: 2,
+};
+
 export const INSTRUMENT_IDS: readonly InstrumentId[] = ["ruler", "cylinder"];
 
 export const INSTRUMENTS: Record<InstrumentId, InstrumentSpec> = {
@@ -94,6 +104,7 @@ export function formatTolerance(spec: InstrumentSpec): string {
 }
 
 export function describeDecimalPlaces(decimals: number): string {
+  if (decimals === 0) return "a whole number";
   return `${decimals} decimal ${decimals === 1 ? "place" : "places"}`;
 }
 

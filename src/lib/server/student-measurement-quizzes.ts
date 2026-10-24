@@ -11,6 +11,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const MODE_KEYS = new Set<MeasurementQuizModeKey>([
   "ruler_tenths",
   "ruler_hundredths",
+  "cylinder_whole",
   "cylinder_tenths",
 ]);
 

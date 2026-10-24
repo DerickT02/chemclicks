@@ -27,7 +27,7 @@ export type TeacherActivityAttemptSummary = {
       kind?: 'exploration' | 'quiz'
       quizKey?: string | null
       instrument?: 'ruler' | 'cylinder' | null
-      precisionMode?: 'tenths' | 'hundredths' | null
+      precisionMode?: 'whole' | 'tenths' | 'hundredths' | null
       score?: number | null
       questionTotal?: number | null
       percentage?: number | null

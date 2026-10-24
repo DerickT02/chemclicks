@@ -11,6 +11,7 @@ export type ActivityType =
   | 'lewis_structures_ionic'
   | 'measurement_ruler_tenths'
   | 'measurement_ruler_hundredths'
+  | 'measurement_graduated_cylinder_whole'
   | 'measurement_graduated_cylinder'
 
 export type Activity = {
