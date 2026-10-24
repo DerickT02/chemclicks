@@ -11,7 +11,7 @@ import MeasurementQuiz, {
 } from "../../src/components/measurement/MeasurementQuiz";
 import PrecisionRuler from "../../src/components/measurement/PrecisionRuler";
 import { evaluateAnswer } from "../../src/lib/measurement/answer";
-import { CYLINDER_SPEC, RULER_SPEC } from "../../src/lib/measurement/instruments";
+import { CYLINDER_SPEC, CYLINDER_WHOLE_SPEC, RULER_SPEC } from "../../src/lib/measurement/instruments";
 import type { QuestionState, ResultsState } from "../../src/lib/measurement/quiz";
 
 function rulerQuestion(overrides: Partial<QuestionState> = {}): QuestionState {
@@ -210,6 +210,37 @@ describe("MeasurementQuestion", () => {
     const html = render(rulerQuestion({ mode, instrument, readings: [...readings] }));
     expect(html).not.toContain(reading);
     expect(html).not.toContain("aria-value");
+  });
+
+  it("draws the whole-milliliter cylinder with 10 mL marks and asks for a whole number", () => {
+    const html = render(cylinderQuestion({ mode: "cylinder_whole", readings: [24, 37, 13, 46, 7] }));
+
+    expect(html).toContain("0–50 mL, marked every 10 mL");
+    expect(html).toContain("the nearest 1 mL (a whole number)");
+    expect(html).toContain("Enter a whole number, like 12.");
+    expect(html).toContain("±2 mL");
+    expect(drawnPaths(html)).toEqual(
+      drawnPaths(renderToStaticMarkup(<GraduatedCylinder lockedValue={24} precision="whole" />)),
+    );
+    expect((html.match(/<line /g) ?? []).length).toBeLessThan(
+      (render(cylinderQuestion()).match(/<line /g) ?? []).length,
+    );
+  });
+
+  it("hides the whole-milliliter reading until an answer is graded", () => {
+    const html = render(cylinderQuestion({ mode: "cylinder_whole", readings: [24, 37, 13, 46, 7] }));
+    expect(html).not.toMatch(/>\s*24\s*</);
+    expect(html).not.toContain("24 mL");
+    expect(html).not.toContain("aria-value");
+  });
+
+  it("names the expected whole-milliliter reading once an answer is graded", () => {
+    const result = evaluateAnswer("30", 24, CYLINDER_WHOLE_SPEC);
+    const html = render(cylinderQuestion({
+      mode: "cylinder_whole", readings: [24, 37, 13, 46, 7], answer: "30", result, attempt: 1, firstTryCorrect: false,
+    }));
+    expect(html).toContain("Incorrect");
+    expect(html).toContain("expected reading of 24 mL");
   });
 });
 

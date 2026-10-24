@@ -8,7 +8,8 @@ describe("shared activity support contract", () => {
   it("gives every catalog activity an assignable exploration", () => {
     expect(entries.map(([type]) => type)).toEqual([
       "bohr_model_intro", "bohr_model_stability", "lewis_diagram", "lewis_structures_covalent", "lewis_structures_ionic",
-      "measurement_ruler_tenths", "measurement_ruler_hundredths", "measurement_graduated_cylinder",
+      "measurement_ruler_tenths", "measurement_ruler_hundredths",
+      "measurement_graduated_cylinder_whole", "measurement_graduated_cylinder",
     ]);
     for (const [type, definition] of entries) {
       expect(definition.description).not.toBe("");
@@ -21,6 +22,13 @@ describe("shared activity support contract", () => {
   it("offers both ruler precisions as assignable explorations", () => {
     for (const type of ["measurement_ruler_tenths", "measurement_ruler_hundredths"]) {
       expect(hasActivityContent(type)).toBe(true);
+      expect(canAssignActivity(type)).toBe(true);
+    }
+  });
+
+  it("offers both graduated cylinder precisions as assignable explorations", () => {
+    for (const type of ["measurement_graduated_cylinder_whole", "measurement_graduated_cylinder"]) {
+      expect(getActivityDefinition(type)?.explorer).toBe("cylinder");
       expect(canAssignActivity(type)).toBe(true);
     }
   });
