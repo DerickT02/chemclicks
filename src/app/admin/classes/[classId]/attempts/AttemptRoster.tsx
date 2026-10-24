@@ -3,6 +3,7 @@ import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempt
 import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
 import { LEWIS_QUIZZES } from '@/lib/assignments/lewis-quizzes'
 import { BOHR_QUIZ_KEY } from '@/lib/db/quiz-questions'
+import { measurementAttemptLabel } from '@/lib/measurement/modes'
 
 // Names a teacher recognises; the stored key is an internal identifier.
 const QUIZ_TITLES: Record<string, string> = {
@@ -43,12 +44,7 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                         <tr key={attempt.id}>
                           <th scope="row" className="p-2">{attempt.attemptNumber}</th>
                           <td className="p-2">
-                            {attempt.instrument ? (
-                              <>
-                                {attempt.instrument === 'cylinder' ? 'Graduated cylinder' : 'Ruler'}
-                                {attempt.precisionMode && ` · ${attempt.precisionMode}`}
-                              </>
-                            ) : attempt.quizKey ? (Object.hasOwn(QUIZ_TITLES, attempt.quizKey) ? QUIZ_TITLES[attempt.quizKey] : 'Quiz') : 'Exploration'}
+                            {attempt.instrument ? measurementAttemptLabel(attempt.instrument, attempt.precisionMode) : attempt.quizKey ? (Object.hasOwn(QUIZ_TITLES, attempt.quizKey) ? QUIZ_TITLES[attempt.quizKey] : 'Quiz') : 'Exploration'}
                             {attempt.score !== null && attempt.score !== undefined && attempt.questionTotal !== null && attempt.questionTotal !== undefined && (
                               <span className="block">
                                 {`${attempt.score}/${attempt.questionTotal} · ${attempt.passed ? 'Passed' : 'Not passed'}`}

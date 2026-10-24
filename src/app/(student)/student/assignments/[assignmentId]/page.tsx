@@ -19,7 +19,7 @@ import MeasurementQuiz from "@/components/measurement/MeasurementQuiz";
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
-import { measurementQuizModeForActivity } from "@/lib/measurement/modes";
+import { measurementAttemptLabel, measurementQuizModeForActivity } from "@/lib/measurement/modes";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ export default async function AssignmentPage({ params }: {
                     {measurementAttempts.map((attempt) => (
                       <li key={attempt.id} className="rounded-lg border border-border bg-muted p-3 text-sm">
                         <p className="font-medium">
-                          {`${attempt.instrument === "cylinder" ? "Graduated cylinder" : "Ruler"} · ${attempt.precision_mode === "hundredths" ? "hundredths" : "tenths"} · Attempt ${attempt.attempt_number}`}
+                          {`${measurementAttemptLabel(attempt.instrument, attempt.precision_mode)} · Attempt ${attempt.attempt_number}`}
                         </p>
                         {attempt.status === "completed" ? (
                           <p className="mt-1">

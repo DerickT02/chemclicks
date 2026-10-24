@@ -57,12 +57,15 @@ export function evaluateAnswer(
     );
   }
 
+  // A graded answer has used the scored try, so feedback may name the reading.
+  const expected = `${formatReading(reading, spec)} ${spec.unit}`;
+
   const answerDecimals = answer.split(".")[1]?.length ?? 0;
   if (answerDecimals !== spec.decimals) {
     return {
       status: "incorrect",
       reason: "precision",
-      message: `Report the reading to ${describeDecimalPlaces(spec.decimals)} (the nearest ${spec.step} ${spec.unit}), like ${example}.`,
+      message: `Report the reading to ${describeDecimalPlaces(spec.decimals)} (the nearest ${spec.step} ${spec.unit}), like ${example}. The expected reading is ${expected}.`,
     };
   }
 
@@ -72,13 +75,12 @@ export function evaluateAnswer(
   const difference = Math.abs(Math.round(value * scale) - Math.round(reading * scale));
   const allowed = Math.round(spec.tolerance * scale);
   const given = `${value.toFixed(spec.decimals)} ${spec.unit}`;
-  const expected = `${formatReading(reading, spec)} ${spec.unit}`;
 
   if (difference > allowed) {
     return {
       status: "incorrect",
       reason: "value",
-      message: `${given} is more than ${formatTolerance(spec)} from the reading. Look at the scale again and try another answer.`,
+      message: `${given} is more than ${formatTolerance(spec)} from the expected reading of ${expected}. Look at the scale again to see where it lines up.`,
     };
   }
 

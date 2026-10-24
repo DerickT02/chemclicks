@@ -27,7 +27,7 @@ const props = (assignmentId?: string) => ({ params: Promise.resolve({ classId: '
 describe('teacher report', () => {
   it('renders zeros, statuses and readable timestamps with a timezone', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
-    for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 exploration attempt', '1 quiz attempt', '4/5 · Passed', '1 completed', '1 in progress', 'Ruler', 'Not completed', '2026-09-23 12:00:00 UTC', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
+    for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 exploration attempt', '1 quiz attempt', '4/5 · Passed', '1 completed', '1 in progress', 'Ruler · tenths (0.1 cm)', 'Not completed', '2026-09-23 12:00:00 UTC', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
   })
   it('names each quiz and shows its score instead of the stored quiz key', () => {
     const quizAttempt = (id: string, quizKey: string, score: number, passed: boolean) => ({
