@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateIonicCharge,
+  clampElectronCount,
+  clampProtonCount,
   describeChargeRule,
   describeIonicCharge,
   describeNeutralChargeStability,
@@ -9,6 +11,10 @@ import {
   describeProtonElectronDifference,
   evaluateNobleGasRule,
   isNobleGasStableElectronCount,
+  MAX_ELECTRON_COUNT,
+  MAX_PROTON_COUNT,
+  MIN_ELECTRON_COUNT,
+  MIN_PROTON_COUNT,
 } from "@/lib/chemistry/bohr-explorer";
 
 describe("ionic charge", () => {
@@ -34,6 +40,19 @@ describe("ionic charge", () => {
     expect(describeChargeRule(0)).toContain("neutral");
     expect(describeChargeRule(2)).toContain("cation");
     expect(describeChargeRule(-1)).toContain("anion");
+  });
+});
+
+describe("particle count bounds", () => {
+  it("clamps protons and electrons to the supported range", () => {
+    expect(MIN_PROTON_COUNT).toBe(1);
+    expect(MAX_PROTON_COUNT).toBe(20);
+    expect(MIN_ELECTRON_COUNT).toBe(0);
+    expect(MAX_ELECTRON_COUNT).toBe(20);
+    expect(clampProtonCount(0)).toBe(1);
+    expect(clampProtonCount(21)).toBe(20);
+    expect(clampElectronCount(-1)).toBe(0);
+    expect(clampElectronCount(25)).toBe(20);
   });
 });
 
