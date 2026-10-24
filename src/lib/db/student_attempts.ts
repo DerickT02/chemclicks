@@ -16,7 +16,7 @@ export type StudentAttempt = {
   submission_key: string | null
   /** Measurement quiz metadata; null for exploration and other quiz kinds. */
   instrument?: 'ruler' | 'cylinder' | null
-  precision_mode?: 'tenths' | 'hundredths' | null
+  precision_mode?: 'whole' | 'tenths' | 'hundredths' | null
   status: AttemptStatus
   started_at: string
   completed_at: string | null

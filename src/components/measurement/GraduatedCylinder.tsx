@@ -1,7 +1,12 @@
 "use client";
 
 import { useId, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { CYLINDER_SPEC, formatReading, quantizeReading } from "@/lib/measurement/instruments";
+import {
+  CYLINDER_SPEC,
+  CYLINDER_WHOLE_SPEC,
+  formatReading,
+  quantizeReading,
+} from "@/lib/measurement/instruments";
 
 const CAPACITY_ML = CYLINDER_SPEC.max;
 const DEFAULT_ML = CYLINDER_SPEC.defaultReading;
@@ -12,7 +17,7 @@ const SCALE_ML = [0, 10, 20, 30, 40, 50];
 export type CylinderPrecision = "whole" | "tenths";
 
 const CYLINDER_SPECS = {
-  whole: { ...CYLINDER_SPEC, graduation: 10, step: 1, decimals: 0 },
+  whole: CYLINDER_WHOLE_SPEC,
   tenths: CYLINDER_SPEC,
 };
 const CYLINDER_PATH =
