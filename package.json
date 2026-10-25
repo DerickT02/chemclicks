@@ -8,7 +8,6 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run --config vitest.config.mts",
-    "test:integration:assignment-timers": "node --env-file=.env.test.local ./node_modules/vitest/vitest.mjs run --config vitest.database.config.mts",
     "test:watch": "vitest --config vitest.config.mts",
     "typecheck": "tsc --noEmit --incremental false"
   },
