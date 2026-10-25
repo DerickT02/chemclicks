@@ -63,6 +63,42 @@ describe('teacher report', () => {
     expect(mock.summary).not.toHaveBeenCalled()
     expect(renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [] }} />)).toContain('No students enrolled')
   })
+  it('shows the unified status for each student instead of just raw counts', () => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
+    expect(html).toContain('Not started')
+    expect(html).toContain('Exploring')
+  })
+  it('shows exploration duration, or In progress/Not started instead of a fabricated duration', () => {
+    const student = (overrides: Partial<TeacherActivityAttemptSummary['students'][number]>) => ({
+      ...report.students[0], ...overrides,
+    })
+    const notStarted = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({})] }} />)
+    expect(notStarted).toContain('Not started')
+    const inProgress = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'exploring', explorationStatus: 'in_progress',
+    })] }} />)
+    expect(inProgress).toContain('In progress')
+    const completed = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'completed', explorationStatus: 'completed', explorationDurationSeconds: 125,
+    })] }} />)
+    expect(completed).toContain('2m 5s')
+  })
+  it('shows the passing quiz attempt distinctly from a not-yet-passed failed-attempt count', () => {
+    const student = (overrides: Partial<TeacherActivityAttemptSummary['students'][number]>) => ({
+      ...report.students[0], ...overrides,
+    })
+    const needsRetry = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'needs_retry', failedQuizAttemptCount: 2,
+    })] }} />)
+    expect(needsRetry).toContain('Not yet passed')
+    expect(needsRetry).toContain('2 failed attempts')
+    const passed = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'completed', passingQuizAttemptNumber: 2, passingQuizScore: 10, passingQuizTotal: 12,
+      passingQuizPercentage: 83.33, passingQuizCompletedAt: '2026-09-23T12:05:00Z', failedQuizAttemptCount: 1,
+    })] }} />)
+    expect(passed).toContain('Passed on attempt 2: 10/12')
+    expect(passed).toContain('83.33%')
+  })
   it('provides accessible loading and retry states without showing raw errors', () => {
     expect(renderToStaticMarkup(<Loading />)).toContain('role="status"')
     const html = renderToStaticMarkup(<ErrorPage reset={() => {}} />)
