@@ -8,12 +8,21 @@ const mocks = vi.hoisted(() => ({
   user: null as { id: string } | null,
   admin: vi.fn(), student: vi.fn(), teacher: vi.fn(), studentEq: vi.fn(), teacherFrom: vi.fn(),
 }));
+// Every session response carries cookies as if updateSession had just refreshed
+// the session: a replacement token, and an old chunk being cleared.
+const REFRESHED_COOKIES = [
+  {
+    name: "sb-chemclicks-auth-token", value: "refreshed-session",
+    httpOnly: true, path: "/", sameSite: "lax", secure: true, maxAge: 34_560_000,
+  },
+  { name: "sb-chemclicks-auth-token.1", value: "", path: "/", maxAge: 0 },
+] as const;
 vi.mock("@/lib/supabase/middleware", () => ({
-  updateSession: async () => ({
-    response: NextResponse.next(),
-    user: mocks.user,
-    supabase: { from: mocks.teacherFrom },
-  }),
+  updateSession: async () => {
+    const response = NextResponse.next();
+    for (const cookie of REFRESHED_COOKIES) response.cookies.set(cookie);
+    return { response, user: mocks.user, supabase: { from: mocks.teacherFrom } };
+  },
 }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 
@@ -33,6 +42,12 @@ function pageRoutes(segmentDir: string): string[] {
       .map((part) => part.replace(/^\[(.+)\]$/, "sample-$1"))
       .join("/"))
     .sort();
+}
+
+function expectRefreshedCookies(response: NextResponse) {
+  for (const cookie of REFRESHED_COOKIES) {
+    expect(response.cookies.get(cookie.name)).toEqual(expect.objectContaining(cookie));
+  }
 }
 
 const adminPages = pageRoutes("admin");
@@ -147,5 +162,54 @@ describe("role redirects for every protected page", () => {
       const response = await proxy(request(path));
       expect(response.headers.get("location")).toBeNull();
     });
+  });
+});
+
+describe("refreshed session cookies", () => {
+  async function expectRedirectKeepsCookies(path: string, location: string) {
+    const response = await proxy(request(path));
+    expect(response.headers.get("location")).toBe(`https://chemclicks.test${location}`);
+    expectRefreshedCookies(response);
+    // The browser receives every cookie on the redirect, not just the latest one.
+    const setCookie = response.headers.getSetCookie();
+    expect(setCookie).toHaveLength(REFRESHED_COOKIES.length);
+    expect(setCookie[0]).toMatch(/HttpOnly/i);
+    expect(setCookie[0]).toMatch(/SameSite=lax/i);
+    expect(setCookie[0]).toMatch(/Path=\//);
+  }
+
+  it("survive the student redirect away from /admin", async () => {
+    mocks.student.mockResolvedValue({ data: { id: "student-row" }, error: null });
+    await expectRedirectKeepsCookies("/admin", "/student");
+  });
+
+  it("survive the teacher redirect away from /student", async () => {
+    await expectRedirectKeepsCookies("/student", "/admin");
+  });
+
+  it("survive the redirect when the student lookup fails", async () => {
+    mocks.student.mockResolvedValue({ data: null, error: { message: "private error" } });
+    await expectRedirectKeepsCookies("/admin", "/forbidden");
+  });
+
+  it("survive the redirect when the user has no teacher record", async () => {
+    mocks.teacher.mockResolvedValue({ data: null, error: null });
+    await expectRedirectKeepsCookies("/admin", "/forbidden");
+  });
+
+  it("survive the sign-in redirect outside development", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      mocks.user = null;
+      await expectRedirectKeepsCookies("/admin/labs", "/login/teacher?redirectedFrom=%2Fadmin%2Flabs");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("are kept when the request passes through", async () => {
+    const response = await proxy(request("/admin"));
+    expect(response.headers.get("location")).toBeNull();
+    expectRefreshedCookies(response);
   });
 });

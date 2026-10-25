@@ -23,6 +23,18 @@ function findStudent(userId: string) {
 }
 
 /**
+ * Redirect while keeping any session cookies updateSession refreshed on this
+ * request, attributes included; a bare redirect would drop them.
+ */
+function redirectWithSession(response: NextResponse, url: URL): NextResponse {
+  const redirectResponse = NextResponse.redirect(url);
+  for (const cookie of response.cookies.getAll()) {
+    redirectResponse.cookies.set(cookie);
+  }
+  return redirectResponse;
+}
+
+/**
  * Session refresh for Supabase (formerly `middleware.ts` in Next.js).
  * @see https://nextjs.org/docs/messages/middleware-to-proxy
  */
@@ -49,7 +61,7 @@ export default async function proxy(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/admin";
       url.search = "";
-      return NextResponse.redirect(url);
+      return redirectWithSession(response, url);
     }
     return response;
   }
@@ -68,7 +80,7 @@ export default async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login/teacher";
     url.searchParams.set("redirectedFrom", pathname);
-    return NextResponse.redirect(url);
+    return redirectWithSession(response, url);
   }
 
   // Students never reach /admin, even if a legacy signup trigger also created a
@@ -79,14 +91,14 @@ export default async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/forbidden";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithSession(response, url);
   }
 
   if (student) {
     const url = request.nextUrl.clone();
     url.pathname = "/student";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithSession(response, url);
   }
 
   // Check if the logged-in user has an approved teacher record
@@ -99,7 +111,7 @@ export default async function proxy(request: NextRequest) {
   if (!teacher) {
     const url = request.nextUrl.clone();
     url.pathname = "/forbidden";
-    return NextResponse.redirect(url);
+    return redirectWithSession(response, url);
   }
 
   return response;
