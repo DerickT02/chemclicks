@@ -11,8 +11,8 @@ import ErrorPage from '@/app/admin/classes/[classId]/attempts/error'
 const report: TeacherActivityAttemptSummary = {
   classId: 'class', className: 'Chemistry', assignmentId: 'second', activityId: 'activity', activityTitle: 'Lewis diagrams',
   students: [
-    { studentId: 'zero', firstName: 'Zero', lastName: 'Student', verified: false, attemptCount: 0, completedCount: 0, inProgressCount: 0, attempts: [] },
-    { studentId: 'many', firstName: 'Many', lastName: 'Student', verified: true, attemptCount: 2, explorationAttemptCount: 1, quizAttemptCount: 1, completedCount: 1, inProgressCount: 1, attempts: [
+    { studentId: 'zero', firstName: 'Zero', lastName: 'Student', verified: false, attemptCount: 0, completedCount: 0, inProgressCount: 0, overallStatus: 'not_started', explorationStatus: 'not_started', explorationDurationSeconds: null, passingQuizAttemptNumber: null, passingQuizScore: null, passingQuizTotal: null, passingQuizPercentage: null, passingQuizCompletedAt: null, failedQuizAttemptCount: 0, attempts: [] },
+    { studentId: 'many', firstName: 'Many', lastName: 'Student', verified: true, attemptCount: 2, explorationAttemptCount: 1, quizAttemptCount: 1, completedCount: 1, inProgressCount: 1, overallStatus: 'exploring', explorationStatus: 'in_progress', explorationDurationSeconds: null, passingQuizAttemptNumber: 1, passingQuizScore: 4, passingQuizTotal: 5, passingQuizPercentage: 80, passingQuizCompletedAt: '2026-09-23T12:05:00Z', failedQuizAttemptCount: 0, attempts: [
       { id: 'two', attemptNumber: 2, status: 'in_progress', startedAt: '2026-09-24T12:00:00Z', completedAt: null, kind: 'exploration', quizKey: null },
       { id: 'one', attemptNumber: 1, status: 'completed', startedAt: '2026-09-23T12:00:00Z', completedAt: '2026-09-23T12:05:00Z', kind: 'quiz', quizKey: 'measurement_ruler_tenths', instrument: 'ruler', precisionMode: 'tenths', score: 4, questionTotal: 5, percentage: 80, passed: true },
     ] },
