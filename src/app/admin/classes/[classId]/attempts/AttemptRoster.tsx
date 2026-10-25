@@ -12,6 +12,17 @@ const QUIZ_TITLES: Record<string, string> = {
   [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
 }
 
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.trunc(seconds))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const remainder = total % 60
+
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${remainder}s`
+  return `${remainder}s`
+}
+
 export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
   return (
     <section aria-labelledby="activity-title" className="rounded-xl border border-border bg-card p-5">
@@ -22,6 +33,23 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
           {summary.students.map(student => (
             <li key={student.studentId} className="py-4">
               <h3 className="font-semibold">{student.firstName} {student.lastName}</h3>
+              <p className="mt-1 text-sm">
+                Assignment stage: <span className="font-medium">{student.stage ?? 'Not started'}</span>
+              </p>
+              <div className="mt-1 space-y-1 text-sm text-muted-foreground">
+                {student.explorationStartedAt && (
+                  <p>Exploration started <LocalizedTimestamp value={student.explorationStartedAt} />.</p>
+                )}
+                {student.firstQuizStartedAt && (
+                  <p>First quiz started <LocalizedTimestamp value={student.firstQuizStartedAt} />.</p>
+                )}
+                {student.quizStartedAt && student.quizStartedAt !== student.firstQuizStartedAt && (
+                  <p>Latest quiz started <LocalizedTimestamp value={student.quizStartedAt} />.</p>
+                )}
+                {student.explorationDurationSeconds != null && (
+                  <p>Exploration duration: {formatDuration(student.explorationDurationSeconds)}.</p>
+                )}
+              </div>
               {(() => {
                 const explorationCount = student.explorationAttemptCount
                   ?? student.attempts.filter((attempt) => attempt.kind === 'exploration' || (attempt.kind === undefined && attempt.quizKey == null)).length
@@ -33,7 +61,9 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                   </p>
                 )
               })()}
-              {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">No attempts yet.</p> : (
+              {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">
+                {student.stage === 'Taking quiz' ? 'Quiz started; no result submitted yet.' : 'No attempts yet.'}
+              </p> : (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm underline">View attempt history for {student.firstName} {student.lastName}</summary>
                   <div className="mt-3 overflow-x-auto">
