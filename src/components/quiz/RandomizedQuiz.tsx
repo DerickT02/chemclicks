@@ -25,6 +25,7 @@ type RandomizedQuizProps = {
 type AttemptSnapshot = {
   questions: QuizQuestion[];
   passingThresholdPercent: number;
+  startedAt: string | null;
 };
 
 export default function RandomizedQuiz({
@@ -52,10 +53,7 @@ export default function RandomizedQuiz({
     const timeoutId = window.setTimeout(async () => {
       const isAssignmentQuiz = Boolean(assignmentId && quizKey);
       if (isAssignmentQuiz) setStarting(true);
-      const nextAttempt = {
-        questions: pickRandomQuestions(pool, questionsPerAttempt),
-        passingThresholdPercent,
-      };
+      let startedAt: string | null = null;
       if (assignmentId && quizKey) {
         try {
           const result = await startQuizAction(assignmentId, quizKey, retryRequested);
@@ -64,6 +62,7 @@ export default function RandomizedQuiz({
             setRetryRequested(false);
             return;
           }
+          startedAt = result.startedAt;
           setStartError(null);
         } catch (error) {
           setStartError(error instanceof Error ? error.message : "The quiz could not be started. Please try again.");
@@ -72,6 +71,11 @@ export default function RandomizedQuiz({
           setStarting(false);
         }
       }
+      const nextAttempt = {
+        questions: pickRandomQuestions(pool, questionsPerAttempt),
+        passingThresholdPercent,
+        startedAt,
+      };
       setRetryRequested(false);
       setStarting(false);
       setAttempt(nextAttempt);
@@ -80,7 +84,7 @@ export default function RandomizedQuiz({
   }, [attempt, retryRequired, pool, questionsPerAttempt, passingThresholdPercent, loadError, validCount, assignmentId, quizKey, retryRequested]);
 
   async function submitAnswers(answers: QuizAnswer[]): Promise<QuizCompleteResult> {
-    if (!assignmentId || !quizKey) {
+    if (!assignmentId || !quizKey || !attempt?.startedAt) {
       throw new Error("This quiz is not linked to an assignment.");
     }
 
@@ -92,6 +96,7 @@ export default function RandomizedQuiz({
     return submitQuizAction({
       assignmentId,
       quizKey,
+      startedAt: attempt.startedAt,
       submissionKey: key,
       answers,
     });
@@ -156,7 +161,7 @@ export default function RandomizedQuiz({
       <h2 className="text-2xl font-semibold text-foreground md:text-3xl">
         {title}
       </h2>
-      <p role={loadError || !validCount ? "alert" : "status"}
+      <p role={loadError || startError || !validCount ? "alert" : "status"}
         className="mt-3 text-base text-muted-foreground md:text-lg">
         {loadError ?? startError ?? (!validCount
           ? "This quiz could not be started. Please return to assignments and try again."

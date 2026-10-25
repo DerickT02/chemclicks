@@ -384,6 +384,188 @@ REVOKE ALL ON FUNCTION public.student_quiz_retry_start(uuid, uuid, uuid, text)
 GRANT EXECUTE ON FUNCTION public.student_quiz_retry_start(uuid, uuid, uuid, text)
   TO service_role;
 
+-- Bind every result to the start timestamp shown to the quiz client. The row
+-- lock serializes concurrent tabs, while the timestamp rejects stale tabs
+-- after an explicit retry has started.
+DROP FUNCTION IF EXISTS public.student_quiz_submit(uuid, uuid, uuid, text, text, jsonb);
+
+CREATE OR REPLACE FUNCTION public.student_quiz_submit(
+  p_student_id uuid,
+  p_class_id uuid,
+  p_assignment_id uuid,
+  p_quiz_key text,
+  p_quiz_started_at timestamptz,
+  p_submission_key text,
+  p_answers jsonb
+) RETURNS SETOF public.student_attempts
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+DECLARE
+  progress uuid;
+  assignment_type text;
+  expected_questions integer;
+  answer jsonb;
+  submitted_question_key text;
+  selected_index integer;
+  correct_index integer;
+  option_count integer;
+  answer_count integer;
+  question_pool_count integer;
+  score_value integer := 0;
+  next_attempt_number integer;
+  percentage_value numeric(5, 2);
+  passed_value boolean;
+  started_timestamp timestamptz;
+  completed_timestamp timestamptz;
+  existing_attempt public.student_attempts%ROWTYPE;
+  inserted_attempt public.student_attempts%ROWTYPE;
+BEGIN
+  IF p_quiz_key IS NULL OR p_quiz_key !~ '^[a-z0-9_]+$'
+     OR p_quiz_started_at IS NULL
+     OR p_submission_key IS NULL OR length(btrim(p_submission_key)) = 0
+     OR p_answers IS NULL OR jsonb_typeof(p_answers) <> 'array' THEN
+    RAISE EXCEPTION 'Invalid quiz submission' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM 1
+  FROM public.class_activities ca
+  JOIN public.classes c ON c.id = ca.class_id
+  JOIN public.students s ON s.class_id = c.id
+  JOIN public.activities a ON a.id = ca.activity_id
+  WHERE ca.id = p_assignment_id
+    AND c.id = p_class_id
+    AND s.id = p_student_id
+    AND s.verified
+    AND c.is_active
+    AND ca.archived_at IS NULL
+    AND (ca.opens_at IS NULL OR ca.opens_at <= now())
+    AND (ca.closes_at IS NULL OR ca.closes_at > now())
+    AND (
+      (p_quiz_key = 'bohr_models' AND a.type::text IN ('bohr_model_intro', 'bohr_model_stability'))
+      OR (p_quiz_key = 'lewis_covalent' AND a.type::text = 'lewis_structures_covalent')
+      OR (p_quiz_key = 'lewis_ionic' AND a.type::text = 'lewis_structures_ionic')
+    )
+  FOR SHARE OF ca, c, s, a;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Quiz assignment unavailable' USING ERRCODE = '42501';
+  END IF;
+
+  -- Serialize submissions for this assignment. Duplicate tabs share one
+  -- result per start; a result from a previous start cannot complete a retry.
+  SELECT id, quiz_started_at INTO progress, started_timestamp
+  FROM public.student_progress
+  WHERE student_id = p_student_id
+    AND class_activity_id = p_assignment_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Quiz has not been started' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO existing_attempt
+  FROM public.student_attempts
+  WHERE submission_key = p_submission_key
+    AND progress_id = progress
+    AND quiz_key = p_quiz_key;
+  IF FOUND THEN
+    IF existing_attempt.started_at <> p_quiz_started_at THEN
+      RAISE EXCEPTION 'Submission key reused for a different quiz start' USING ERRCODE = '22023';
+    END IF;
+    RETURN NEXT existing_attempt;
+    RETURN;
+  END IF;
+
+  IF started_timestamp IS NULL OR started_timestamp <> p_quiz_started_at THEN
+    RAISE EXCEPTION 'Quiz start is stale' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO existing_attempt
+  FROM public.student_attempts
+  WHERE progress_id = progress
+    AND quiz_key = p_quiz_key
+    AND started_at = p_quiz_started_at
+  ORDER BY created_at DESC
+  LIMIT 1;
+  IF FOUND THEN
+    -- A second tab may have submitted different answers or a different
+    -- idempotency key. Return the first result; never create another attempt.
+    RETURN NEXT existing_attempt;
+    RETURN;
+  END IF;
+
+  SELECT count(*)::integer INTO question_pool_count
+  FROM public.quiz_questions
+  WHERE quiz_key = p_quiz_key AND is_active;
+
+  expected_questions := LEAST(12, question_pool_count);
+  answer_count := jsonb_array_length(p_answers);
+
+  IF expected_questions = 0 OR answer_count <> expected_questions THEN
+    RAISE EXCEPTION 'Quiz submission has an invalid question count' USING ERRCODE = '22023';
+  END IF;
+
+  IF (
+    SELECT count(DISTINCT value->>'questionId')
+    FROM jsonb_array_elements(p_answers)
+  ) <> answer_count THEN
+    RAISE EXCEPTION 'Quiz submission contains duplicate questions' USING ERRCODE = '22023';
+  END IF;
+
+  FOR answer IN SELECT value FROM jsonb_array_elements(p_answers)
+  LOOP
+    submitted_question_key := answer->>'questionId';
+    IF submitted_question_key IS NULL OR submitted_question_key = ''
+       OR (answer->>'selectedIndex') IS NULL
+       OR (answer->>'selectedIndex') !~ '^[0-9]+$' THEN
+      RAISE EXCEPTION 'Invalid quiz answer' USING ERRCODE = '22023';
+    END IF;
+
+    selected_index := (answer->>'selectedIndex')::integer;
+
+    SELECT qq.correct_index, jsonb_array_length(qq.options)
+    INTO correct_index, option_count
+    FROM public.quiz_questions qq
+    WHERE qq.quiz_key = p_quiz_key
+      AND qq.question_key = submitted_question_key
+      AND qq.is_active;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Quiz question is unavailable' USING ERRCODE = '22023';
+    END IF;
+
+    IF selected_index >= option_count THEN
+      RAISE EXCEPTION 'Quiz answer choice is unavailable' USING ERRCODE = '22023';
+    END IF;
+
+    IF selected_index = correct_index THEN
+      score_value := score_value + 1;
+    END IF;
+  END LOOP;
+
+  percentage_value := round((score_value * 100.0) / answer_count, 2);
+  passed_value := percentage_value >= 80;
+  completed_timestamp := clock_timestamp();
+
+  SELECT COALESCE(max(attempt_number), 0) + 1 INTO next_attempt_number
+  FROM public.student_attempts
+  WHERE progress_id = progress AND quiz_key = p_quiz_key;
+
+  INSERT INTO public.student_attempts(
+    progress_id, attempt_number, quiz_key, question_total, score,
+    percentage, passed, submission_key, status, started_at, completed_at
+  ) VALUES (
+    progress, next_attempt_number, p_quiz_key, answer_count, score_value,
+    percentage_value, passed_value, p_submission_key, 'completed',
+    p_quiz_started_at, completed_timestamp
+  ) RETURNING * INTO inserted_attempt;
+
+  RETURN NEXT inserted_attempt;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.student_quiz_submit(uuid, uuid, uuid, text, timestamptz, text, jsonb)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.student_quiz_submit(uuid, uuid, uuid, text, timestamptz, text, jsonb)
+  TO service_role;
+
 CREATE OR REPLACE FUNCTION public.student_measurement_quiz_start(
   p_student_id uuid,
   p_class_id uuid,

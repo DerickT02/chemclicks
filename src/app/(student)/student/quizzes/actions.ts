@@ -8,6 +8,7 @@ import type { QuizAnswer, QuizCompleteResult } from "@/components/quiz/types";
 type SubmitQuizInput = {
   assignmentId: string;
   quizKey: string;
+  startedAt: string;
   submissionKey: string;
   answers: QuizAnswer[];
 };
@@ -16,9 +17,11 @@ export async function startQuizAction(
   assignmentId: string,
   quizKey: string,
   retry = false,
-): Promise<{ status: "in_progress" | "retry_required" }> {
+): Promise<{ status: "in_progress"; startedAt: string } | { status: "retry_required" }> {
   const result = await startStudentQuiz(assignmentId, quizKey, retry);
-  return { status: result.status };
+  return result.status === "in_progress"
+    ? { status: result.status, startedAt: result.started_at }
+    : { status: result.status };
 }
 
 export async function submitQuizAction(

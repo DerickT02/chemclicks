@@ -29,7 +29,7 @@ export async function startStudentQuiz(
   }
 
   const { data, error } = await createServiceClient().rpc(
-    retry ? "student_quiz_retry_start" : "student_quiz_start",
+    retry === true ? "student_quiz_retry_start" : "student_quiz_start",
     {
       p_student_id: session.studentId,
       p_class_id: session.classId,
@@ -45,7 +45,9 @@ export async function startStudentQuiz(
   if (data.status === "retry_required") return { status: "retry_required" };
   if (data.status === "in_progress"
     && typeof data.progress_id === "string"
-    && typeof data.started_at === "string") {
+    && UUID_PATTERN.test(data.progress_id)
+    && typeof data.started_at === "string"
+    && Number.isFinite(Date.parse(data.started_at))) {
     return {
       progress_id: data.progress_id,
       status: "in_progress",
