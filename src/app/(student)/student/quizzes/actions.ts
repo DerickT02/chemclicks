@@ -15,8 +15,9 @@ type SubmitQuizInput = {
 export async function startQuizAction(
   assignmentId: string,
   quizKey: string,
-): Promise<{ status: "in_progress" }> {
-  const result = await startStudentQuiz(assignmentId, quizKey);
+  retry = false,
+): Promise<{ status: "in_progress" | "retry_required" }> {
+  const result = await startStudentQuiz(assignmentId, quizKey, retry);
   return { status: result.status };
 }
 

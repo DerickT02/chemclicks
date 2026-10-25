@@ -9,6 +9,10 @@ export type StudentProgress = {
   status: ProgressStatus   // defaults to 'not_started'
   started_at: string | null
   completed_at: string | null
+  exploration_started_at: string | null
+  first_quiz_started_at: string | null
+  quiz_started_at: string | null
+  exploration_duration_seconds: number | null
 }
 
 export type InsertStudentProgress = Pick<StudentProgress, 'student_id' | 'class_activity_id'>
