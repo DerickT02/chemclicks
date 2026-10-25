@@ -5,11 +5,13 @@ import type { StudentAssignment } from "@/lib/db/student-assignments";
 
 type Props = {
   kind: LewisQuizKind;
+  /** The lesson assignment the quiz is taken for. */
+  assignmentId: string;
   /** The signed-in student's server-verified class assignments. */
   assignments: StudentAssignment[];
 };
 
-export default function LewisQuizCard({ kind, assignments }: Props) {
+export default function LewisQuizCard({ kind, assignmentId, assignments }: Props) {
   const { title, path, lessonTitle } = LEWIS_QUIZZES[kind];
   const unlocked = findLewisQuizAssignment(assignments, kind) !== null;
 
@@ -17,7 +19,7 @@ export default function LewisQuizCard({ kind, assignments }: Props) {
     <section className="space-y-3 rounded-xl border border-border bg-card p-6">
       <h2 className="text-lg font-semibold">{title}</h2>
       {unlocked ? (
-        <Link href={path} prefetch={false}
+        <Link href={`${path}?assignmentId=${encodeURIComponent(assignmentId)}`} prefetch={false}
           className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
           Start quiz
         </Link>

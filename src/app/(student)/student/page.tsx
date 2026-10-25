@@ -1,7 +1,7 @@
 import Link from "next/link";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { hasActivityContent } from "@/lib/assignments/activity-content";
-import { getNewAssignmentBlockReason } from "@/lib/activities/registry";
+import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { LEWIS_QUIZZES, lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import { groupWorkQueue, type QueueAssignment, type QueueSection } from "@/lib/assignments/work-queue";
 import { getStudentWorkQueue } from "@/lib/server/student-work-queue";
@@ -16,8 +16,13 @@ const ACTIONS = { not_started: "Open to start", in_progress: "Resume exploration
 
 function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; section: QueueSection }) {
   const available = OPEN_SECTIONS.includes(section);
-  const quizKind = available ? lewisQuizForLesson(assignment.activity.type) : null;
-  const action = Object.hasOwn(ACTIONS, section) ? ACTIONS[section as keyof typeof ACTIONS] : null;
+  const lockedBy = available ? assignment.lockedBy ?? null : null;
+  const unlocked = available && !lockedBy;
+  const quizKind = unlocked ? lewisQuizForLesson(assignment.activity.type) : null;
+  const quizQuery = `?assignmentId=${encodeURIComponent(assignment.id)}`;
+  const quizPath = quizKind ? LEWIS_QUIZZES[quizKind].path
+    : unlocked && getActivityDefinition(assignment.activity.type)?.explorer === "bohr" ? "/student/quizzes/bohr" : null;
+  const action = !lockedBy && Object.hasOwn(ACTIONS, section) ? ACTIONS[section as keyof typeof ACTIONS] : null;
   return (
     <li className="space-y-3 rounded-xl border border-border bg-card p-5">
       <h3 className="text-lg font-semibold">{assignment.activity.title}</h3>
@@ -40,14 +45,23 @@ function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; 
       {!hasActivityContent(assignment.activity.type) && (
         <p className="text-sm text-muted-foreground">Exercise not available yet. {getNewAssignmentBlockReason(assignment.activity.type)}</p>
       )}
+      {lockedBy && (
+        <p className="text-sm text-muted-foreground" role="status">
+          Locked: finish{" "}
+          <Link href={`/student/assignments/${lockedBy.id}`} prefetch={false} className="font-semibold text-foreground underline">
+            {lockedBy.activity.title}
+          </Link>{" "}
+          first.
+        </p>
+      )}
       {action && (
         <Link href={`/student/assignments/${assignment.id}`} prefetch={false}
           className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
           {action}<span className="sr-only">: {assignment.activity.title}</span>
         </Link>
       )}
-      {quizKind && (
-        <Link href={LEWIS_QUIZZES[quizKind].path} prefetch={false}
+      {quizPath && (
+        <Link href={`${quizPath}${quizQuery}`} prefetch={false}
           className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground">
           Take quiz<span className="sr-only">: {assignment.activity.title}</span>
         </Link>

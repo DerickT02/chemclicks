@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { assertAssignmentUnlocked } from '@/lib/assignments/prerequisites'
 import { transitionStudentAttempt, type AttemptAction } from '@/lib/server/student-assignments'
 
 export type AttemptFormState = { error: string | null }
@@ -15,6 +16,8 @@ export async function saveAttempt(_previous: AttemptFormState, form: FormData): 
     return { error: 'Invalid attempt request.' }
   }
   try {
+    // Completing in-flight work is never gated; starting new work is.
+    if (action !== 'complete') await assertAssignmentUnlocked(assignmentId)
     await transitionStudentAttempt(assignmentId, action as AttemptAction, attemptId ?? undefined)
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not save. Please try again.' }

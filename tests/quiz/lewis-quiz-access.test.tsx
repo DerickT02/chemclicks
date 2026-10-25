@@ -3,12 +3,30 @@ vi.mock('@/app/(student)/student/assignments/[assignmentId]/AttemptControls', ()
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const mocks = vi.hoisted(() => ({ reader: vi.fn(), listQuestions: vi.fn(), adminClient: {} }));
+const mocks = vi.hoisted(() => ({ reader: vi.fn(), listQuestions: vi.fn(), gate: vi.fn(), adminClient: {} }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/student-assignments", () => ({
   getStudentAssignments: mocks.reader,
   getStudentAssignmentSchedules: mocks.reader,
 }));
+vi.mock("@/lib/assignments/prerequisites", async (importOriginal) => {
+  // Keep the real schedule checks; stub only the progress-backed gate.
+  const actual = await importOriginal<typeof import("@/lib/assignments/prerequisites")>();
+  const { scheduleStatus } = await import("@/lib/assignments/schedule");
+  return {
+    ...actual,
+    getAssignmentGate: mocks.gate,
+    getSectionAccess: async (assignment: { id: string; opens_at: string | null; closes_at: string | null }) => {
+      const status = scheduleStatus(assignment, Date.now());
+      if (status === "Scheduled") return { status: "scheduled", assignment };
+      if (status !== "Open") return { status: "closed", assignment };
+      const gate = await mocks.gate(assignment.id);
+      return gate.status === "locked"
+        ? { status: "blocked", assignment, blocker: gate.blocker }
+        : { status: "available", assignment };
+    },
+  };
+});
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
@@ -61,6 +79,7 @@ const renderAssignment = async (id: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.listQuestions.mockResolvedValue({ data: [question], error: null });
+  mocks.gate.mockResolvedValue({ status: "open", entry: { complete: false }, next: null });
 });
 
 const QUIZZES = [
@@ -161,8 +180,40 @@ describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, titl
     withAssignments([lesson]);
     const html = await renderAssignment(lesson.id);
     expect(html).toContain(title);
-    expect(html).toContain(`href="${path}"`);
+    expect(html).toContain(`href="${path}?assignmentId=${lesson.id}"`);
     expect(html).toContain("Start quiz");
+  });
+});
+
+describe("Lewis quiz assignment routing", () => {
+  it("opens the quiz for the lesson it was started from", async () => {
+    withAssignments([covalentLesson]);
+    expect(await getLewisQuizAccess("covalent", covalentLesson.id)).toEqual({ status: "available", assignment: covalentLesson });
+    expect(mocks.gate).toHaveBeenCalledWith(covalentLesson.id);
+  });
+
+  it("treats another quiz's lesson or a foreign id as missing", async () => {
+    withAssignments([covalentLesson, ionicLesson, diagram]);
+    expect(await getLewisQuizAccess("covalent", ionicLesson.id)).toEqual({ status: "missing" });
+    expect(await getLewisQuizAccess("covalent", diagram.id)).toEqual({ status: "missing" });
+    expect(await getLewisQuizAccess("ionic", "other-class-assignment")).toEqual({ status: "missing" });
+    const html = renderToStaticMarkup(await LewisQuizPage({ kind: "covalent", assignmentId: ionicLesson.id }));
+    expect(html).toContain("This assignment is unavailable.");
+    expect(html).toContain('href="/student"');
+    expect(mocks.listQuestions).not.toHaveBeenCalled();
+  });
+
+  it("blocks the quiz until earlier sections are finished", async () => {
+    const blocker = assignmentOf("lewis_diagram");
+    withAssignments([diagram, covalentLesson]);
+    mocks.gate.mockResolvedValue({ status: "locked", blocker });
+    expect(await getLewisQuizAccess("covalent", covalentLesson.id))
+      .toEqual({ status: "blocked", assignment: covalentLesson, blocker });
+    const html = renderToStaticMarkup(await LewisQuizPage({ kind: "covalent", assignmentId: covalentLesson.id }));
+    expect(html).toContain("This section is locked.");
+    expect(html).toContain(`href="/student/assignments/${blocker.id}"`);
+    expect(html).not.toContain("Started ");
+    expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
 });
 

@@ -15,6 +15,8 @@ const adminClient = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_QUIZ_KEY: "bohr_models",
+  LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
+  LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/bohr/BohrModelsQuiz", () => ({

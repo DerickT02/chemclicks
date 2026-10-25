@@ -26,6 +26,10 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
 vi.mock("@/lib/db/class_activities", () => ({ insertClassActivity: mocks.insert }));
 vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignments: mocks.assignments, getStudentAssignmentSchedules: mocks.assignments }));
 vi.mock("@/lib/auth/student-session", () => ({ getStudentSession: mocks.session }));
+vi.mock("@/lib/assignments/prerequisites", () => ({
+  assertAssignmentUnlocked: async () => {},
+  getAssignmentGate: async () => ({ status: "open", entry: { complete: false }, next: null }),
+}));
 vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({
   rpc: mocks.rpc,
   from: () => {
