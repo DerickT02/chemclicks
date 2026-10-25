@@ -48,8 +48,13 @@ export const ACTIVITY_REGISTRY: Readonly<Record<ActivityType, ActivityDefinition
     category: "Measurement",
     explorer: "ruler",
   },
+  measurement_graduated_cylinder_whole: {
+    description: "Read a 0–50 mL graduated cylinder to the nearest 1 mL",
+    category: "Measurement",
+    explorer: "cylinder",
+  },
   measurement_graduated_cylinder: {
-    description: "Read liquid volume from a graduated cylinder",
+    description: "Read a 0–50 mL graduated cylinder to the nearest 0.1 mL",
     category: "Measurement",
     explorer: "cylinder",
   },

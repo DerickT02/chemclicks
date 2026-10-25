@@ -38,6 +38,7 @@ type ActivityType =
   | 'lewis_structures_ionic'
   | 'measurement_ruler_tenths'
   | 'measurement_ruler_hundredths'
+  | 'measurement_graduated_cylinder_whole'
   | 'measurement_graduated_cylinder'
 
 type Activity = {
@@ -101,7 +102,8 @@ const mockActivities: Activity[] = [
   { id: 'activity-5', title: 'Lewis Structures: Ionic',      type: 'lewis_structures_ionic',       order_index: 5 },
   { id: 'activity-6', title: 'Ruler (Tenths)',               type: 'measurement_ruler_tenths',     order_index: 6 },
   { id: 'activity-7', title: 'Ruler (Hundredths)',           type: 'measurement_ruler_hundredths', order_index: 7 },
-  { id: 'activity-8', title: 'Graduated Cylinder',           type: 'measurement_graduated_cylinder', order_index: 8 },
+  { id: 'activity-9', title: 'Graduated Cylinder (Whole)',   type: 'measurement_graduated_cylinder_whole', order_index: 8 },
+  { id: 'activity-8', title: 'Graduated Cylinder (Tenths)',  type: 'measurement_graduated_cylinder', order_index: 9 },
 ]
 
 const mockClassActivities: ClassActivity[] = [

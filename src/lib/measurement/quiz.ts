@@ -14,6 +14,7 @@ export const QUESTION_POOL: Record<InstrumentId, readonly number[]> = {
 export const MODE_QUESTION_POOL: Record<MeasurementQuizModeKey, readonly number[]> = {
   ruler_tenths: [0.5, 1.4, 2.0, 2.8, 3.7, 4.3, 5.9, 6.6, 7.1, 7.7, 8.6, 9.2],
   ruler_hundredths: QUESTION_POOL.ruler,
+  cylinder_whole: [7, 13, 18, 24, 26, 33, 37, 41, 44, 46, 48, 49],
   cylinder_tenths: QUESTION_POOL.cylinder,
 };
 
