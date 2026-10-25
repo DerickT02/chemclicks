@@ -167,6 +167,19 @@ npm test -- tests/auth/student-login.test.ts
 Those suites create and delete real database and Auth records, so no script
 runs them; use only a disposable Supabase project if you run them by hand.
 
+The SCRUM-232 assignment-timer database suite has an explicit runner:
+
+```bash
+npm run test:integration:assignment-timers
+```
+
+Configure `.env.test.local` with `NEXT_PUBLIC_SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_TEST_PROJECT_REF`. The reference must
+match the configured URL (`local` for a local Supabase stack). Apply the
+assignment-timer migration to that disposable project first. The runner only
+selects `tests/database/integration/student_quiz_attempts.test.ts`; it creates
+and deletes its own test class and related records.
+
 The safe-checks GitHub workflow runs `npm ci`, `npm test`, TypeScript, and lint,
 without Supabase secrets, database operations, migrations, or deployment.
 Browser/E2E coverage is still pending; no `test:e2e` script is configured.

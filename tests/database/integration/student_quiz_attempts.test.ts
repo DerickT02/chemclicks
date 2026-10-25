@@ -2,9 +2,26 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 
+const databaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const expectedTestProjectRef = process.env.SUPABASE_TEST_PROJECT_REF;
+
+if (!databaseUrl || !serviceRoleKey || !expectedTestProjectRef) {
+  throw new Error("Set the Supabase URL, service-role key, and SUPABASE_TEST_PROJECT_REF in .env.test.local.");
+}
+
+const databaseHost = new URL(databaseUrl).hostname;
+const actualTestProjectRef = ["localhost", "127.0.0.1", "::1"].includes(databaseHost)
+  ? "local"
+  : databaseHost.split(".")[0];
+
+if (actualTestProjectRef !== expectedTestProjectRef) {
+  throw new Error("The configured Supabase URL does not match SUPABASE_TEST_PROJECT_REF.");
+}
+
 const client = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  databaseUrl,
+  serviceRoleKey,
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
