@@ -3,12 +3,13 @@ vi.mock('@/app/(student)/student/assignments/[assignmentId]/AttemptControls', ()
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const mocks = vi.hoisted(() => ({ reader: vi.fn(), listQuestions: vi.fn(), adminClient: {} }));
+const mocks = vi.hoisted(() => ({ reader: vi.fn(), attempts: vi.fn(), listQuestions: vi.fn(), adminClient: {} }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/student-assignments", () => ({
   getStudentAssignments: mocks.reader,
   getStudentAssignmentSchedules: mocks.reader,
 }));
+vi.mock("@/lib/server/student-assignments", () => ({ getAssignmentAttempts: mocks.attempts }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
@@ -60,6 +61,7 @@ const renderAssignment = async (id: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.attempts.mockResolvedValue([]);
   mocks.listQuestions.mockResolvedValue({ data: [question], error: null });
 });
 
@@ -187,6 +189,10 @@ describe("independent Lewis quizzes", () => {
 
   it("shows no quiz cards on the Lewis dot diagram page", async () => {
     withAssignments([diagram, covalentLesson, ionicLesson]);
+    mocks.attempts.mockResolvedValue([{
+      id: "exploration", attempt_number: 1, quiz_key: null, status: "in_progress",
+      started_at: "2026-10-24T10:00:00Z", completed_at: null,
+    }]);
     const html = await renderAssignment(diagram.id);
     expect(html).toContain("Lewis exercise");
     expect(html).not.toContain("Compounds Quiz");

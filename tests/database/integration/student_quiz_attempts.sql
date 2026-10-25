@@ -15,6 +15,10 @@ DECLARE
   failed_replay public.student_attempts%ROWTYPE;
   pass_answers jsonb;
   fail_answers jsonb;
+  start_result jsonb;
+  retry_result jsonb;
+  initial_started_at timestamptz;
+  retry_started_at timestamptz;
   attempt_count integer;
 BEGIN
   SELECT id INTO teacher FROM public.teachers LIMIT 1;
@@ -70,13 +74,18 @@ BEGIN
 
   SET LOCAL ROLE service_role;
 
-  PERFORM public.student_quiz_start(
+  start_result := public.student_quiz_start(
     student, classroom, assignment, 'bohr_models'
   );
+  initial_started_at := (start_result->>'started_at')::timestamptz;
+  IF start_result->>'status' <> 'in_progress' OR initial_started_at IS NULL THEN
+    RAISE EXCEPTION 'Quiz did not return a valid server start';
+  END IF;
 
   SELECT * INTO first_attempt
     FROM public.student_quiz_submit(
-      student, classroom, assignment, 'bohr_models', 'quiz-submit-1', pass_answers
+      student, classroom, assignment, 'bohr_models', initial_started_at,
+      'quiz-submit-1', pass_answers
     );
   IF first_attempt.attempt_number <> 1
      OR first_attempt.score <> 12
@@ -96,13 +105,17 @@ BEGIN
     RAISE EXCEPTION 'Passing Bohr quiz did not complete assignment progress';
   END IF;
 
-  PERFORM public.student_quiz_start(
+  start_result := public.student_quiz_start(
     student, classroom, assignment, 'bohr_models'
   );
+  IF start_result->>'status' <> 'retry_required' THEN
+    RAISE EXCEPTION 'Completed quiz start did not require an explicit retry';
+  END IF;
 
   SELECT * INTO replayed_attempt
     FROM public.student_quiz_submit(
-      student, classroom, assignment, 'bohr_models', 'quiz-submit-1', pass_answers
+      student, classroom, assignment, 'bohr_models', initial_started_at,
+      'quiz-submit-1', pass_answers
     );
   IF replayed_attempt.id <> first_attempt.id
      OR replayed_attempt.completed_at <> first_attempt.completed_at
@@ -110,9 +123,40 @@ BEGIN
     RAISE EXCEPTION 'Replayed passing submission changed its result';
   END IF;
 
+  SELECT * INTO replayed_attempt
+    FROM public.student_quiz_submit(
+      student, classroom, assignment, 'bohr_models', initial_started_at,
+      'different-tab-key', fail_answers
+    );
+  IF replayed_attempt.id <> first_attempt.id
+     OR replayed_attempt.score <> first_attempt.score THEN
+    RAISE EXCEPTION 'A second tab changed the result with a different submission key';
+  END IF;
+
+  retry_result := public.student_quiz_retry_start(
+    student, classroom, assignment, 'bohr_models'
+  );
+  retry_started_at := (retry_result->>'started_at')::timestamptz;
+  IF retry_result->>'status' <> 'in_progress'
+     OR retry_started_at IS NULL
+     OR retry_started_at <= initial_started_at THEN
+    RAISE EXCEPTION 'Explicit retry did not create a newer server start';
+  END IF;
+
+  BEGIN
+    PERFORM public.student_quiz_submit(
+      student, classroom, assignment, 'bohr_models', initial_started_at,
+      'stale-tab-key', pass_answers
+    );
+    RAISE EXCEPTION 'A stale tab submitted against the previous quiz start';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
   SELECT * INTO failed_attempt
     FROM public.student_quiz_submit(
-      student, classroom, assignment, 'bohr_models', 'quiz-submit-2', fail_answers
+      student, classroom, assignment, 'bohr_models', retry_started_at,
+      'quiz-submit-2', fail_answers
     );
   IF failed_attempt.id = first_attempt.id
      OR failed_attempt.attempt_number <> 2
@@ -133,7 +177,8 @@ BEGIN
 
   SELECT * INTO failed_replay
     FROM public.student_quiz_submit(
-      student, classroom, assignment, 'bohr_models', 'quiz-submit-2', fail_answers
+      student, classroom, assignment, 'bohr_models', retry_started_at,
+      'quiz-submit-2', fail_answers
     );
   IF failed_replay.id <> failed_attempt.id
      OR failed_replay.completed_at <> failed_attempt.completed_at THEN
@@ -152,7 +197,8 @@ BEGIN
   SET LOCAL ROLE authenticated;
   BEGIN
     PERFORM public.student_quiz_submit(
-      student, classroom, assignment, 'bohr_models', 'browser-submit', pass_answers
+      student, classroom, assignment, 'bohr_models', retry_started_at,
+      'browser-submit', pass_answers
     );
     RAISE EXCEPTION 'Authenticated browser invoked the quiz RPC';
   EXCEPTION WHEN insufficient_privilege THEN

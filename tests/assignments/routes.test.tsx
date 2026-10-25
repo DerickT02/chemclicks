@@ -38,6 +38,10 @@ const assignment = {
 };
 beforeEach(() => { reader.mockReset(); attempts.mockReset().mockResolvedValue([]); });
 const page = (id = assignment.id) => AssignmentPage({ params: Promise.resolve({ assignmentId: id }) });
+const startedExploration = {
+  id: "exploration-1", attempt_number: 1, quiz_key: null,
+  status: "in_progress", started_at: "2026-10-24T10:00:00Z", completed_at: null,
+};
 
 describe("student assignment pages", () => {
   it("redirects unauthenticated requests", async () => {
@@ -65,17 +69,18 @@ describe("student assignment pages", () => {
     expect(updated.key).toBe(initial.key);
     expect(updated.props.closesAt).toBe("2030-01-01T12:00:00Z");
   });
-  it("places Start before the exercise and collapses saved history afterward", async () => {
+  it("keeps the exercise closed until Start exploration creates a saved attempt", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     const html = renderToStaticMarkup(await page());
-    expect(html.indexOf("Start exploration</button>")).toBeLessThan(html.indexOf("Cylinder exercise"));
-    expect(html.indexOf("Saved exploration history")).toBeGreaterThan(html.indexOf("Cylinder exercise"));
+    expect(html.indexOf("Start exploration</button>")).toBeLessThan(html.indexOf("Start exploration above to open"));
+    expect(html).not.toContain("Cylinder exercise");
+    expect(html).toContain("Saved exploration history");
     expect(html).toContain("<details");
-    expect(html).toContain("Opening the page alone does not save completion");
+    expect(html).toContain("Opening the page alone does not record participation");
   });
   it("places Finish after the exercise and confirms existing saved completion without automatically retrying", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
-    const record = { id: "attempt", attempt_number: 1, status: "in_progress", started_at: "2026-01-01T00:00Z", completed_at: null };
+    const record = { ...startedExploration, started_at: "2026-01-01T00:00Z" };
     attempts.mockResolvedValue([record]);
     let html = renderToStaticMarkup(await page());
     expect(html.indexOf("Finish exploration</button>")).toBeGreaterThan(html.indexOf("Cylinder exercise"));
@@ -96,6 +101,7 @@ describe("student assignment pages", () => {
   });
   it("renders only the assigned exercise", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
+    attempts.mockResolvedValue([startedExploration]);
     const html = renderToStaticMarkup(await page());
     expect(html).toContain("Cylinder exercise");
     expect(html).not.toContain("Ruler exercise");
@@ -107,6 +113,7 @@ describe("student assignment pages", () => {
   it.each(["bohr_model_intro", "bohr_model_stability"])("renders the Bohr viewer for %s assignments", async (type) => {
     const bohr = { ...assignment, id: "bohr", activity: { ...assignment.activity, type } };
     reader.mockResolvedValue({ status: "ok", assignments: [bohr] });
+    attempts.mockResolvedValue([startedExploration]);
     const html = renderToStaticMarkup(await page("bohr"));
     expect(html).toContain("Bohr exercise");
     expect(html).toContain("Start exploration");
@@ -124,6 +131,8 @@ describe("student assignment pages", () => {
     }]);
     const html = renderToStaticMarkup(await page());
     expect(html).toContain("Start exploration");
+    expect(html).toContain("Start exploration above to open this assigned exercise.");
+    expect(html).not.toContain("Cylinder exercise");
     expect(html).toContain("Saved exploration history (0)");
     expect(html).toContain("4 of 5 correct");
   });
@@ -152,6 +161,7 @@ describe("student assignment pages", () => {
     reader.mockResolvedValue({ status: "ok", assignments: [{
       ...assignment, activity: { ...assignment.activity, type: `measurement_ruler_${precision}` },
     }] });
+    attempts.mockResolvedValue([startedExploration]);
     const html = renderToStaticMarkup(await page());
     expect(html).toContain("Ruler exercise: tenths");
     expect(html).toContain("Next");
@@ -160,6 +170,7 @@ describe("student assignment pages", () => {
   it("renders the ionic compound explorer for ionic assignments", async () => {
     const ionic = { ...assignment, id: "ionic", activity: { ...assignment.activity, type: "lewis_structures_ionic" } };
     reader.mockResolvedValue({ status: "ok", assignments: [ionic] });
+    attempts.mockResolvedValue([startedExploration]);
     const html = renderToStaticMarkup(await page("ionic"));
     expect(html).toContain("Ionic exercise");
     expect(html).not.toContain("Lewis exercise");
@@ -169,6 +180,7 @@ describe("student assignment pages", () => {
   it("renders the covalent bond explorer for covalent assignments", async () => {
     const covalent = { ...assignment, id: "covalent", activity: { ...assignment.activity, type: "lewis_structures_covalent" } };
     reader.mockResolvedValue({ status: "ok", assignments: [covalent] });
+    attempts.mockResolvedValue([startedExploration]);
     const html = renderToStaticMarkup(await page("covalent"));
     expect(html).toContain("Covalent exercise");
     expect(html).not.toContain("Ionic exercise");

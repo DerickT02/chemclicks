@@ -4,7 +4,7 @@ import { ACTIVITY_REGISTRY, canAssignActivity } from "@/lib/activities/registry"
 import type { ActivityType } from "@/lib/db/activities";
 
 const mocks = vi.hoisted(() => ({
-  type: "lewis_diagram", insert: vi.fn(), assignments: vi.fn(), session: vi.fn(), rpc: vi.fn(), refresh: vi.fn(),
+  type: "lewis_diagram", insert: vi.fn(), assignments: vi.fn(), attempts: vi.fn(), session: vi.fn(), rpc: vi.fn(), refresh: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.refresh }));
@@ -25,6 +25,10 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
 vi.mock("@/lib/db/class_activities", () => ({ insertClassActivity: mocks.insert }));
 vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignments: mocks.assignments, getStudentAssignmentSchedules: mocks.assignments }));
+vi.mock("@/lib/server/student-assignments", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server/student-assignments")>()),
+  getAssignmentAttempts: mocks.attempts,
+}));
 vi.mock("@/lib/auth/student-session", () => ({ getStudentSession: mocks.session }));
 vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({
   rpc: mocks.rpc,
@@ -57,6 +61,7 @@ beforeEach(() => {
   mocks.insert.mockResolvedValue({ data: { id: assignmentId }, error: null });
   mocks.session.mockResolvedValue(session);
   mocks.assignments.mockResolvedValue({ status: "ok", assignments: [] });
+  mocks.attempts.mockResolvedValue([]);
   mocks.rpc.mockImplementation(async (_name: string, input: { p_action: string }) => ({
     data: [{ id: attemptId, status: input.p_action === "complete" ? "completed" : "in_progress", score: null, passed: null }], error: null,
   }));
@@ -77,6 +82,10 @@ describe("mocked assign → open → finish contract (not a live deployment chec
       id: assignmentId, opens_at: null, closes_at: null,
       activity: { id: activityId, title: "Assigned activity", type: type as ActivityType, order_index: 1 },
     }] });
+    mocks.attempts.mockResolvedValue([{
+      id: "exploration", attempt_number: 1, quiz_key: null, status: "in_progress",
+      started_at: "2026-10-24T10:00:00Z", completed_at: null,
+    }]);
     const html = renderToStaticMarkup(await AssignmentPage({ params: Promise.resolve({ assignmentId }) }));
     expect(html).toContain(`Explorer: ${definition.explorer}`);
     expect(html).toContain("Saved exploration history");

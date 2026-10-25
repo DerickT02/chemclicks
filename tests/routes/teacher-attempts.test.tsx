@@ -40,6 +40,42 @@ describe('teacher report', () => {
     for (const text of ['Bohr Models Quiz', '4/12 · Not passed', 'Ionic Compounds Quiz', '11/12 · Passed', '12/12 · Passed']) expect(html).toContain(text)
     for (const key of ['bohr_models', 'lewis_ionic', 'future_quiz']) expect(html).not.toContain(key)
   })
+  it('shows a started quiz even before a result row exists and keeps both quiz timestamps', () => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0],
+      stage: 'Taking quiz',
+      firstQuizStartedAt: '2026-09-23T12:00:00Z',
+      quizStartedAt: '2026-09-24T12:00:00Z',
+      explorationStartedAt: '2026-09-23T11:00:00Z',
+      explorationDurationSeconds: 3661,
+    }] }} />)
+
+    expect(html).toContain('Assignment stage: <span class="font-medium">Taking quiz</span>')
+    expect(html).toContain('Quiz started; no result submitted yet.')
+    expect(html).toContain('Exploration started')
+    expect(html).toContain('First quiz started')
+    expect(html).toContain('Latest quiz started')
+    expect(html).toContain('Exploration duration: 1h 1m.')
+  })
+  it.each([
+    ['Not started', 'Not started'],
+    ['Exploring', 'Exploring'],
+    ['Taking quiz', 'Taking quiz'],
+    ['Needs retry', 'Needs retry'],
+    ['Completed', 'Completed'],
+  ] as const)('renders the server-derived stage %s', (stage, label) => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], stage,
+    }] }} />)
+    expect(html).toContain(`Assignment stage: <span class="font-medium">${label}</span>`)
+  })
+  it.each([0, -1, 59, 60])('formats unusual duration values safely (%s seconds)', seconds => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], explorationDurationSeconds: seconds,
+    }] }} />)
+    const expected = seconds <= 0 ? '0s' : seconds < 60 ? `${seconds}s` : '1m 0s'
+    expect(html).toContain(`Exploration duration: ${expected}.`)
+  })
   it('loads the explicitly selected assignment and keeps it selected', async () => {
     const html = renderToStaticMarkup(await Page(props('second')))
     expect(mock.summary).toHaveBeenCalledWith('class', 'second')
