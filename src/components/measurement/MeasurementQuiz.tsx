@@ -284,9 +284,9 @@ export function MeasurementQuestion({
 
       <div className="mt-6">
         {question.instrument === "ruler" ? (
-          <PrecisionRuler lockedValue={reading} precision={mode?.precision ?? "hundredths"} />
+          <PrecisionRuler lockedValue={reading} precision={mode?.precision === "tenths" ? "tenths" : "hundredths"} />
         ) : (
-          <GraduatedCylinder lockedValue={reading} />
+          <GraduatedCylinder lockedValue={reading} precision={mode?.precision === "whole" ? "whole" : "tenths"} />
         )}
       </div>
 
@@ -324,7 +324,7 @@ export function MeasurementQuestion({
           )}
         </div>
         <p id={hintId} className="text-xs text-muted-foreground">
-          {`Enter a number with ${describeDecimalPlaces(spec.decimals)}, like ${exampleAnswer(spec)}. Answers within ${formatTolerance(spec)} of the reading are marked correct.`}
+          {`Enter ${spec.decimals === 0 ? "a whole number" : `a number with ${describeDecimalPlaces(spec.decimals)}`}, like ${exampleAnswer(spec)}. Answers within ${formatTolerance(spec)} of the reading are marked correct.`}
         </p>
       </form>
 
