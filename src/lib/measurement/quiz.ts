@@ -14,6 +14,7 @@ export const QUESTION_POOL: Record<InstrumentId, readonly number[]> = {
 export const MODE_QUESTION_POOL: Record<MeasurementQuizModeKey, readonly number[]> = {
   ruler_tenths: [0.5, 1.4, 2.0, 2.8, 3.7, 4.3, 5.9, 6.6, 7.1, 7.7, 8.6, 9.2],
   ruler_hundredths: QUESTION_POOL.ruler,
+  cylinder_whole: [7, 13, 18, 24, 26, 33, 37, 41, 44, 46, 48, 49],
   cylinder_tenths: QUESTION_POOL.cylinder,
 };
 
@@ -145,6 +146,11 @@ export function canContinue(question: QuestionState): boolean {
   return question.result !== null && question.result.status !== "invalid";
 }
 
+/** One try per question: a graded answer, right or wrong, can't be changed. */
+export function isAnswerLocked(question: QuestionState): boolean {
+  return question.result !== null && question.result.status !== "invalid";
+}
+
 export function quizReducer(state: QuizState, action: QuizAction): QuizState {
   if (action.type === "start") return startQuestion(
     action.instrument,
@@ -175,7 +181,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       return { ...state, answer: action.answer };
 
     case "submit": {
-      if (state.result?.status === "correct") return state;
+      if (isAnswerLocked(state)) return state;
 
       const spec = state.mode
         ? getMeasurementQuizMode(state.mode).spec
@@ -196,6 +202,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
     }
 
     case "server-submit": {
+      if (isAnswerLocked(state)) return state;
       const addsPoint = action.counted && action.firstTryCorrect === true;
       return {
         ...state,

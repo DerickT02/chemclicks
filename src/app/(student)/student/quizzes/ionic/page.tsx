@@ -8,6 +8,13 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-export default function IonicCompoundsQuizPage() {
-  return <LewisQuizPage kind="ionic" />;
+type Props = {
+  searchParams?: Promise<{ assignmentId?: string | string[] }>;
+};
+
+export default async function IonicCompoundsQuizPage({ searchParams }: Props = {}) {
+  const params = searchParams ? await searchParams : {};
+  const rawAssignmentId = params.assignmentId;
+  const assignmentId = Array.isArray(rawAssignmentId) ? rawAssignmentId[0] : rawAssignmentId;
+  return <LewisQuizPage kind="ionic" assignmentId={assignmentId} />;
 }

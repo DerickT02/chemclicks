@@ -18,6 +18,7 @@ import { submitStudentQuiz } from "@/lib/server/student-quizzes";
 
 const assignmentId = "11111111-1111-1111-1111-111111111111";
 const submissionKey = "submission-1";
+const startedAt = "2026-10-24T10:00:00Z";
 const answers = [
   { questionId: "bohr-q-1", selectedIndex: 0 },
 ];
@@ -34,6 +35,7 @@ describe("student quiz submission server boundary", () => {
     await expect(submitStudentQuiz({
       assignmentId,
       quizKey: "bohr_models",
+      startedAt,
       submissionKey,
       answers,
     })).resolves.toEqual({ id: "attempt" });
@@ -43,6 +45,7 @@ describe("student quiz submission server boundary", () => {
       p_class_id: "class",
       p_assignment_id: assignmentId,
       p_quiz_key: "bohr_models",
+      p_quiz_started_at: startedAt,
       p_submission_key: submissionKey,
       p_answers: answers,
     });
@@ -54,6 +57,7 @@ describe("student quiz submission server boundary", () => {
     await expect(submitStudentQuiz({
       assignmentId,
       quizKey: "bohr_models",
+      startedAt,
       submissionKey,
       answers,
     })).rejects.toThrow("session");
@@ -64,6 +68,19 @@ describe("student quiz submission server boundary", () => {
     await expect(submitStudentQuiz({
       assignmentId: "not-an-assignment",
       quizKey: "bohr_models",
+      startedAt,
+      submissionKey,
+      answers,
+    })).rejects.toThrow("Invalid quiz submission");
+
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid start timestamp instead of allowing a client-selected attempt window", async () => {
+    await expect(submitStudentQuiz({
+      assignmentId,
+      quizKey: "bohr_models",
+      startedAt: "not-a-date",
       submissionKey,
       answers,
     })).rejects.toThrow("Invalid quiz submission");
@@ -77,6 +94,7 @@ describe("student quiz submission server boundary", () => {
     await expect(submitStudentQuiz({
       assignmentId,
       quizKey: "bohr_models",
+      startedAt,
       submissionKey,
       answers,
     })).rejects.toThrow("could not be submitted");

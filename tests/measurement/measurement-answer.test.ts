@@ -25,8 +25,15 @@ describe("evaluateAnswer with the ruler", () => {
     expect(grade("4.34")).toMatchObject({ status: "incorrect", reason: "value" });
   });
 
-  it("does not reveal the reading in incorrect feedback", () => {
-    expect(grade("4.50").message).not.toContain("4.37");
+  it("names the expected reading in incorrect feedback", () => {
+    expect(grade("4.50").message).toContain("expected reading of 4.37 cm");
+    expect(grade("4.4").message).toContain("The expected reading is 4.37 cm.");
+  });
+
+  it("does not reveal the reading for input that isn't graded", () => {
+    for (const answer of ["", "abc", "4.37cm", "10.01"]) {
+      expect(grade(answer).message).not.toContain("4.37 cm");
+    }
   });
 
   it("requires the answer to two decimal places", () => {

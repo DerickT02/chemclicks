@@ -24,9 +24,12 @@ export async function getNavigationIdentity(): Promise<NavigationIdentity> {
       // created a teacher profile. Client-editable metadata is never a role source.
       const admin = createAdminClient();
       const { data: student, error: studentError } = await admin
-        .from("students").select("id, class_id").eq("auth_user_id", user.id).maybeSingle();
+        .from("students").select("id, class_id, verified").eq("auth_user_id", user.id).maybeSingle();
       if (studentError) throw studentError;
       if (student) {
+        if (student.verified !== true) {
+          return { status: "signed-in", role: null, message: "Your account is awaiting teacher approval. Please contact your teacher." };
+        }
         const { data: classroom, error: classError } = await admin
           .from("classes").select("id").eq("id", student.class_id).eq("is_active", true).maybeSingle();
         if (classError) throw classError;

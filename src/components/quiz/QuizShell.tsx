@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
+import CovalentQuizDiagram from "@/components/quiz/CovalentQuizDiagram";
 import type {
   QuizAnswer,
   QuizCompleteResult,
@@ -191,11 +192,6 @@ export default function QuizShell({
               currently available.
             </p>
           )}
-          {result.passed && !onSubmit && (
-            <button type="button" className={primaryButtonClassName}>
-              Continue to next section
-            </button>
-          )}
         </div>
       </article>
     );
@@ -216,6 +212,10 @@ export default function QuizShell({
         <legend className="text-xl font-medium text-foreground md:text-2xl">
           {current.question}
         </legend>
+
+        {current.diagramKey && (
+          <CovalentQuizDiagram key={current.id} diagramKey={current.diagramKey} />
+        )}
 
         <div className="mt-6 flex flex-col gap-3" role="radiogroup">
           {current.options.map((option, optionIndex) => {

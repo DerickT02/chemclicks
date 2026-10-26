@@ -11,8 +11,8 @@ import ErrorPage from '@/app/admin/classes/[classId]/attempts/error'
 const report: TeacherActivityAttemptSummary = {
   classId: 'class', className: 'Chemistry', assignmentId: 'second', activityId: 'activity', activityTitle: 'Lewis diagrams',
   students: [
-    { studentId: 'zero', firstName: 'Zero', lastName: 'Student', verified: false, attemptCount: 0, completedCount: 0, inProgressCount: 0, attempts: [] },
-    { studentId: 'many', firstName: 'Many', lastName: 'Student', verified: true, attemptCount: 2, explorationAttemptCount: 1, quizAttemptCount: 1, completedCount: 1, inProgressCount: 1, attempts: [
+    { studentId: 'zero', firstName: 'Zero', lastName: 'Student', verified: false, attemptCount: 0, completedCount: 0, inProgressCount: 0, overallStatus: 'not_started', explorationStatus: 'not_started', explorationDurationSeconds: null, passingQuizAttemptNumber: null, passingQuizScore: null, passingQuizTotal: null, passingQuizPercentage: null, passingQuizCompletedAt: null, failedQuizAttemptCount: 0, attempts: [] },
+    { studentId: 'many', firstName: 'Many', lastName: 'Student', verified: true, attemptCount: 2, explorationAttemptCount: 1, quizAttemptCount: 1, completedCount: 1, inProgressCount: 1, overallStatus: 'exploring', explorationStatus: 'in_progress', explorationDurationSeconds: null, passingQuizAttemptNumber: 1, passingQuizScore: 4, passingQuizTotal: 5, passingQuizPercentage: 80, passingQuizCompletedAt: '2026-09-23T12:05:00Z', failedQuizAttemptCount: 0, attempts: [
       { id: 'two', attemptNumber: 2, status: 'in_progress', startedAt: '2026-09-24T12:00:00Z', completedAt: null, kind: 'exploration', quizKey: null },
       { id: 'one', attemptNumber: 1, status: 'completed', startedAt: '2026-09-23T12:00:00Z', completedAt: '2026-09-23T12:05:00Z', kind: 'quiz', quizKey: 'measurement_ruler_tenths', instrument: 'ruler', precisionMode: 'tenths', score: 4, questionTotal: 5, percentage: 80, passed: true },
     ] },
@@ -27,7 +27,7 @@ const props = (assignmentId?: string) => ({ params: Promise.resolve({ classId: '
 describe('teacher report', () => {
   it('renders zeros, statuses and readable timestamps with a timezone', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
-    for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 exploration attempt', '1 quiz attempt', '4/5 · Passed', '1 completed', '1 in progress', 'Ruler', 'Not completed', '2026-09-23 12:00:00 UTC', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
+    for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 exploration attempt', '1 quiz attempt', '4/5 · Passed', '1 completed', '1 in progress', 'Ruler · tenths (0.1 cm)', 'Not completed', '2026-09-23 12:00:00 UTC', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
   })
   it('names each quiz and shows its score instead of the stored quiz key', () => {
     const quizAttempt = (id: string, quizKey: string, score: number, passed: boolean) => ({
@@ -39,6 +39,53 @@ describe('teacher report', () => {
     }] }} />)
     for (const text of ['Bohr Models Quiz', '4/12 · Not passed', 'Ionic Compounds Quiz', '11/12 · Passed', '12/12 · Passed']) expect(html).toContain(text)
     for (const key of ['bohr_models', 'lewis_ionic', 'future_quiz']) expect(html).not.toContain(key)
+  })
+  it('shows a started quiz even before a result row exists and keeps both quiz timestamps', () => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0],
+      overallStatus: 'taking_quiz',
+      explorationStatus: 'completed',
+      explorationDurationSeconds: 125,
+      passingQuizAttemptNumber: 1,
+      passingQuizScore: 10,
+      passingQuizTotal: 12,
+      passingQuizPercentage: 83.33,
+      passingQuizCompletedAt: '2026-09-23T12:05:00Z',
+      failedQuizAttemptCount: 1,
+      stage: 'Taking quiz',
+      firstQuizStartedAt: '2026-09-23T12:00:00Z',
+      quizStartedAt: '2026-09-24T12:00:00Z',
+      explorationStartedAt: '2026-09-23T11:00:00Z',
+      timeToFirstQuizSeconds: 3661,
+    }] }} />)
+
+    expect(html).toContain('Assignment stage:</dt><dd>Taking quiz</dd>')
+    expect(html).toContain('Quiz started; no result submitted yet.')
+    expect(html).toContain('Exploration started')
+    expect(html).toContain('First quiz started')
+    expect(html).toContain('Latest quiz started')
+    expect(html).toContain('Exploration to first quiz:</dt><dd>1h 1m')
+    expect(html).toContain('Passed on attempt 1: 10/12 (83.33%)')
+    expect(html).toContain('Exploration:</dt><dd>2m 5s')
+  })
+  it.each([
+    ['Not started', 'Not started'],
+    ['Exploring', 'Exploring'],
+    ['Taking quiz', 'Taking quiz'],
+    ['Needs retry', 'Needs retry'],
+    ['Completed', 'Completed'],
+  ] as const)('renders the server-derived stage %s', (stage, label) => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], stage,
+    }] }} />)
+    expect(html).toContain(`Assignment stage:</dt><dd>${label}</dd>`)
+  })
+  it.each([0, -1, 59, 60])('formats unusual timer values safely (%s seconds)', seconds => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], timeToFirstQuizSeconds: seconds,
+    }] }} />)
+    const expected = seconds <= 0 ? '0s' : seconds < 60 ? `${seconds}s` : '1m 0s'
+    expect(html).toContain(`Exploration to first quiz:</dt><dd>${expected}`)
   })
   it('loads the explicitly selected assignment and keeps it selected', async () => {
     const html = renderToStaticMarkup(await Page(props('second')))
@@ -62,6 +109,42 @@ describe('teacher report', () => {
     expect(renderToStaticMarkup(await Page(props()))).toContain('No activities assigned')
     expect(mock.summary).not.toHaveBeenCalled()
     expect(renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [] }} />)).toContain('No students enrolled')
+  })
+  it('shows the unified status for each student instead of just raw counts', () => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
+    expect(html).toContain('Not started')
+    expect(html).toContain('Exploring')
+  })
+  it('shows exploration duration, or In progress/Not started instead of a fabricated duration', () => {
+    const student = (overrides: Partial<TeacherActivityAttemptSummary['students'][number]>) => ({
+      ...report.students[0], ...overrides,
+    })
+    const notStarted = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({})] }} />)
+    expect(notStarted).toContain('Not started')
+    const inProgress = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'exploring', explorationStatus: 'in_progress',
+    })] }} />)
+    expect(inProgress).toContain('In progress')
+    const completed = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'completed', explorationStatus: 'completed', explorationDurationSeconds: 125,
+    })] }} />)
+    expect(completed).toContain('2m 5s')
+  })
+  it('shows the passing quiz attempt distinctly from a not-yet-passed failed-attempt count', () => {
+    const student = (overrides: Partial<TeacherActivityAttemptSummary['students'][number]>) => ({
+      ...report.students[0], ...overrides,
+    })
+    const needsRetry = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'needs_retry', failedQuizAttemptCount: 2,
+    })] }} />)
+    expect(needsRetry).toContain('Not yet passed')
+    expect(needsRetry).toContain('2 failed attempts')
+    const passed = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      overallStatus: 'completed', passingQuizAttemptNumber: 2, passingQuizScore: 10, passingQuizTotal: 12,
+      passingQuizPercentage: 83.33, passingQuizCompletedAt: '2026-09-23T12:05:00Z', failedQuizAttemptCount: 1,
+    })] }} />)
+    expect(passed).toContain('Passed on attempt 2: 10/12')
+    expect(passed).toContain('83.33%')
   })
   it('provides accessible loading and retry states without showing raw errors', () => {
     expect(renderToStaticMarkup(<Loading />)).toContain('role="status"')

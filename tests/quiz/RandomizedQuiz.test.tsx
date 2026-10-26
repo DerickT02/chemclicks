@@ -11,17 +11,20 @@ vi.mock("@/components/quiz/random", async importOriginal => {
 });
 import RandomizedQuiz from "@/components/quiz/RandomizedQuiz";
 import { pickRandomQuestions } from "@/components/quiz/random";
-import { submitQuizAction } from "@/app/(student)/student/quizzes/actions";
+import { startQuizAction, submitQuizAction } from "@/app/(student)/student/quizzes/actions";
 import type { QuizQuestion } from "@/components/quiz/types";
 
 const draw = vi.mocked(pickRandomQuestions);
+const start = vi.mocked(startQuizAction);
 const submit = vi.mocked(submitQuizAction);
 const linked = { assignmentId: "assignment", quizKey: "quiz" };
+const startedAt = "2026-10-24T10:00:00Z";
 function pool(prefix = "Original", count = 2): QuizQuestion[] {
   return Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${i}`, question: `${prefix} question ${i + 1}?`, options: [`${prefix} right ${i + 1}`, `${prefix} wrong ${i + 1}`] }));
 }
 beforeEach(() => {
   draw.mockClear();
+  start.mockReset().mockResolvedValue({ status: "in_progress", startedAt });
   submit.mockReset();
   vi.spyOn(Math, "random").mockReturnValue(0.999);
 });
@@ -50,6 +53,37 @@ describe("attempt question snapshots", () => {
     await screen.findByText("Original question 1?");
     expect(draw).toHaveBeenCalledTimes(1);
   });
+  it("requires an explicit retry after a completed attempt and does not draw before retry starts", async () => {
+    const user = userEvent.setup();
+    start.mockResolvedValueOnce({ status: "retry_required" }).mockResolvedValueOnce({ status: "in_progress", startedAt });
+
+    render(<RandomizedQuiz title="Quiz" pool={pool()} questionsPerAttempt={2} {...linked} />);
+
+    expect(await screen.findByText(/saved attempt/i)).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(start).toHaveBeenCalledExactlyOnceWith(linked.assignmentId, linked.quizKey, false);
+    expect(draw).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Original question 1?")).toBeInTheDocument();
+    expect(start).toHaveBeenNthCalledWith(2, linked.assignmentId, linked.quizKey, true);
+    expect(draw).toHaveBeenCalledTimes(1);
+  });
+  it("does not reveal questions when the start is rejected by the server", async () => {
+    start.mockRejectedValueOnce(new Error("Assignment unavailable"));
+
+    render(<RandomizedQuiz title="Quiz" pool={pool()} questionsPerAttempt={2} {...linked} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Assignment unavailable");
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(draw).not.toHaveBeenCalled();
+  });
+  it("does not duplicate a privileged start when React replays mount effects", async () => {
+    render(<StrictMode><RandomizedQuiz title="Quiz" pool={pool()} questionsPerAttempt={2} {...linked} /></StrictMode>);
+
+    expect(await screen.findByText("Original question 1?")).toBeInTheDocument();
+    expect(start).toHaveBeenCalledExactlyOnceWith(linked.assignmentId, linked.quizKey, false);
+  });
   it("preserves questions, options, selection and the saved result across fresh and changed server pools", async () => {
     const user = userEvent.setup();
     const onComplete = vi.fn();
@@ -72,7 +106,7 @@ describe("attempt question snapshots", () => {
     expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
     await answer(user, "Original wrong 2");
     // Answers are reported by authored index, whatever order the options were shown in.
-    expect(submit).toHaveBeenCalledExactlyOnceWith({ ...linked, submissionKey: expect.any(String), answers: [
+    expect(submit).toHaveBeenCalledExactlyOnceWith({ ...linked, startedAt, submissionKey: expect.any(String), answers: [
       { questionId: "Original-0", selectedIndex: 0 }, { questionId: "Original-1", selectedIndex: 1 },
     ] });
     expect(onComplete).toHaveBeenCalledExactlyOnceWith(failed);
@@ -88,6 +122,42 @@ describe("attempt question snapshots", () => {
     expect(onComplete).toHaveBeenLastCalledWith(passed);
     // A retry is a new attempt, so it must not reuse the first submission's idempotency key.
     expect(submit.mock.calls[1][0].submissionKey).not.toBe(submit.mock.calls[0][0].submissionKey);
+  });
+  it("submits a diagram question through the existing server-graded flow", async () => {
+    const user = userEvent.setup();
+    submit.mockResolvedValue({
+      score: 1,
+      total: 1,
+      percent: 100,
+      passed: true,
+      attemptId: "attempt-diagram",
+      attemptNumber: 1,
+      nextDestination: null,
+    });
+    render(
+      <RandomizedQuiz
+        title="Covalent Quiz"
+        pool={[{
+          id: "lewis-diagram-n2-bond-order",
+          question: "Which type of bond is shown?",
+          options: ["Triple bond", "Double bond"],
+          diagramKey: "n2",
+        }]}
+        questionsPerAttempt={1}
+        {...linked}
+      />,
+    );
+
+    expect(await screen.findByRole("img", { name: /Nitrogen gas before bonding/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Triple bond" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(submit).toHaveBeenCalledWith({
+      ...linked,
+      startedAt,
+      submissionKey: expect.any(String),
+      answers: [{ questionId: "lewis-diagram-n2-bond-order", selectedIndex: 0 }],
+    });
   });
   it("keeps the snapshot independent of in-place source mutations", async () => {
     const original = pool();

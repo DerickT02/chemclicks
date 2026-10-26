@@ -48,9 +48,15 @@ beforeEach(() => {
 });
 
 describe("Lewis quiz routes", () => {
-  it("render the covalent and ionic quiz pages respectively", () => {
-    expect(CovalentQuizRoute().props).toEqual({ kind: "covalent" });
-    expect(IonicQuizRoute().props).toEqual({ kind: "ionic" });
+  it("render the covalent and ionic quiz pages respectively", async () => {
+    expect((await CovalentQuizRoute()).props).toEqual({ kind: "covalent", assignmentId: undefined });
+    expect((await IonicQuizRoute()).props).toEqual({ kind: "ionic", assignmentId: undefined });
+  });
+
+  it("pass the assignment the quiz was opened from", async () => {
+    const searchParams = Promise.resolve({ assignmentId: "lesson-1" });
+    expect((await CovalentQuizRoute({ searchParams })).props).toEqual({ kind: "covalent", assignmentId: "lesson-1" });
+    expect((await IonicQuizRoute({ searchParams })).props).toEqual({ kind: "ionic", assignmentId: "lesson-1" });
   });
 });
 
@@ -64,7 +70,7 @@ describe.each([
     getAccess.mockResolvedValue({ status: "unauthenticated" });
 
     await expect(LewisQuizPage({ kind })).rejects.toThrow("REDIRECT:/login/student");
-    expect(getAccess).toHaveBeenCalledWith(kind);
+    expect(getAccess).toHaveBeenCalledWith(kind, undefined);
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
@@ -89,6 +95,21 @@ describe.each([
     getAccess.mockResolvedValue({ status, assignment: { id: "assignment-1" } });
     const html = await render();
     expect(html).toContain(message);
+    expect(listQuestions).not.toHaveBeenCalled();
+  });
+
+  it("links a blocked quiz back to the earlier section without reading quiz content", async () => {
+    getAccess.mockResolvedValue({
+      status: "blocked",
+      assignment: { id: "assignment-1" },
+      blocker: { id: "bohr-1", activity: { title: "Bohr Intro" } },
+    });
+    const html = renderToStaticMarkup(await LewisQuizPage({ kind, assignmentId: "assignment-1" }));
+    expect(getAccess).toHaveBeenCalledWith(kind, "assignment-1");
+    expect(html).toContain("This section is locked.");
+    expect(html).toContain("Bohr Intro");
+    expect(html).toContain('href="/student/assignments/bohr-1"');
+    expect(html).toContain('href="/student"');
     expect(listQuestions).not.toHaveBeenCalled();
   });
 

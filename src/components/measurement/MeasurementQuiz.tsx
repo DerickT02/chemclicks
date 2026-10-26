@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
 import PrecisionRuler from "@/components/measurement/PrecisionRuler";
 import type { AnswerResult } from "@/lib/measurement/answer";
@@ -25,6 +26,7 @@ import {
   QUESTIONS_PER_ATTEMPT,
   currentReading,
   hasPassed,
+  isAnswerLocked,
   passingScore,
   pickReadings,
   quizReducer,
@@ -150,7 +152,7 @@ function InstrumentChooser({ returned, assignedMode, pending = false, onStart }:
   return (
     <Panel heading="Choose an instrument" focusHeading={returned}>
       <p className="mt-2 text-sm text-muted-foreground">
-        {`Each attempt asks ${QUESTIONS_PER_ATTEMPT} random questions about one instrument, shown without its readout. Answer at least ${passingScore(QUESTIONS_PER_ATTEMPT)} correctly on your first try to pass.`}
+        {`Each attempt asks ${QUESTIONS_PER_ATTEMPT} random questions about one instrument, shown without its readout. You get one try per question. Answer at least ${passingScore(QUESTIONS_PER_ATTEMPT)} correctly to pass.`}
       </p>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -180,10 +182,9 @@ function InstrumentChooser({ returned, assignedMode, pending = false, onStart }:
 
 type FeedbackProps = {
   result: AnswerResult;
-  countedInScore: boolean;
 };
 
-function Feedback({ result, countedInScore }: FeedbackProps) {
+function Feedback({ result }: FeedbackProps) {
   if (result.status === "invalid") {
     return <p className="text-sm font-medium text-destructive">{result.message}</p>;
   }
@@ -195,13 +196,7 @@ function Feedback({ result, countedInScore }: FeedbackProps) {
       success={isCorrect}
       title={isCorrect ? "Correct" : "Incorrect"}
       message={result.message}
-    >
-      {isCorrect && !countedInScore && (
-        <p className="mt-1 text-sm text-muted-foreground">
-          Only your first answer is scored, so this one doesn&apos;t change your score.
-        </p>
-      )}
-    </Verdict>
+    />
   );
 }
 
@@ -222,14 +217,13 @@ export function MeasurementQuestion({
   onSubmit,
   onContinue,
 }: QuestionProps) {
-  const spec = question.mode
-    ? getMeasurementQuizMode(question.mode).spec
-    : INSTRUMENTS[question.instrument];
+  const mode = question.mode ? getMeasurementQuizMode(question.mode) : null;
+  const spec = mode ? mode.spec : INSTRUMENTS[question.instrument];
   const reading = currentReading(question);
   const questionCount = question.readings.length;
   const isLastQuestion = question.questionIndex === questionCount - 1;
   const { result } = question;
-  const isCorrect = result?.status === "correct";
+  const locked = isAnswerLocked(question);
 
   const idPrefix = useId();
   const inputId = `${idPrefix}-answer`;
@@ -239,9 +233,9 @@ export function MeasurementQuestion({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
-    // Invalid and incorrect answers keep the student on the input to retry. A
-    // correct answer mounts the Next button, which takes focus with autoFocus.
+    if (pending || locked) return;
+    // Invalid answers keep the student on the input to fix them. A graded answer
+    // mounts the Next button, which takes focus with autoFocus.
     inputRef.current?.focus();
     if (onSubmit) onSubmit(question);
     else dispatch({ type: "submit" });
@@ -266,7 +260,7 @@ export function MeasurementQuestion({
     >
       <p className="mt-2 text-foreground">{PROMPTS[question.instrument]}</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        {`Only your first answer to each question is scored. Get ${passingScore(questionCount)} of ${questionCount} right to pass.`}
+        {`You get one try per question. Get ${passingScore(questionCount)} of ${questionCount} right to pass.`}
       </p>
 
       <dl className="mt-4 grid gap-4 rounded-lg border border-border bg-muted p-4 text-sm sm:grid-cols-3">
@@ -290,9 +284,9 @@ export function MeasurementQuestion({
 
       <div className="mt-6">
         {question.instrument === "ruler" ? (
-          <PrecisionRuler lockedValue={reading} />
+          <PrecisionRuler lockedValue={reading} precision={mode?.precision === "tenths" ? "tenths" : "hundredths"} />
         ) : (
-          <GraduatedCylinder lockedValue={reading} />
+          <GraduatedCylinder lockedValue={reading} precision={mode?.precision === "whole" ? "whole" : "tenths"} />
         )}
       </div>
 
@@ -314,7 +308,7 @@ export function MeasurementQuestion({
                 dispatch({ type: "edit-answer", answer: event.target.value })
               }
               // Read-only, not disabled, while an answer saves: a disabled input drops focus.
-              readOnly={isCorrect || pending}
+              readOnly={locked || pending}
               aria-invalid={result?.status === "invalid"}
               aria-describedby={`${hintId} ${feedbackId}`}
               className="w-32 rounded-md border border-border bg-background px-3 py-2 font-mono text-foreground outline-none read-only:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive"
@@ -323,50 +317,33 @@ export function MeasurementQuestion({
               {spec.unit}
             </span>
           </div>
-          {!isCorrect && (
+          {!locked && (
             <button type="submit" disabled={pending} className={PRIMARY_BUTTON_CLASS}>
               Check answer
             </button>
           )}
         </div>
         <p id={hintId} className="text-xs text-muted-foreground">
-          {`Enter a number with ${describeDecimalPlaces(spec.decimals)}, like ${exampleAnswer(spec)}. Answers within ${formatTolerance(spec)} of the reading are marked correct.`}
+          {`Enter ${spec.decimals === 0 ? "a whole number" : `a number with ${describeDecimalPlaces(spec.decimals)}`}, like ${exampleAnswer(spec)}. Answers within ${formatTolerance(spec)} of the reading are marked correct.`}
         </p>
       </form>
 
       <div id={feedbackId} role="status" aria-live="polite" className="mt-4">
         {result && (
-          <Feedback
-            key={question.attempt}
-            result={result}
-            countedInScore={question.firstTryCorrect === true}
-          />
+          <Feedback key={question.attempt} result={result} />
         )}
       </div>
 
-      {result && result.status !== "invalid" && (
+      {locked && (
         <div className="mt-4 flex flex-wrap gap-3">
-          {/* Distinct keys so a correct retry mounts a new button and autoFocus fires. */}
-          {isCorrect ? (
-            <button
-              key="next"
-              type="button"
-              autoFocus
-              onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
-              className={PRIMARY_BUTTON_CLASS}
-            >
-              {continueLabel}
-            </button>
-          ) : (
-            <button
-              key="skip"
-              type="button"
-              onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
-              className={SECONDARY_BUTTON_CLASS}
-            >
-              {isLastQuestion ? "Skip and see results" : "Skip to next question"}
-            </button>
-          )}
+          <button
+            type="button"
+            autoFocus
+            onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
+            className={PRIMARY_BUTTON_CLASS}
+          >
+            {continueLabel}
+          </button>
         </div>
       )}
     </Panel>
@@ -378,14 +355,23 @@ type ResultsProps = {
   assignedMode?: MeasurementQuizModeKey;
   onTryAgain: () => void;
   onChooseInstrument: () => void;
+  /** Where a passed assigned attempt leads next; null when nothing is open. */
+  nextDestination?: string | null;
 };
 
-export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInstrument }: ResultsProps) {
+export function AttemptResults({
+  results,
+  assignedMode,
+  onTryAgain,
+  onChooseInstrument,
+  nextDestination = null,
+}: ResultsProps) {
   const spec = results.mode
     ? getMeasurementQuizMode(results.mode).spec
     : INSTRUMENTS[results.instrument];
   const passed = results.passed ?? hasPassed(results.score, results.total);
   const percent = Math.round((results.score / results.total) * 100);
+  const continueTo = assignedMode && passed ? nextDestination : null;
 
   // The button that finished the attempt is gone, so focus starts on the score.
   return (
@@ -407,13 +393,27 @@ export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInst
       )}
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <button type="button" onClick={onTryAgain} className={PRIMARY_BUTTON_CLASS}>
+        <button
+          type="button"
+          onClick={onTryAgain}
+          className={continueTo ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
+        >
           Try again with new questions
         </button>
         {!assignedMode && (
           <button type="button" onClick={onChooseInstrument} className={SECONDARY_BUTTON_CLASS}>
             Choose a different instrument
           </button>
+        )}
+        {continueTo && (
+          <Link href={continueTo} className={PRIMARY_BUTTON_CLASS}>
+            Continue to next section
+          </Link>
+        )}
+        {assignedMode && (
+          <Link href="/student" className={SECONDARY_BUTTON_CLASS}>
+            Back to assignments
+          </Link>
         )}
       </div>
     </Panel>
@@ -429,11 +429,13 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
   const [state, dispatch] = useReducer(quizReducer, INITIAL_QUIZ_STATE);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextDestination, setNextDestination] = useState<string | null>(null);
 
   // The random draw happens here, in an event handler, rather than in the
   // reducer: React can call a reducer twice and needs the same result both times.
   function startAttempt(instrument: InstrumentId) {
     setError(null);
+    setNextDestination(null);
     if (mode && assignmentId) {
       setPending(true);
       startMeasurementQuizAction(assignmentId, mode)
@@ -486,14 +488,17 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
     setPending(true);
     setError(null);
     completeMeasurementQuizAction(assignmentId, question.attemptId)
-      .then((result) => dispatch({
-        type: "server-complete",
-        attemptId: result.attemptId,
-        attemptNumber: result.attemptNumber,
-        score: result.score,
-        total: result.total,
-        passed: result.passed,
-      }))
+      .then((result) => {
+        setNextDestination(result.nextDestination);
+        dispatch({
+          type: "server-complete",
+          attemptId: result.attemptId,
+          attemptNumber: result.attemptNumber,
+          score: result.score,
+          total: result.total,
+          passed: result.passed,
+        });
+      })
       .catch(() => setError("The quiz could not be completed. Please try again."))
       .finally(() => setPending(false));
   }
@@ -514,6 +519,7 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
         assignedMode={mode}
         onTryAgain={() => startAttempt(state.instrument)}
         onChooseInstrument={() => dispatch({ type: "choose-instrument" })}
+        nextDestination={nextDestination}
       />
       </>
     );

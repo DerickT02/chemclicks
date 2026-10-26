@@ -15,6 +15,8 @@ const adminClient = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_QUIZ_KEY: "bohr_models",
+  LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
+  LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/bohr/BohrModelsQuiz", () => ({
@@ -54,6 +56,23 @@ describe("Bohr quiz page", () => {
     const html = renderToStaticMarkup(await BohrModelQuizPage());
 
     expect(html).toContain("This quiz is locked");
+    expect(listQuestions).not.toHaveBeenCalled();
+  });
+
+  it("renders an assignment choice for ambiguous generic entry", async () => {
+    getAccess.mockResolvedValue({
+      status: "selection",
+      assignments: [
+        { id: "intro", activity: { title: "Introduction" } },
+        { id: "stability", activity: { title: "Stability" } },
+      ],
+    });
+
+    const html = renderToStaticMarkup(await BohrModelQuizPage());
+
+    expect(html).toContain("Choose the Bohr assignment you want to take.");
+    expect(html).toContain("assignmentId=intro");
+    expect(html).toContain("assignmentId=stability");
     expect(listQuestions).not.toHaveBeenCalled();
   });
 

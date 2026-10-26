@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { QuizQuestion } from "@/components/quiz/types";
+import { COVALENT_COMPOUNDS } from "@/lib/chemistry/covalent-compounds";
 
 // Logic and types regarding the QUIZ_QUESTIONS table.
 
@@ -12,6 +13,7 @@ type QuizQuestionRow = {
   question: string;
   options: unknown;
   correct_index: number;
+  diagram_key?: unknown;
 };
 
 type QuizQuestionsError = {
@@ -32,6 +34,12 @@ function isChoiceList(value: unknown): value is string[] {
   );
 }
 
+const COVALENT_DIAGRAM_KEYS = new Set(COVALENT_COMPOUNDS.map((compound) => compound.id));
+
+function isCovalentDiagramKey(value: unknown): value is string {
+  return typeof value === "string" && COVALENT_DIAGRAM_KEYS.has(value);
+}
+
 function toQuizQuestion(row: QuizQuestionRow): QuizQuestion | null {
   if (!isChoiceList(row.options)) return null;
   if (
@@ -41,11 +49,15 @@ function toQuizQuestion(row: QuizQuestionRow): QuizQuestion | null {
   ) {
     return null;
   }
+  if (row.diagram_key !== undefined && row.diagram_key !== null && !isCovalentDiagramKey(row.diagram_key)) {
+    return null;
+  }
 
   return {
     id: row.question_key,
     question: row.question,
     options: row.options,
+    ...(row.diagram_key ? { diagramKey: row.diagram_key } : {}),
     answerOrder: row.options.map((_, index) => index),
   };
 }
@@ -61,7 +73,7 @@ export async function listQuizQuestions(
 ): Promise<QuizQuestionsResult> {
   const { data, error } = await supabase
     .from("quiz_questions")
-    .select("question_key, question, options, correct_index")
+    .select("question_key, question, options, correct_index, diagram_key")
     .eq("quiz_key", quizKey)
     .eq("is_active", true)
     .order("order_index", { ascending: true })

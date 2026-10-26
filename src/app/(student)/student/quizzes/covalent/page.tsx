@@ -8,6 +8,13 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-export default function CovalentCompoundsQuizPage() {
-  return <LewisQuizPage kind="covalent" />;
+type Props = {
+  searchParams?: Promise<{ assignmentId?: string | string[] }>;
+};
+
+export default async function CovalentCompoundsQuizPage({ searchParams }: Props = {}) {
+  const params = searchParams ? await searchParams : {};
+  const rawAssignmentId = params.assignmentId;
+  const assignmentId = Array.isArray(rawAssignmentId) ? rawAssignmentId[0] : rawAssignmentId;
+  return <LewisQuizPage kind="covalent" assignmentId={assignmentId} />;
 }

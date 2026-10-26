@@ -54,6 +54,18 @@ describe("listQuizQuestions", () => {
     ]);
   });
 
+  it("loads a valid covalent diagram key without exposing the answer key", async () => {
+    const { client } = fakeClient({
+      data: [{ ...row, diagram_key: "n2" }],
+      error: null,
+    });
+
+    const result = await listQuizQuestions(client, BOHR_QUIZ_KEY);
+
+    expect(result.error).toBeNull();
+    expect(result.data?.[0]).toMatchObject({ diagramKey: "n2" });
+  });
+
   it("returns an empty list, not an error, when a quiz has no questions", async () => {
     const { client } = fakeClient({ data: [], error: null });
 
@@ -79,6 +91,7 @@ describe("listQuizQuestions", () => {
     ["a choice is not a string", { ...row, options: ["2", 5, "8", "3"] }],
     ["the answer index is out of range", { ...row, correct_index: 4 }],
     ["the answer index is negative", { ...row, correct_index: -1 }],
+    ["the diagram key is not a known covalent compound", { ...row, diagram_key: "not-a-compound" }],
   ])("fails the whole read when a row is malformed (%s)", async (_, bad) => {
     const { client } = fakeClient({ data: [row, bad], error: null });
 

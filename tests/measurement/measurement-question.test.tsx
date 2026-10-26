@@ -11,7 +11,7 @@ import MeasurementQuiz, {
 } from "../../src/components/measurement/MeasurementQuiz";
 import PrecisionRuler from "../../src/components/measurement/PrecisionRuler";
 import { evaluateAnswer } from "../../src/lib/measurement/answer";
-import { CYLINDER_SPEC, RULER_SPEC } from "../../src/lib/measurement/instruments";
+import { CYLINDER_SPEC, CYLINDER_WHOLE_SPEC, RULER_SPEC } from "../../src/lib/measurement/instruments";
 import type { QuestionState, ResultsState } from "../../src/lib/measurement/quiz";
 
 function rulerQuestion(overrides: Partial<QuestionState> = {}): QuestionState {
@@ -64,7 +64,7 @@ describe("MeasurementQuiz", () => {
 
     expect(html).toContain("Choose an instrument");
     expect(html).toContain("5 random questions");
-    expect(html).toContain("at least 4 correctly on your first try to pass");
+    expect(html).toContain("You get one try per question. Answer at least 4 correctly to pass.");
     expect(html).toContain("Start ruler questions");
     expect(html).toContain("Start graduated cylinder questions");
     expect(html.match(/<button type="button"/g)).toHaveLength(2);
@@ -97,7 +97,7 @@ describe("MeasurementQuestion", () => {
   it("explains the scoring rule and the pass mark", () => {
     const html = render(rulerQuestion());
 
-    expect(html).toContain("Only your first answer to each question is scored.");
+    expect(html).toContain("You get one try per question.");
     expect(html).toContain("Get 4 of 5 right to pass.");
   });
 
@@ -163,14 +163,6 @@ describe("MeasurementQuestion", () => {
     expect(html).not.toContain("change your score");
   });
 
-  it("tells the student a correct retry doesn't change their score", () => {
-    const result = evaluateAnswer("4.37", 4.37, RULER_SPEC);
-    const html = render(rulerQuestion({ answer: "4.37", result, attempt: 2, firstTryCorrect: false }));
-
-    expect(html).toContain("Correct");
-    expect(html).toContain("Only your first answer is scored, so this one doesn&#x27;t change your score.");
-  });
-
   it("offers See results on the last question", () => {
     const result = evaluateAnswer("17.2", 17.2, CYLINDER_SPEC);
     const html = render(
@@ -181,7 +173,7 @@ describe("MeasurementQuestion", () => {
     expect(html).toContain("See results");
   });
 
-  it("shows incorrect feedback with options to retry or skip", () => {
+  it("locks an incorrect answer and only offers the next question", () => {
     const result = evaluateAnswer("30.0", 23.4, CYLINDER_SPEC);
     const html = render(
       cylinderQuestion({ answer: "30.0", result, attempt: 1, firstTryCorrect: false }),
@@ -189,9 +181,66 @@ describe("MeasurementQuestion", () => {
 
     expect(html).toContain("Incorrect");
     expect(html).not.toContain(">Correct<");
-    expect(html).toContain("Check answer");
-    expect(html).toContain("Skip to next question");
-    expect(html).not.toContain("23.4 mL");
+    expect(html).toContain("expected reading of 23.4 mL");
+    expect(html).toContain("readOnly");
+    expect(html).not.toContain("Check answer");
+    expect(html).not.toContain("Skip");
+    expect(html).toContain("Next question");
+  });
+
+  it("draws the tenths ruler with whole-centimeter marks and its own tolerance", () => {
+    const html = render(rulerQuestion({ mode: "ruler_tenths", readings: [4.3, 6.6, 2.8, 7.1, 9.2] }));
+
+    expect(html).toContain("0–10 cm, marked every 1 cm");
+    expect(html).toContain("the nearest 0.1 cm (1 decimal place)");
+    expect(html).toContain("±0.2 cm");
+    expect(drawnPaths(html)).toEqual(
+      drawnPaths(renderToStaticMarkup(<PrecisionRuler lockedValue={4.3} precision="tenths" />)),
+    );
+    expect((html.match(/<line /g) ?? []).length).toBeLessThan(
+      (render(rulerQuestion()).match(/<line /g) ?? []).length,
+    );
+  });
+
+  it.each([
+    ["ruler_tenths", "ruler", [4.3, 6.6, 2.8, 7.1, 9.2], "4.3"],
+    ["ruler_hundredths", "ruler", [4.37, 6.62, 2.85, 7.18, 9.21], "4.37"],
+    ["cylinder_tenths", "cylinder", [23.4, 41.7, 8.6, 31.1, 17.2], "23.4"],
+  ] as const)("hides the %s reading until an answer is graded", (mode, instrument, readings, reading) => {
+    const html = render(rulerQuestion({ mode, instrument, readings: [...readings] }));
+    expect(html).not.toContain(reading);
+    expect(html).not.toContain("aria-value");
+  });
+
+  it("draws the whole-milliliter cylinder with 10 mL marks and asks for a whole number", () => {
+    const html = render(cylinderQuestion({ mode: "cylinder_whole", readings: [24, 37, 13, 46, 7] }));
+
+    expect(html).toContain("0–50 mL, marked every 10 mL");
+    expect(html).toContain("the nearest 1 mL (a whole number)");
+    expect(html).toContain("Enter a whole number, like 12.");
+    expect(html).toContain("±2 mL");
+    expect(drawnPaths(html)).toEqual(
+      drawnPaths(renderToStaticMarkup(<GraduatedCylinder lockedValue={24} precision="whole" />)),
+    );
+    expect((html.match(/<line /g) ?? []).length).toBeLessThan(
+      (render(cylinderQuestion()).match(/<line /g) ?? []).length,
+    );
+  });
+
+  it("hides the whole-milliliter reading until an answer is graded", () => {
+    const html = render(cylinderQuestion({ mode: "cylinder_whole", readings: [24, 37, 13, 46, 7] }));
+    expect(html).not.toMatch(/>\s*24\s*</);
+    expect(html).not.toContain("24 mL");
+    expect(html).not.toContain("aria-value");
+  });
+
+  it("names the expected whole-milliliter reading once an answer is graded", () => {
+    const result = evaluateAnswer("30", 24, CYLINDER_WHOLE_SPEC);
+    const html = render(cylinderQuestion({
+      mode: "cylinder_whole", readings: [24, 37, 13, 46, 7], answer: "30", result, attempt: 1, firstTryCorrect: false,
+    }));
+    expect(html).toContain("Incorrect");
+    expect(html).toContain("expected reading of 24 mL");
   });
 });
 

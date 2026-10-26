@@ -1,15 +1,30 @@
 "use server";
 
 import { submitStudentQuiz } from "@/lib/server/student-quizzes";
-import { getQuizProgression } from "@/lib/assignments/prerequisites";
+import { startStudentQuiz } from "@/lib/server/student-quiz-start";
+import { assertAssignmentUnlocked, getQuizProgression } from "@/lib/assignments/prerequisites";
 import type { QuizAnswer, QuizCompleteResult } from "@/components/quiz/types";
 
 type SubmitQuizInput = {
   assignmentId: string;
   quizKey: string;
+  startedAt: string;
   submissionKey: string;
   answers: QuizAnswer[];
 };
+
+export async function startQuizAction(
+  assignmentId: string,
+  quizKey: string,
+  retry = false,
+): Promise<{ status: "in_progress"; startedAt: string } | { status: "retry_required" }> {
+  // Only new attempts are gated, so an attempt already in flight can be submitted.
+  await assertAssignmentUnlocked(assignmentId);
+  const result = await startStudentQuiz(assignmentId, quizKey, retry);
+  return result.status === "in_progress"
+    ? { status: result.status, startedAt: result.started_at }
+    : { status: result.status };
+}
 
 export async function submitQuizAction(
   input: SubmitQuizInput,

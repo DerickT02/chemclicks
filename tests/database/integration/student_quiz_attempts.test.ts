@@ -82,6 +82,13 @@ afterAll(async () => {
 describe("student quiz attempt replay", () => {
   it("returns one immutable attempt for concurrent replays of one submission", async () => {
     const submissionKey = `concurrent-${randomUUID()}`;
+    const start = await client.rpc("student_quiz_start", {
+      p_student_id: studentId,
+      p_class_id: classId,
+      p_assignment_id: assignmentId,
+      p_quiz_key: "bohr_models",
+    });
+    expect(start.error).toBeNull();
     const results = await Promise.all(
       Array.from({ length: 6 }, () => client.rpc("student_quiz_submit", {
         p_student_id: studentId,

@@ -74,9 +74,7 @@ describe("assigned measurement quiz", () => {
         index === 0 ? "0.0" : readings[index].toFixed(1),
       );
       await user.click(screen.getByRole("button", {
-        name: index === readings.length - 1
-          ? (index === 0 ? "Skip and see results" : "See results")
-          : (index === 0 ? "Skip to next question" : "Next question"),
+        name: index === readings.length - 1 ? "See results" : "Next question",
       }));
     }
 
@@ -86,7 +84,7 @@ describe("assigned measurement quiz", () => {
     expect(screen.getByText("Attempt 1")).toBeTruthy();
   });
 
-  it("keeps focus on the answer while it saves and after an incorrect result", async () => {
+  it("keeps focus on the answer while it saves, then locks an incorrect result", async () => {
     const user = userEvent.setup();
     let finishSaving: (receipt: unknown) => void = () => {};
     actions.record.mockImplementation(() => new Promise((resolve) => { finishSaving = resolve; }));
@@ -108,8 +106,13 @@ describe("assigned measurement quiz", () => {
       result: { status: "incorrect", reason: "value", message: "Try again." },
     });
     await screen.findByText("Try again.");
-    expect(input).toHaveFocus();
-    expect(input).not.toHaveAttribute("readonly");
+    expect(input).toHaveAttribute("readonly");
+    expect(screen.queryByRole("button", { name: "Check answer" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Next question" })).toHaveFocus();
+
+    input.focus();
+    await user.keyboard("{Enter}");
+    expect(actions.record).toHaveBeenCalledTimes(1);
   });
 
   it("retries through a new server attempt and keeps the assigned instrument fixed", async () => {
@@ -134,7 +137,7 @@ describe("assigned measurement quiz", () => {
       await user.click(screen.getByRole("button", { name: "Check answer" }));
       await screen.findByText("Incorrect.");
       await user.click(screen.getByRole("button", {
-        name: index === readings.length - 1 ? "Skip and see results" : "Skip to next question",
+        name: index === readings.length - 1 ? "See results" : "Next question",
       }));
     }
     await screen.findByRole("heading", { name: "Graduated cylinder results: 0 of 5 correct" });
@@ -142,5 +145,49 @@ describe("assigned measurement quiz", () => {
     await user.click(screen.getByRole("button", { name: "Try again with new questions" }));
     await screen.findByRole("heading", { name: "Graduated cylinder question 1 of 5" });
     expect(actions.start).toHaveBeenNthCalledWith(2, "assignment-1", "cylinder_tenths");
+  });
+
+  it("runs a whole-milliliter cylinder attempt through the server and retries in the same mode", async () => {
+    const user = userEvent.setup();
+    const wholeReadings = [24, 37, 13, 46, 7];
+    const wholeAttempt = (attemptNumber: number, attemptId: string) => ({
+      attemptId,
+      attemptNumber,
+      questions: wholeReadings.map((reading, questionIndex) => ({ questionIndex, reading })),
+    });
+    actions.start
+      .mockResolvedValueOnce(wholeAttempt(1, "attempt-1"))
+      .mockResolvedValueOnce(wholeAttempt(2, "attempt-2"));
+    actions.record.mockResolvedValue({
+      counted: true,
+      firstTryCorrect: true,
+      result: { status: "correct", message: "Correct reading." },
+    });
+    actions.complete.mockResolvedValue({
+      attemptId: "attempt-1", attemptNumber: 1, score: 5, total: 5, passed: true,
+    });
+    render(<MeasurementQuiz assignmentId="assignment-1" mode="cylinder_whole" />);
+
+    expect(screen.getByText("Graduated cylinder: report each reading to a whole number.")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Start quiz" }));
+    await screen.findByRole("heading", { name: "Graduated cylinder question 1 of 5" });
+    expect(actions.start).toHaveBeenCalledWith("assignment-1", "cylinder_whole");
+
+    for (let index = 0; index < wholeReadings.length; index += 1) {
+      await user.type(screen.getByLabelText("Your reading, in milliliters"), String(wholeReadings[index]));
+      await user.click(screen.getByRole("button", { name: "Check answer" }));
+      await screen.findByText("Correct reading.");
+      expect(actions.record).toHaveBeenLastCalledWith(
+        "assignment-1", "attempt-1", index, String(wholeReadings[index]),
+      );
+      await user.click(screen.getByRole("button", {
+        name: index === wholeReadings.length - 1 ? "See results" : "Next question",
+      }));
+    }
+    await screen.findByRole("heading", { name: "Graduated cylinder results: 5 of 5 correct" });
+
+    await user.click(screen.getByRole("button", { name: "Try again with new questions" }));
+    await screen.findByRole("heading", { name: "Graduated cylinder question 1 of 5" });
+    expect(actions.start).toHaveBeenNthCalledWith(2, "assignment-1", "cylinder_whole");
   });
 });

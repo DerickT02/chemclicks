@@ -13,6 +13,7 @@ import {
 } from "@/components/auth/AuthPageLayout";
 import { validateStudentID, validateStudentCode } from "@/lib/auth/validate-student-signup";
 import { loginStudent } from "./actions";
+import { useApprovalSignIn } from "./use-approval-sign-in";
 import { SESSION_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 export default function StudentLoginPage() {
@@ -23,6 +24,9 @@ export default function StudentLoginPage() {
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // The submitted credentials of a student still waiting for teacher approval.
+  const [pendingLogin, setPendingLogin] = useState<{ studentID: string; code: string } | null>(null);
+  const approved = useApprovalSignIn(pendingLogin?.studentID ?? "", pendingLogin?.code ?? "", pendingLogin !== null);
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -30,6 +34,7 @@ export default function StudentLoginPage() {
     setCodeError(undefined);
     setFormError(undefined);
     setIsLoggedIn(false);
+    setPendingLogin(null);
 
     const normalizedStudentID = studentID.trim();
     const normalizedCode = code.trim().toUpperCase();
@@ -52,6 +57,7 @@ export default function StudentLoginPage() {
         if (result.field === "studentID") setStudentIDError(result.message);
         else if (result.field === "code") setCodeError(result.message);
         else setFormError(result.message);
+        if (result.field === "approval") setPendingLogin({ studentID: normalizedStudentID, code: normalizedCode });
         return;
       }
 
@@ -95,6 +101,7 @@ export default function StudentLoginPage() {
             onChange={(e) => {
               setStudentID(e.target.value);
               if (studentIDError) setStudentIDError(undefined);
+              setPendingLogin(null);
             }}
             error={studentIDError}
           />
@@ -108,11 +115,12 @@ export default function StudentLoginPage() {
             onChange={(e) => {
               setCode(e.target.value);
               if (codeError) setCodeError(undefined);
+              setPendingLogin(null);
             }}
             error={codeError}
           />
-          <AuthFormError message={formError} />
-          {isLoggedIn ? (
+          <AuthFormError message={approved ? undefined : formError} />
+          {isLoggedIn || approved ? (
             <p className="text-sm text-muted-foreground" role="status">Signed in. Opening your assignments...</p>
           ) : null}
           <AuthPrimaryButton type="submit" disabled={isSubmitting}>

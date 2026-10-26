@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), teacher: vi.fn() }));
+const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), teacher: vi.fn(), roster: vi.fn() }));
 vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ session: "teacher" }) }));
 vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({ role: "service" }) }));
@@ -10,6 +10,8 @@ vi.mock("@/lib/db/activities", () => ({ listActivityCatalog: mocks.catalog }));
 vi.mock("@/lib/db/class_activities", () => ({ getClassActivities: mocks.assignments }));
 vi.mock("@/lib/db/classes", () => ({ listActiveClassesForTeacher: mocks.classes }));
 vi.mock("@/lib/server/teacher-lesson-progress", () => ({ getTeacherClassLessonProgress: mocks.lessonProgress }));
+vi.mock("@/lib/server/student-roster", () => ({ getOwnedStudentRoster: mocks.roster }));
+vi.mock("@/app/admin/classes/roster-actions", () => ({ approveStudent: vi.fn() }));
 vi.mock("@/app/admin/assignments/AssignmentForm", () => ({ default: () => <p>New assignment form</p> }));
 vi.mock("@/app/admin/assignments/actions", () => ({ saveAssignment: vi.fn(), unassignActivity: vi.fn() }));
 vi.mock("@/components/assignments/RefreshAssignments", () => ({ default: ({ label }: { label: string }) => <button>{label}</button> }));
@@ -24,6 +26,7 @@ const render = async () => renderToStaticMarkup(await AdminPage({ searchParams: 
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.teacher.mockResolvedValue("teacher");
+  mocks.roster.mockResolvedValue({ pending: [], active: [] });
   mocks.lessonProgress.mockResolvedValue({ classId, className: "Chemistry", students: [] });
   mocks.classes.mockResolvedValue({ data: [{ id: classId, name: "Chemistry", section: "A", class_code: "ABC123", student_count: 0 }], error: null });
   mocks.catalog.mockResolvedValue({ data: [activity], error: null });
@@ -128,8 +131,27 @@ describe("teacher enrollment and lesson progress", () => {
     expect(html).toContain("Lewis Diagrams: Completed");
     expect(html).toContain("Graduated Cylinder: Not started");
     expect(html).toContain("1 student enrolled");
-    expect(html).not.toContain("Active students");
+    expect(html).toContain("Active students");
     expect(mocks.lessonProgress).toHaveBeenCalledWith(classId);
+  });
+  it("renders separate pending and active rosters with identifiers and accurate counts", async () => {
+    const pending = { id: "pending", first_name: "Alex", last_name: "Waiting", student_id: "PENDING1", verified: false };
+    const active = { id: "active", first_name: "Jo", last_name: "Approved", student_id: "ACTIVE1", verified: true };
+    mocks.roster.mockResolvedValue({ pending: [pending], active: [active] });
+    const html = await render();
+    expect(html).toContain("Pending (1)");
+    expect(html).toContain("Active (1)");
+    expect(html).toContain("PENDING1");
+    expect(html).toContain("ACTIVE1");
+    expect(mocks.roster).toHaveBeenCalledExactlyOnceWith(classId);
+  });
+  it("shows retryable roster errors rather than false zero counts", async () => {
+    mocks.roster.mockRejectedValue(new Error("private roster details"));
+    const html = await render();
+    expect(html).toContain("Student roster could not be loaded");
+    expect(html).toContain("Retry student roster");
+    expect(html).not.toContain("Pending (0)");
+    expect(html).not.toContain("private roster details");
   });
   it("shows the enrollment counts returned with the class list", async () => {
     const html = await render();
@@ -190,6 +212,7 @@ describe("teacher enrollment and lesson progress", () => {
     expect(html).toContain("Please sign in to view your classes");
     expect(html).not.toContain("private auth");
     expect(mocks.classes).not.toHaveBeenCalled();
+    expect(mocks.roster).not.toHaveBeenCalled();
     expect(mocks.lessonProgress).not.toHaveBeenCalled();
   });
 });

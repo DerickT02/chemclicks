@@ -5,4 +5,5 @@ import { vi } from "vitest";
 // The real action is exercised through the server-action integration boundary.
 vi.mock("@/app/(student)/student/quizzes/actions", () => ({
   submitQuizAction: vi.fn(),
+  startQuizAction: vi.fn().mockResolvedValue({ status: "in_progress", startedAt: "2026-10-24T10:00:00Z" }),
 }));
