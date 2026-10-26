@@ -77,19 +77,27 @@ export default async function AssignmentPage({ params }: {
           {hasActivityContent(type) && (
             <section aria-label="Exploration instructions" className="space-y-3 rounded-xl border border-border bg-card p-5">
               <h2 className="text-lg font-semibold">Goal: {definition?.description}</h2>
-              <p className="text-sm text-muted-foreground">Start exploration to record participation, try a few examples or readings below, then use Finish exploration after the exercise. Opening the page alone does not save completion.</p>
+              <p className="text-sm text-muted-foreground">Start exploration to record when you begin this assigned exercise. Try a few examples or readings below, then use Finish exploration when you are done. Opening the page alone does not record participation.</p>
               {latest?.status === "completed" ? <p role="status">Completion saved. This records exploration participation, not a quiz score. You can review the exercise without starting again.</p>
                 : latest ? <p>Your exploration is in progress. Continue below, then save your completion.</p> : null}
               {(!latest || latest.status === "completed") && <AttemptControls key={latest?.id ?? 'new'} assignmentId={assignmentId} attemptId={latest?.id} completed={latest?.status === 'completed'} />}
             </section>
           )}
           <section className="rounded-xl border border-border bg-card p-6">
-            {explorer === "bohr" && <BohrModelViewer />}
-            {explorer === "lewis-diagram" && <LewisDotExplorer />}
-            {explorer === "ionic" && <IonicCompoundExplorer />}
-            {explorer === "covalent" && <CovalentBondExplorer />}
-            {explorer === "cylinder" && <MeasurementComparison instrument="cylinder" />}
-            {explorer === "ruler" && <MeasurementComparison instrument="ruler" />}
+            {hasActivityContent(type) && !latest ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                Start exploration above to open this assigned exercise.
+              </p>
+            ) : (
+              <>
+                {explorer === "bohr" && <BohrModelViewer />}
+                {explorer === "lewis-diagram" && <LewisDotExplorer />}
+                {explorer === "ionic" && <IonicCompoundExplorer />}
+                {explorer === "covalent" && <CovalentBondExplorer />}
+                {explorer === "cylinder" && <MeasurementComparison instrument="cylinder" />}
+                {explorer === "ruler" && <MeasurementComparison instrument="ruler" />}
+              </>
+            )}
             {!hasActivityContent(type) && (
               <div className="space-y-2 text-muted-foreground" role="status">
                 <p>This activity’s exercise is not available yet.</p>

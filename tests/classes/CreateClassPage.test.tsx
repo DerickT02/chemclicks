@@ -42,7 +42,7 @@ describe("create class form", () => {
     expect(codeInput()).toHaveValue("A1B2C3");
     expect(screen.getByText(/Generated code A1B2C3/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Regenerate" }));
+    await user.click(await screen.findByRole("button", { name: "Regenerate" }));
     expect(codeInput()).toHaveValue("Z9Y8X7");
   });
 

@@ -16,6 +16,7 @@ export type QuizSubmissionAnswer = {
 export type QuizSubmission = {
   assignmentId: string;
   quizKey: string;
+  startedAt: string;
   submissionKey: string;
   answers: QuizSubmissionAnswer[];
 };
@@ -29,8 +30,9 @@ function isValidAnswer(value: QuizSubmissionAnswer): boolean {
 
 /**
  * Submits answers for the authenticated student's own assigned quiz.
- * Scores, totals, percentages, pass state, timestamps, and attempt numbers
- * are all produced by the server/database and are never accepted as input.
+ * Scores, totals, percentages, completion timestamps, and attempt numbers are
+ * produced by the server/database. The submitted start timestamp is only a
+ * server-issued token and is checked against the current database start.
  */
 export async function submitStudentQuiz(
   submission: QuizSubmission,
@@ -40,10 +42,12 @@ export async function submitStudentQuiz(
 
   if (typeof submission.assignmentId !== "string"
     || typeof submission.quizKey !== "string"
+    || typeof submission.startedAt !== "string"
     || typeof submission.submissionKey !== "string"
     || !Array.isArray(submission.answers)
     || !UUID_PATTERN.test(submission.assignmentId)
     || !QUIZ_KEY_PATTERN.test(submission.quizKey)
+    || !Number.isFinite(Date.parse(submission.startedAt))
     || submission.submissionKey.trim().length === 0
     || submission.answers.length === 0
     || !submission.answers.every(isValidAnswer)) {
@@ -57,6 +61,7 @@ export async function submitStudentQuiz(
       p_class_id: session.classId,
       p_assignment_id: submission.assignmentId,
       p_quiz_key: submission.quizKey,
+      p_quiz_started_at: submission.startedAt,
       p_submission_key: submission.submissionKey,
       p_answers: submission.answers,
     },

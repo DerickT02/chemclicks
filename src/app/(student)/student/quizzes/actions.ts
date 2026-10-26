@@ -8,6 +8,7 @@ import type { QuizAnswer, QuizCompleteResult } from "@/components/quiz/types";
 type SubmitQuizInput = {
   assignmentId: string;
   quizKey: string;
+  startedAt: string;
   submissionKey: string;
   answers: QuizAnswer[];
 };
@@ -15,11 +16,14 @@ type SubmitQuizInput = {
 export async function startQuizAction(
   assignmentId: string,
   quizKey: string,
-): Promise<{ status: "in_progress" }> {
+  retry = false,
+): Promise<{ status: "in_progress"; startedAt: string } | { status: "retry_required" }> {
   // Only new attempts are gated, so an attempt already in flight can be submitted.
   await assertAssignmentUnlocked(assignmentId);
-  const result = await startStudentQuiz(assignmentId, quizKey);
-  return { status: result.status };
+  const result = await startStudentQuiz(assignmentId, quizKey, retry);
+  return result.status === "in_progress"
+    ? { status: result.status, startedAt: result.started_at }
+    : { status: result.status };
 }
 
 export async function submitQuizAction(

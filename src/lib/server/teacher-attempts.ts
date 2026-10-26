@@ -18,6 +18,20 @@ export type TeacherActivityAttemptSummary = {
     quizAttemptCount?: number
     completedCount: number
     inProgressCount: number
+    overallStatus: 'not_started' | 'exploring' | 'taking_quiz' | 'needs_retry' | 'completed'
+    explorationStatus: 'not_started' | 'in_progress' | 'completed'
+    explorationDurationSeconds: number | null
+    passingQuizAttemptNumber: number | null
+    passingQuizScore: number | null
+    passingQuizTotal: number | null
+    passingQuizPercentage: number | null
+    passingQuizCompletedAt: string | null
+    failedQuizAttemptCount: number
+    stage?: 'Not started' | 'Exploring' | 'Taking quiz' | 'Needs retry' | 'Completed'
+    explorationStartedAt?: string | null
+    firstQuizStartedAt?: string | null
+    quizStartedAt?: string | null
+    timeToFirstQuizSeconds?: number | null
     attempts: {
       id: string
       attemptNumber: number
