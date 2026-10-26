@@ -12,6 +12,17 @@ const QUIZ_TITLES: Record<string, string> = {
   [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
 }
 
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.trunc(seconds))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const remainder = total % 60
+
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${remainder}s`
+  return `${remainder}s`
+}
+
 type Student = TeacherActivityAttemptSummary['students'][number]
 
 const STATUS_LABEL: Record<Student['overallStatus'], string> = {
@@ -28,13 +39,6 @@ const STATUS_CLASS: Record<Student['overallStatus'], string> = {
   taking_quiz: 'border-ring bg-muted text-foreground',
   needs_retry: 'border-destructive bg-destructive/10 text-destructive',
   completed: 'border-accent bg-accent/15 text-accent',
-}
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  if (minutes === 0) return `${remainingSeconds}s`
-  return `${minutes}m ${remainingSeconds}s`
 }
 
 function ExplorationDuration({ student }: { student: Student }) {
@@ -85,6 +89,34 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                   <dt className="font-medium text-foreground/80">Quiz:</dt>
                   <dd><QuizPassSummary student={student} /></dd>
                 </div>
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="font-medium text-foreground/80">Assignment stage:</dt>
+                  <dd>{student.stage ?? STATUS_LABEL[student.overallStatus]}</dd>
+                </div>
+                {student.explorationStartedAt && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-medium text-foreground/80">Exploration started:</dt>
+                    <dd><LocalizedTimestamp value={student.explorationStartedAt} /></dd>
+                  </div>
+                )}
+                {student.firstQuizStartedAt && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-medium text-foreground/80">First quiz started:</dt>
+                    <dd><LocalizedTimestamp value={student.firstQuizStartedAt} /></dd>
+                  </div>
+                )}
+                {student.quizStartedAt && student.quizStartedAt !== student.firstQuizStartedAt && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-medium text-foreground/80">Latest quiz started:</dt>
+                    <dd><LocalizedTimestamp value={student.quizStartedAt} /></dd>
+                  </div>
+                )}
+                {student.timeToFirstQuizSeconds != null && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-medium text-foreground/80">Exploration to first quiz:</dt>
+                    <dd>{formatDuration(student.timeToFirstQuizSeconds)}</dd>
+                  </div>
+                )}
               </dl>
               {(() => {
                 const explorationCount = student.explorationAttemptCount
@@ -97,7 +129,9 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                   </p>
                 )
               })()}
-              {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">No attempts yet.</p> : (
+              {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">
+                {student.stage === 'Taking quiz' || student.overallStatus === 'taking_quiz' ? 'Quiz started; no result submitted yet.' : 'No attempts yet.'}
+              </p> : (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm underline">View attempt history for {student.firstName} {student.lastName}</summary>
                   <div className="mt-3 overflow-x-auto">
