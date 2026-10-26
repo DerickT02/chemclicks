@@ -12,6 +12,55 @@ const QUIZ_TITLES: Record<string, string> = {
   [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
 }
 
+type Student = TeacherActivityAttemptSummary['students'][number]
+
+const STATUS_LABEL: Record<Student['overallStatus'], string> = {
+  not_started: 'Not started',
+  exploring: 'Exploring',
+  taking_quiz: 'Taking quiz',
+  needs_retry: 'Needs retry',
+  completed: 'Completed',
+}
+
+const STATUS_CLASS: Record<Student['overallStatus'], string> = {
+  not_started: 'border-border bg-muted text-muted-foreground',
+  exploring: 'border-ring bg-muted text-foreground',
+  taking_quiz: 'border-ring bg-muted text-foreground',
+  needs_retry: 'border-destructive bg-destructive/10 text-destructive',
+  completed: 'border-accent bg-accent/15 text-accent',
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes === 0) return `${remainingSeconds}s`
+  return `${minutes}m ${remainingSeconds}s`
+}
+
+function ExplorationDuration({ student }: { student: Student }) {
+  if (student.explorationStatus === 'not_started') return <>Not started</>
+  if (student.explorationStatus === 'in_progress') return <>In progress</>
+  return <>{student.explorationDurationSeconds !== null ? formatDuration(student.explorationDurationSeconds) : 'Completed'}</>
+}
+
+function QuizPassSummary({ student }: { student: Student }) {
+  if (student.passingQuizAttemptNumber !== null) {
+    return (
+      <>
+        Passed on attempt {student.passingQuizAttemptNumber}: {student.passingQuizScore}/{student.passingQuizTotal}
+        {student.passingQuizPercentage !== null ? ` (${student.passingQuizPercentage}%)` : ''}
+        {student.passingQuizCompletedAt ? <> · <LocalizedTimestamp value={student.passingQuizCompletedAt} /></> : ''}
+      </>
+    )
+  }
+  return (
+    <>
+      Not yet passed
+      {student.failedQuizAttemptCount > 0 ? ` · ${student.failedQuizAttemptCount} failed ${student.failedQuizAttemptCount === 1 ? 'attempt' : 'attempts'}` : ''}
+    </>
+  )
+}
+
 export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
   return (
     <section aria-labelledby="activity-title" className="rounded-xl border border-border bg-card p-5">
@@ -21,7 +70,22 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
         <ul className="mt-5 divide-y divide-border">
           {summary.students.map(student => (
             <li key={student.studentId} className="py-4">
-              <h3 className="font-semibold">{student.firstName} {student.lastName}</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold">{student.firstName} {student.lastName}</h3>
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[student.overallStatus]}`}>
+                  {STATUS_LABEL[student.overallStatus]}
+                </span>
+              </div>
+              <dl className="mt-2 space-y-1 text-sm text-muted-foreground">
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="font-medium text-foreground/80">Exploration:</dt>
+                  <dd><ExplorationDuration student={student} /></dd>
+                </div>
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="font-medium text-foreground/80">Quiz:</dt>
+                  <dd><QuizPassSummary student={student} /></dd>
+                </div>
+              </dl>
               {(() => {
                 const explorationCount = student.explorationAttemptCount
                   ?? student.attempts.filter((attempt) => attempt.kind === 'exploration' || (attempt.kind === undefined && attempt.quizKey == null)).length
