@@ -15,11 +15,14 @@ import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
 import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
 import MeasurementQuiz from "@/components/measurement/MeasurementQuiz";
+import LockedSection from "@/components/assignments/LockedSection";
 
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
 import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import { measurementAttemptLabel, measurementQuizModeForActivity } from "@/lib/measurement/modes";
+import { getAssignmentGate } from "@/lib/assignments/prerequisites";
+import { assignmentPath } from "@/lib/assignments/sequence";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +44,18 @@ export default async function AssignmentPage({ params }: {
     <main className="min-h-screen-below-nav space-y-4 bg-background px-6 py-10 text-foreground">
       <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
       <p role="status">This activity is not available right now. Check its schedule on My assignments or ask your teacher.</p>
+    </main>
+  );
+  // Earlier sections must be finished first, even when this URL is opened directly.
+  const gate = await getAssignmentGate(assignmentId);
+  if (gate.status === "unauthenticated") redirect("/login/student");
+  if (gate.status === "error") throw new Error(gate.message);
+  if (gate.status === "locked") return (
+    <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
+        <LockedSection blocker={gate.blocker} />
+      </div>
     </main>
   );
   const type = assignment.activity.type;
@@ -131,7 +146,7 @@ export default async function AssignmentPage({ params }: {
             </>
           )}
         </AssignmentAccess>
-        {quizKind && <LewisQuizCard kind={quizKind} assignments={result.assignments} />}
+        {quizKind && <LewisQuizCard kind={quizKind} assignmentId={assignmentId} assignments={result.assignments} />}
         {explorer === "bohr" && (
           <section className="space-y-3 rounded-xl border border-border bg-card p-6">
             <h2 className="text-lg font-semibold">Bohr Models Quiz</h2>
@@ -139,6 +154,26 @@ export default async function AssignmentPage({ params }: {
               className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
               Start quiz
             </Link>
+          </section>
+        )}
+        {gate.status === "open" && gate.entry.complete && (
+          <section aria-label="Next section" className="space-y-3 rounded-xl border border-border bg-card p-5">
+            {gate.next ? (
+              <>
+                <p className="font-semibold">Section complete.</p>
+                <Link href={assignmentPath(gate.next.assignment)} prefetch={false}
+                  className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
+                  Continue to {gate.next.assignment.activity.title}
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">You&apos;ve finished all open sections.</p>
+                <Link href="/student" className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold">
+                  Back to assignments
+                </Link>
+              </>
+            )}
           </section>
         )}
       </div>

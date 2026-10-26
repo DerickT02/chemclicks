@@ -1,8 +1,8 @@
 import "server-only";
 
-import { scheduleStatus } from "@/lib/assignments/schedule";
 import { isAssignmentAvailable } from "@/lib/assignments/availability";
-import { getStudentAssignments, type StudentAssignment } from "@/lib/db/student-assignments";
+import { getSectionAccess } from "@/lib/assignments/prerequisites";
+import { getStudentAssignmentSchedules, type StudentAssignment } from "@/lib/db/student-assignments";
 
 const BOHR_ACTIVITY_TYPES = ["bohr_model_intro", "bohr_model_stability"] as const;
 
@@ -14,6 +14,7 @@ export type BohrQuizAccess =
   | { status: "missing" }
   | { status: "scheduled"; assignment: StudentAssignment }
   | { status: "closed"; assignment: StudentAssignment }
+  | { status: "blocked"; assignment: StudentAssignment; blocker: StudentAssignment }
   | { status: "available"; assignment: StudentAssignment };
 
 function isBohrAssignment(assignment: StudentAssignment): boolean {
@@ -35,31 +36,25 @@ export function findBohrQuizAssignment(
 /**
  * Resolves a Bohr quiz from an explicit originating assignment when provided.
  * Generic entry is only automatic when there is exactly one Bohr assignment;
- * multiple assignments require the caller to present a choice.
+ * multiple assignments require the caller to present a choice. Either way the
+ * lesson's earlier sections must be finished first.
  */
 export async function getBohrQuizAccess(assignmentId?: string): Promise<BohrQuizAccess> {
-  const result = await getStudentAssignments();
+  const result = await getStudentAssignmentSchedules();
   if (result.status !== "ok") return result;
 
   const bohrAssignments = result.assignments.filter(isBohrAssignment);
   if (assignmentId !== undefined) {
     const assignment = bohrAssignments.find((item) => item.id === assignmentId);
     if (!assignment) return { status: "missing" };
-
-    const status = scheduleStatus(assignment, Date.now());
-    return {
-      status: status === "Open" ? "available" : status === "Scheduled" ? "scheduled" : "closed",
-      assignment,
-    };
+    return getSectionAccess(assignment);
   }
 
-  if (bohrAssignments.length === 0) return { status: "locked" };
-  if (bohrAssignments.length > 1) return { status: "selection", assignments: bohrAssignments };
-
-  const [assignment] = bohrAssignments;
-  const status = scheduleStatus(assignment, Date.now());
-  return {
-    status: status === "Open" ? "available" : status === "Scheduled" ? "scheduled" : "closed",
-    assignment,
-  };
+  // Generic entry offers open lessons first, then any scheduled or closed one.
+  const now = Date.now();
+  const open = bohrAssignments.filter((assignment) => isAssignmentAvailable(assignment, now));
+  const candidates = open.length > 0 ? open : bohrAssignments;
+  if (candidates.length === 0) return { status: "locked" };
+  if (candidates.length > 1) return { status: "selection", assignments: candidates };
+  return getSectionAccess(candidates[0]);
 }

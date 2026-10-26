@@ -6,6 +6,8 @@ import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getStudentAssignmentSchedules } from "@/lib/db/student-assignments";
 import { getAssignmentAttempts } from "@/lib/server/student-assignments";
 import { scheduleStatus } from "@/lib/assignments/schedule";
+import { getAssignmentGate } from "@/lib/assignments/prerequisites";
+import LockedSection from "@/components/assignments/LockedSection";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,18 @@ export default async function AssignmentHistoryPage({ params }: { params: Promis
   if (!assignment) notFound();
   // eslint-disable-next-line react-hooks/purity -- Request-time Server Component availability check.
   const status = scheduleStatus(assignment, Date.now());
+  // Closed work stays reviewable; an open section stays behind its prerequisites.
+  const gate = status === "Open" ? await getAssignmentGate(assignmentId) : null;
+  if (gate?.status === "unauthenticated") redirect("/login/student");
+  if (gate?.status === "error") throw new Error(gate.message);
+  if (gate?.status === "locked") return (
+    <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <h1 className="text-3xl font-semibold">{assignment.activity.title} — saved history</h1>
+        <LockedSection blocker={gate.blocker} />
+      </div>
+    </main>
+  );
   const readable = status === "Open" || status === "Closed";
   const allAttempts = readable ? await getAssignmentAttempts(assignmentId) : [];
   const attempts = allAttempts.filter(attempt => !attempt.quiz_key);

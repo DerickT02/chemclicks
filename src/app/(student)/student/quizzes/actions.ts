@@ -2,7 +2,7 @@
 
 import { submitStudentQuiz } from "@/lib/server/student-quizzes";
 import { startStudentQuiz } from "@/lib/server/student-quiz-start";
-import { getQuizProgression } from "@/lib/assignments/prerequisites";
+import { assertAssignmentUnlocked, getQuizProgression } from "@/lib/assignments/prerequisites";
 import type { QuizAnswer, QuizCompleteResult } from "@/components/quiz/types";
 
 type SubmitQuizInput = {
@@ -18,6 +18,8 @@ export async function startQuizAction(
   quizKey: string,
   retry = false,
 ): Promise<{ status: "in_progress"; startedAt: string } | { status: "retry_required" }> {
+  // Only new attempts are gated, so an attempt already in flight can be submitted.
+  await assertAssignmentUnlocked(assignmentId);
   const result = await startStudentQuiz(assignmentId, quizKey, retry);
   return result.status === "in_progress"
     ? { status: result.status, startedAt: result.started_at }

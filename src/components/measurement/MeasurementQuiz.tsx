@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import GraduatedCylinder from "@/components/measurement/GraduatedCylinder";
 import PrecisionRuler from "@/components/measurement/PrecisionRuler";
 import type { AnswerResult } from "@/lib/measurement/answer";
@@ -354,14 +355,23 @@ type ResultsProps = {
   assignedMode?: MeasurementQuizModeKey;
   onTryAgain: () => void;
   onChooseInstrument: () => void;
+  /** Where a passed assigned attempt leads next; null when nothing is open. */
+  nextDestination?: string | null;
 };
 
-export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInstrument }: ResultsProps) {
+export function AttemptResults({
+  results,
+  assignedMode,
+  onTryAgain,
+  onChooseInstrument,
+  nextDestination = null,
+}: ResultsProps) {
   const spec = results.mode
     ? getMeasurementQuizMode(results.mode).spec
     : INSTRUMENTS[results.instrument];
   const passed = results.passed ?? hasPassed(results.score, results.total);
   const percent = Math.round((results.score / results.total) * 100);
+  const continueTo = assignedMode && passed ? nextDestination : null;
 
   // The button that finished the attempt is gone, so focus starts on the score.
   return (
@@ -383,13 +393,27 @@ export function AttemptResults({ results, assignedMode, onTryAgain, onChooseInst
       )}
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <button type="button" onClick={onTryAgain} className={PRIMARY_BUTTON_CLASS}>
+        <button
+          type="button"
+          onClick={onTryAgain}
+          className={continueTo ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
+        >
           Try again with new questions
         </button>
         {!assignedMode && (
           <button type="button" onClick={onChooseInstrument} className={SECONDARY_BUTTON_CLASS}>
             Choose a different instrument
           </button>
+        )}
+        {continueTo && (
+          <Link href={continueTo} className={PRIMARY_BUTTON_CLASS}>
+            Continue to next section
+          </Link>
+        )}
+        {assignedMode && (
+          <Link href="/student" className={SECONDARY_BUTTON_CLASS}>
+            Back to assignments
+          </Link>
         )}
       </div>
     </Panel>
@@ -405,11 +429,13 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
   const [state, dispatch] = useReducer(quizReducer, INITIAL_QUIZ_STATE);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextDestination, setNextDestination] = useState<string | null>(null);
 
   // The random draw happens here, in an event handler, rather than in the
   // reducer: React can call a reducer twice and needs the same result both times.
   function startAttempt(instrument: InstrumentId) {
     setError(null);
+    setNextDestination(null);
     if (mode && assignmentId) {
       setPending(true);
       startMeasurementQuizAction(assignmentId, mode)
@@ -462,14 +488,17 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
     setPending(true);
     setError(null);
     completeMeasurementQuizAction(assignmentId, question.attemptId)
-      .then((result) => dispatch({
-        type: "server-complete",
-        attemptId: result.attemptId,
-        attemptNumber: result.attemptNumber,
-        score: result.score,
-        total: result.total,
-        passed: result.passed,
-      }))
+      .then((result) => {
+        setNextDestination(result.nextDestination);
+        dispatch({
+          type: "server-complete",
+          attemptId: result.attemptId,
+          attemptNumber: result.attemptNumber,
+          score: result.score,
+          total: result.total,
+          passed: result.passed,
+        });
+      })
       .catch(() => setError("The quiz could not be completed. Please try again."))
       .finally(() => setPending(false));
   }
@@ -490,6 +519,7 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
         assignedMode={mode}
         onTryAgain={() => startAttempt(state.instrument)}
         onChooseInstrument={() => dispatch({ type: "choose-instrument" })}
+        nextDestination={nextDestination}
       />
       </>
     );

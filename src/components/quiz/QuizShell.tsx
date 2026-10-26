@@ -192,11 +192,6 @@ export default function QuizShell({
               currently available.
             </p>
           )}
-          {result.passed && !onSubmit && (
-            <button type="button" className={primaryButtonClassName}>
-              Continue to next section
-            </button>
-          )}
         </div>
       </article>
     );

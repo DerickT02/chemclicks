@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import LockedSection from "@/components/assignments/LockedSection";
 import BohrModelsQuiz from "@/components/quiz/bohr/BohrModelsQuiz";
 import { getBohrQuizAccess } from "@/lib/assignments/bohr-quiz-access";
+import { assignmentPath } from "@/lib/assignments/sequence";
 import { BOHR_QUIZ_KEY, listQuizQuestions, type QuizQuestionsResult } from "@/lib/db/quiz-questions";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -50,18 +52,34 @@ export default async function BohrModelQuizPage({ searchParams }: Props = {}) {
                 ))}
               </ul>
             </div>
+          ) : access.status === "blocked" ? (
+            <div className="mt-6">
+              <LockedSection blocker={access.blocker} />
+            </div>
           ) : (
-            <p role={access.status === "error" ? "alert" : "status"} className="mt-6 text-muted-foreground">
-              {access.status === "error"
-                ? access.message
-                : access.status === "missing"
-                ? "This Bohr assignment is missing or you no longer have access to it."
-                : access.status === "scheduled"
-                ? "This Bohr quiz is scheduled but is not open yet."
-                : access.status === "closed"
-                ? "This Bohr quiz is closed. Previously saved results remain available."
-                : "This quiz is locked until your teacher assigns a Bohr Models lesson."}
-            </p>
+            <div className="mt-6 space-y-4">
+              <p role={access.status === "error" ? "alert" : "status"} className="text-muted-foreground">
+                {access.status === "error"
+                  ? access.message
+                  : access.status === "missing"
+                  ? "This Bohr assignment is missing or you no longer have access to it."
+                  : access.status === "scheduled"
+                  ? "This Bohr quiz is scheduled but is not open yet."
+                  : access.status === "closed"
+                  ? "This Bohr quiz is closed. Previously saved results remain available."
+                  : "This quiz is locked until your teacher assigns a Bohr Models lesson."}
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {(access.status === "scheduled" || access.status === "closed") && (
+                  <Link href={assignmentPath(access.assignment)} className="text-accent underline">
+                    Back to {access.assignment.activity.title}
+                  </Link>
+                )}
+                <Link href="/student" className="text-accent underline">
+                  Back to assignments
+                </Link>
+              </div>
+            </div>
           )}
         </div>
       </div>
