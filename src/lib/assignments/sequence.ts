@@ -3,7 +3,7 @@ import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { LEWIS_QUIZZES, lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import { scheduleStatus, type ScheduleStatus } from "@/lib/assignments/schedule";
 import type { ActivityType } from "@/lib/db/activities";
-import { BOHR_QUIZ_KEY } from "@/lib/db/quiz-questions";
+import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 import type { StudentAssignment } from "@/lib/db/student-assignments";
 import type { ProgressStatus } from "@/lib/db/student_progress";
 import { measurementQuizModeForActivity } from "@/lib/measurement/modes";
@@ -30,7 +30,8 @@ function isBohrLesson(type: ActivityType): boolean {
 
 /** The quiz_key a lesson's quiz attempts are saved under, or null when it has none. */
 export function sectionQuizKey(type: ActivityType): string | null {
-  if (getActivityDefinition(type)?.explorer === "bohr") return BOHR_QUIZ_KEY;
+  if (type === "bohr_model_intro") return BOHR_INTRO_QUIZ_KEY;
+  if (type === "bohr_model_stability") return BOHR_STABILITY_QUIZ_KEY;
   const lewis = lewisQuizForLesson(type);
   if (lewis) return LEWIS_QUIZZES[lewis].quizKey;
   const mode = measurementQuizModeForActivity(type);
@@ -44,7 +45,12 @@ export function isSectionComplete(
   passedQuizKeys: ReadonlySet<string>,
 ): boolean {
   const explored = progress === "completed";
-  if (getActivityDefinition(type)?.explorer === "bohr") return explored || passedQuizKeys.has(BOHR_QUIZ_KEY);
+  if (getActivityDefinition(type)?.explorer === "bohr") {
+    const lessonQuizKey = sectionQuizKey(type);
+    return explored
+      || passedQuizKeys.has(lessonQuizKey ?? "")
+      || passedQuizKeys.has(BOHR_QUIZ_KEY);
+  }
   const lewis = lewisQuizForLesson(type);
   if (lewis) return explored && passedQuizKeys.has(LEWIS_QUIZZES[lewis].quizKey);
   return explored;

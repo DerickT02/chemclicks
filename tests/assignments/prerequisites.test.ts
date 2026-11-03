@@ -39,8 +39,8 @@ const lockedIds = (entries: ReturnType<typeof resolveSequence>) =>
 
 describe("sectionQuizKey", () => {
   it.each([
-    ["bohr_model_intro", "bohr_models"],
-    ["bohr_model_stability", "bohr_models"],
+    ["bohr_model_intro", "bohr_model_intro"],
+    ["bohr_model_stability", "bohr_model_stability"],
     ["lewis_diagram", null],
     ["lewis_structures_covalent", "lewis_covalent"],
     ["lewis_structures_ionic", "lewis_ionic"],

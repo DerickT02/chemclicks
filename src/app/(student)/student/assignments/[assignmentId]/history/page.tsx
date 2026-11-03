@@ -8,6 +8,7 @@ import { getAssignmentAttempts } from "@/lib/server/student-assignments";
 import { scheduleStatus } from "@/lib/assignments/schedule";
 import { getAssignmentGate } from "@/lib/assignments/prerequisites";
 import LockedSection from "@/components/assignments/LockedSection";
+import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,11 @@ export default async function AssignmentHistoryPage({ params }: { params: Promis
   const readable = status === "Open" || status === "Closed";
   const allAttempts = readable ? await getAssignmentAttempts(assignmentId) : [];
   const attempts = allAttempts.filter(attempt => !attempt.quiz_key);
-  const bohrQuizAttempts = allAttempts.filter(attempt => attempt.quiz_key === "bohr_models");
+  const bohrQuizAttempts = allAttempts.filter(attempt =>
+    attempt.quiz_key === BOHR_QUIZ_KEY
+      || attempt.quiz_key === BOHR_INTRO_QUIZ_KEY
+      || attempt.quiz_key === BOHR_STABILITY_QUIZ_KEY,
+  );
   const completed = attempts.some(attempt => attempt.status === "completed");
 
   return (
@@ -48,7 +53,10 @@ export default async function AssignmentHistoryPage({ params }: { params: Promis
           <p className="font-medium">{completed ? "Exploration completion saved." : "No exploration completion has been saved."}</p>
           <AttemptHistory attempts={attempts} />
           {assignment.activity.type === "bohr_model_intro" || assignment.activity.type === "bohr_model_stability" ? (
-            <QuizAttemptHistory title="Bohr quiz" attempts={bohrQuizAttempts} />
+            <QuizAttemptHistory
+              title={assignment.activity.type === "bohr_model_stability" ? "Bohr Model Stability quiz" : "Bohr Model Introduction quiz"}
+              attempts={bohrQuizAttempts}
+            />
           ) : null}
           {status === "Open" && <Link href={`/student/assignments/${assignment.id}`} className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold">Back to activity</Link>}
         </> : <p role="status">Saved history is unavailable until the activity opens with a valid schedule. Return to assignments or ask your teacher.</p>}

@@ -23,6 +23,7 @@ import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import { measurementAttemptLabel, measurementQuizModeForActivity } from "@/lib/measurement/modes";
 import { getAssignmentGate } from "@/lib/assignments/prerequisites";
 import { assignmentPath } from "@/lib/assignments/sequence";
+import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,11 @@ export default async function AssignmentPage({ params }: {
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
   // Quiz attempts share the table; exploration rows carry no quiz key.
   const explorationAttempts = attempts.filter((attempt) => !attempt.quiz_key);
-  const bohrQuizAttempts = attempts.filter((attempt) => attempt.quiz_key === "bohr_models");
+  const bohrQuizAttempts = attempts.filter((attempt) =>
+    attempt.quiz_key === BOHR_QUIZ_KEY
+      || attempt.quiz_key === BOHR_INTRO_QUIZ_KEY
+      || attempt.quiz_key === BOHR_STABILITY_QUIZ_KEY,
+  );
   const measurementAttempts = attempts.filter((attempt) => attempt.instrument !== null && attempt.instrument !== undefined);
   const latest = explorationAttempts[0];
   return (
@@ -111,7 +116,12 @@ export default async function AssignmentPage({ params }: {
             <AttemptControls key={latest.id} assignmentId={assignmentId} attemptId={latest.id} completed={false} />
           </section>}
           {hasActivityContent(type) && <AttemptHistory attempts={explorationAttempts} />}
-          {explorer === "bohr" && <QuizAttemptHistory title="Bohr quiz" attempts={bohrQuizAttempts} />}
+          {explorer === "bohr" && (
+            <QuizAttemptHistory
+              title={type === "bohr_model_stability" ? "Bohr Model Stability quiz" : "Bohr Model Introduction quiz"}
+              attempts={bohrQuizAttempts}
+            />
+          )}
           {measurementQuizMode && (
             <>
               <section aria-label="Measurement quiz history" className="rounded-xl border border-border bg-card p-6">

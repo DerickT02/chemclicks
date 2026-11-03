@@ -15,6 +15,8 @@ const adminClient = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_QUIZ_KEY: "bohr_models",
+  BOHR_INTRO_QUIZ_KEY: "bohr_model_intro",
+  BOHR_STABILITY_QUIZ_KEY: "bohr_model_stability",
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
   listQuizQuestions: listQuestions,
@@ -38,7 +40,12 @@ beforeEach(() => {
   listQuestions.mockReset();
   getAccess.mockResolvedValue({
     status: "available",
-    assignment: { id: "assignment-1", opens_at: null, closes_at: null },
+    assignment: {
+      id: "assignment-1",
+      opens_at: null,
+      closes_at: null,
+      activity: { type: "bohr_model_intro", title: "Introduction" },
+    },
   });
 });
 
@@ -82,7 +89,7 @@ describe("Bohr quiz page", () => {
     const html = renderToStaticMarkup(await BohrModelQuizPage());
 
     // The server's own client: student sessions are not allowed to read the rows.
-    expect(listQuestions).toHaveBeenCalledWith(adminClient, "bohr_models");
+    expect(listQuestions).toHaveBeenCalledWith(adminClient, "bohr_model_intro");
     expect(html).toContain("Quiz with 2 questions");
     expect(html).not.toContain("Check your understanding");
     expect(html).not.toContain("Back to");
