@@ -149,14 +149,14 @@ describe("student assignment pages", () => {
     const bohr = { ...assignment, id: "bohr", activity: { ...assignment.activity, type: "bohr_model_stability" } };
     reader.mockResolvedValue({ status: "ok", assignments: [bohr] });
     attempts.mockResolvedValue([{
-      id: "bohr-quiz", attempt_number: 1, quiz_key: "bohr_models", instrument: null, precision_mode: null,
+      id: "bohr-quiz", attempt_number: 1, quiz_key: "bohr_model_stability", instrument: null, precision_mode: null,
       status: "completed", score: 10, question_total: 12, passed: true,
       started_at: "2026-10-01T12:00:00Z", completed_at: "2026-10-01T12:05:00Z",
     }]);
 
     const html = renderToStaticMarkup(await AssignmentPage({ params: Promise.resolve({ assignmentId: "bohr" }) }));
 
-    expect(html).toContain("Bohr quiz history");
+    expect(html).toContain("Bohr Model Stability quiz history");
     expect(html).toContain("10 of 12 correct");
     expect(html).toContain("Passed");
   });
