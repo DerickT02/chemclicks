@@ -256,7 +256,16 @@ function ParticleControl({ label, particle, value, min, max, onChange }: Particl
 
 const SHELL_CAPACITIES_MAP = SHELL_CAPACITIES;
 
-export default function BohrModelViewer() {
+export type BohrLessonMode = "combined" | "intro" | "stability";
+
+type BohrModelViewerProps = {
+  /** The lesson focus. Combined remains the temporary compatibility default. */
+  mode?: BohrLessonMode;
+};
+
+export default function BohrModelViewer({ mode = "combined" }: BohrModelViewerProps) {
+  const showIntroContent = mode === "combined" || mode === "intro";
+  const showStabilityContent = mode === "combined" || mode === "stability";
   const [selectedElement, setSelectedElement] = useState(ELEMENTS[0]);
   const [protonCount, setProtonCount] = useState(ELEMENTS[0].atomicNumber);
   const [electronCount, setElectronCount] = useState(ELEMENTS[0].atomicNumber);
@@ -342,7 +351,31 @@ export default function BohrModelViewer() {
       </section>
 
       {/* ── Element Selector ───────────────────────────────────────────── */}
-      <div>
+      {mode === "intro" && (
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Introduction concepts</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-xl bg-muted/40 border border-border p-4">
+              <p className="text-sm font-semibold text-foreground mb-0.5">The nucleus</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">The nucleus contains protons. An element&apos;s atomic number tells you how many protons are in its nucleus.</p>
+            </div>
+            <div className="rounded-xl bg-muted/40 border border-border p-4">
+              <p className="text-sm font-semibold text-foreground mb-0.5">Neutral atoms</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">A neutral atom has the same number of electrons as protons. Select an element to see its neutral Bohr model.</p>
+            </div>
+            <div className="rounded-xl bg-muted/40 border border-border p-4">
+              <p className="text-sm font-semibold text-foreground mb-0.5">Electron shells</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">For the first 20 elements, electrons fill shells in a 2, 8, 8, 2 pattern.</p>
+            </div>
+            <div className="rounded-xl bg-muted/40 border border-border p-4">
+              <p className="text-sm font-semibold text-foreground mb-0.5">The first 20 elements</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Choose an element from hydrogen through calcium, then inspect its nucleus, electrons, and occupied shells.</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {showIntroContent && <div>
         <div
           role="group"
           aria-label="Choose an element"
@@ -386,7 +419,17 @@ export default function BohrModelViewer() {
           <br />
           Blue ring: element matching the current proton count.
         </p>
-      </div>
+      </div>}
+
+      {mode === "stability" && (
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold text-foreground">Explore stability</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Adjust protons and electrons independently below. Compare noble-gas electron counts,
+            neutral charge, and the resulting ionic charge.
+          </p>
+        </section>
+      )}
 
       {/* ── Bohr Diagram + Info ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
@@ -450,6 +493,7 @@ export default function BohrModelViewer() {
                 <span className="text-muted-foreground">Occupied shells</span>
                 <span className="font-semibold text-foreground">{shells.length}</span>
               </div>
+              {showStabilityContent && <>
               <div className="flex justify-between items-center px-4 py-2.5 text-sm">
                 <span className="text-muted-foreground">Protons − electrons</span>
                 <span className="font-semibold text-foreground">{chargeDifference ?? "—"}</span>
@@ -460,7 +504,9 @@ export default function BohrModelViewer() {
                   {chargeDescription}
                 </output>
               </div>
+              </>}
             </div>
+            {showStabilityContent && <>
             <div className="mt-3 rounded-xl border border-border bg-muted/50 p-4" aria-live="polite" aria-atomic="true">
               <h3 className="text-sm font-semibold text-foreground">Charge and stability</h3>
               <div className="mt-3 flex flex-col gap-2.5">
@@ -489,10 +535,11 @@ export default function BohrModelViewer() {
             <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4" role="status" aria-live="polite">
               <h4 className="text-sm font-semibold text-foreground">{ionContextHeading}</h4>
               <p className="mt-1 text-sm text-muted-foreground">{ionContextBody}</p>
-            </div>
-          </div>
+             </div>
+             </>}
+           </div>
 
-          <div className="grow rounded-2xl border border-border bg-card p-5">
+          {showStabilityContent && <div className="grow rounded-2xl border border-border bg-card p-5">
             <h2 className="text-sm font-semibold text-foreground mb-4">Build an atom</h2>
             <div className="flex flex-col gap-3">
               <ParticleControl
@@ -524,7 +571,7 @@ export default function BohrModelViewer() {
               Choose an element above to pick a reset target, or adjust protons and electrons independently.
               Common-ion notes appear when counts match documented examples.
             </p>
-          </div>
+          </div>}
         </div>
       </div>
 

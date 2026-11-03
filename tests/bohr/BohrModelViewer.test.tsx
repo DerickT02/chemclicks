@@ -17,6 +17,30 @@ function withinDiagram(svg: HTMLElement) {
 }
 
 describe("Bohr atom builder", () => {
+  it("keeps the Introduction mode focused on neutral first-20-element exploration", () => {
+    render(<BohrModelViewer mode="intro" />);
+
+    expect(screen.getByText("Introduction concepts")).toBeInTheDocument();
+    expect(screen.getByText("For the first 20 elements, electrons fill shells in a 2, 8, 8, 2 pattern.")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Choose an element" })).toBeInTheDocument();
+    expect(screen.getByText("Protons")).toBeInTheDocument();
+    expect(screen.queryByText("Charge and stability")).not.toBeInTheDocument();
+    expect(screen.queryByText("Build an atom")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ionic charge")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Stability mode focused on independent particle controls and stability", () => {
+    render(<BohrModelViewer mode="stability" />);
+
+    expect(screen.getByText("Explore stability")).toBeInTheDocument();
+    expect(screen.getByText("Charge and stability")).toBeInTheDocument();
+    expect(screen.getByText("Build an atom")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a proton" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add an electron" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Choose an element" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Introduction concepts")).not.toBeInTheDocument();
+  });
+
   it("shows p+ and proton count in the nucleus with supplementary symbol", () => {
     render(<BohrModelViewer />);
     const diagram = screen.getByRole("img", {
