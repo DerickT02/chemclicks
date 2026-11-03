@@ -1,7 +1,7 @@
 import BohrModelViewer, { type BohrLessonMode } from "@/components/bohr-models/BohrModelViewer";
 
 type BohrLessonPageProps = {
-  mode: Exclude<BohrLessonMode, "combined">;
+  mode: BohrLessonMode;
 };
 
 const LESSON_CONTENT = {

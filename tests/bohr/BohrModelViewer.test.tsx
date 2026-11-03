@@ -42,7 +42,7 @@ describe("Bohr atom builder", () => {
   });
 
   it("shows p+ and proton count in the nucleus with supplementary symbol", () => {
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
     const diagram = screen.getByRole("img", {
       name: /nucleus shows p\+ 1, 1 proton, 1 electron, ionic charge 0 \(neutral\)/,
     });
@@ -55,7 +55,7 @@ describe("Bohr atom builder", () => {
 
   it("updates nucleus labels when proton count changes", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     await user.click(screen.getByRole("button", { name: "Add a proton" }));
     expect(screen.getByRole("img", { name: /nucleus shows p\+ 2, 2 protons, 1 electron/ })).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe("Bohr atom builder", () => {
 
   it("keeps electrons when protons change and keeps protons when electrons change", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     expect(screen.getByLabelText("Protons: 1")).toBeInTheDocument();
     expect(screen.getByLabelText("Electrons: 1")).toBeInTheDocument();
@@ -90,7 +90,7 @@ describe("Bohr atom builder", () => {
 
   it("selecting an element resets both counts to neutral for that element", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     await user.click(screen.getByRole("button", { name: "Add a proton" }));
     await user.click(screen.getByRole("button", { name: "Add an electron" }));
@@ -104,7 +104,7 @@ describe("Bohr atom builder", () => {
 
   it("reset to neutral restores the selected element without reloading", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     await user.click(screen.getByRole("button", { name: "Sodium, Na" }));
     await user.click(screen.getByRole("button", { name: "Remove an electron" }));
@@ -120,7 +120,7 @@ describe("Bohr atom builder", () => {
 
   it("allows non-common-ion electron counts and shows documented ion notes when counts match", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     await user.click(screen.getByRole("button", { name: "Add an electron" }));
     expect(screen.getByRole("heading", { name: "Common ion example" })).toBeInTheDocument();
@@ -148,7 +148,7 @@ describe("Bohr atom builder", () => {
 
   it("explains carbon bonding and supports documented carbide counts", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     await user.click(screen.getByRole("button", { name: "Carbon, C" }));
     expect(screen.getByText(/Carbon usually shares electrons in covalent bonds/)).toBeInTheDocument();
@@ -165,7 +165,7 @@ describe("Bohr atom builder", () => {
 
   it("disables controls at supported proton and electron bounds", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     expect(screen.getByRole("button", { name: "Remove a proton" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Remove an electron" }));

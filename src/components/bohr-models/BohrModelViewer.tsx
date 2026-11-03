@@ -256,16 +256,16 @@ function ParticleControl({ label, particle, value, min, max, onChange }: Particl
 
 const SHELL_CAPACITIES_MAP = SHELL_CAPACITIES;
 
-export type BohrLessonMode = "combined" | "intro" | "stability";
+export type BohrLessonMode = "intro" | "stability";
 
 type BohrModelViewerProps = {
-  /** The lesson focus. Combined remains the temporary compatibility default. */
-  mode?: BohrLessonMode;
+  /** The lesson focus. */
+  mode: BohrLessonMode;
 };
 
-export default function BohrModelViewer({ mode = "combined" }: BohrModelViewerProps) {
-  const showIntroContent = mode === "combined" || mode === "intro";
-  const showStabilityContent = mode === "combined" || mode === "stability";
+export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
+  const showIntroContent = mode === "intro";
+  const showStabilityContent = mode === "stability";
   const [selectedElement, setSelectedElement] = useState(ELEMENTS[0]);
   const [protonCount, setProtonCount] = useState(ELEMENTS[0].atomicNumber);
   const [electronCount, setElectronCount] = useState(ELEMENTS[0].atomicNumber);
