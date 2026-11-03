@@ -24,7 +24,9 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
 }));
 vi.mock("@/components/assignments/AssignmentAccess", () => ({ default: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock("@/components/bohr-models/BohrModelViewer", () => ({ default: () => <p>Bohr exercise</p> }));
+vi.mock("@/components/bohr-models/BohrModelViewer", () => ({
+  default: ({ mode }: { mode?: string }) => <p>Bohr exercise{mode ? `: ${mode}` : ""}</p>,
+}));
 vi.mock("@/components/measurement/GraduatedCylinder", () => ({ default: () => <p>Cylinder exercise</p> }));
 vi.mock("@/components/measurement/PrecisionRuler", () => ({ default: ({ precision }: { precision: string }) => <p>Ruler exercise: {precision}</p> }));
 vi.mock("@/components/lewis/LewisDotExplorer", () => ({ default: () => <p>Lewis exercise</p> }));
@@ -122,6 +124,7 @@ describe("student assignment pages", () => {
     attempts.mockResolvedValue([startedExploration]);
     const html = renderToStaticMarkup(await page("bohr"));
     expect(html).toContain("Bohr exercise");
+    expect(html).toContain(`Bohr exercise: ${type === "bohr_model_stability" ? "stability" : "intro"}`);
     expect(html).toContain("Start exploration");
     expect(html).toContain('href="/student/quizzes/bohr?assignmentId=bohr"');
     expect(html).not.toContain("Lewis exercise");

@@ -61,6 +61,7 @@ export default async function AssignmentPage({ params }: {
   const type = assignment.activity.type;
   const definition = getActivityDefinition(type);
   const explorer = definition?.explorer;
+  const bohrLessonMode = type === "bohr_model_stability" ? "stability" : "intro";
   const quizKind = lewisQuizForLesson(type);
   const measurementQuizMode = measurementQuizModeForActivity(type);
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
@@ -90,7 +91,7 @@ export default async function AssignmentPage({ params }: {
               </p>
             ) : (
               <>
-                {explorer === "bohr" && <BohrModelViewer />}
+                {explorer === "bohr" && <BohrModelViewer mode={bohrLessonMode} />}
                 {explorer === "lewis-diagram" && <LewisDotExplorer />}
                 {explorer === "ionic" && <IonicCompoundExplorer />}
                 {explorer === "covalent" && <CovalentBondExplorer />}
