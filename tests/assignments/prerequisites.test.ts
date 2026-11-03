@@ -88,7 +88,7 @@ describe("isSectionComplete", () => {
 });
 
 describe("resolveSequence", () => {
-  it("orders by order_index, then id, and locks behind the first unfinished section", () => {
+  it("orders by order_index, then id, while keeping Bohr lessons independently open", () => {
     const entries = resolveSequence([
       section("c", "lewis_diagram", 2),
       section("b", "bohr_model_stability", 1),
@@ -96,7 +96,7 @@ describe("resolveSequence", () => {
     ], new Map(), NOW);
 
     expect(ids(entries)).toEqual(["a", "b", "c"]);
-    expect(lockedIds(entries)).toEqual({ a: null, b: "a", c: "a" });
+    expect(lockedIds(entries)).toEqual({ a: null, b: null, c: "a" });
   });
 
   it("does not mutate the caller's assignment list", () => {
@@ -196,23 +196,21 @@ describe("the Bohr → Lewis → Measurement journey", () => {
     ["cylinder", record("completed", "measurement_cylinder_tenths")],
   ];
 
-  it("unlocks one section at a time and continues to the next", () => {
-    const records = new Map<string, SectionRecord>();
-    for (let step = 0; step < journey.length; step += 1) {
-      const entries = resolveSequence(journey, records, NOW);
-      const unlocked = entries.filter((entry) => !entry.lockedBy).map((entry) => entry.assignment.id);
-      expect(unlocked).toEqual(assignmentIds(journey.slice(0, step + 1)));
-      entries.slice(step + 1).forEach((entry) => expect(entry.lockedBy?.id).toBe(journey[step].id));
+  it("opens both Bohr lessons while keeping later lessons behind unfinished Bohr work", () => {
+    const initial = resolveSequence(journey, new Map(), NOW);
+    expect(lockedIds(initial)).toMatchObject({
+      "bohr-intro": null,
+      "bohr-stability": null,
+      "lewis-diagram": "bohr-intro",
+    });
 
-      const [id, saved] = finish[step];
-      records.set(id, saved);
-      const after = resolveSequence(journey, records, NOW);
-      const next = nextSection(after, id);
-      expect(next?.assignment.id ?? null).toBe(journey[step + 1]?.id ?? null);
-      if (next) expect(assignmentPath(next.assignment)).toBe(`/student/assignments/${journey[step + 1].id}`);
-    }
-    const done = resolveSequence(journey, records, NOW);
-    expect(done.every((entry) => entry.complete && !entry.lockedBy)).toBe(true);
+    const afterIntro = resolveSequence(journey, new Map([finish[0]]), NOW);
+    expect(afterIntro.find((entry) => entry.assignment.id === "bohr-stability")?.lockedBy).toBeNull();
+    expect(afterIntro.find((entry) => entry.assignment.id === "lewis-diagram")?.lockedBy?.id).toBe("bohr-stability");
+
+    const afterBoth = resolveSequence(journey, new Map([finish[0], finish[1]]), NOW);
+    expect(nextSection(afterBoth, "bohr-intro")?.assignment.id).toBe("lewis-diagram");
+    expect(assignmentPath(afterBoth[2].assignment)).toBe("/student/assignments/lewis-diagram");
   });
 
   it("keeps a Lewis lesson blocking until its quiz is passed", () => {

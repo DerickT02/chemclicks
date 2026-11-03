@@ -24,6 +24,10 @@ export type SequenceEntry = {
 
 const NO_QUIZZES: ReadonlySet<string> = new Set();
 
+function isBohrLesson(type: ActivityType): boolean {
+  return type === "bohr_model_intro" || type === "bohr_model_stability";
+}
+
 /** The quiz_key a lesson's quiz attempts are saved under, or null when it has none. */
 export function sectionQuizKey(type: ActivityType): string | null {
   if (getActivityDefinition(type)?.explorer === "bohr") return BOHR_QUIZ_KEY;
@@ -69,7 +73,10 @@ export function resolveSequence(
         record?.progress ?? null,
         record?.passedQuizKeys ?? NO_QUIZZES,
       );
-      const entry: SequenceEntry = { assignment, schedule, complete, lockedBy: blocker };
+      const lockedBy = blocker && isBohrLesson(blocker.activity.type) && isBohrLesson(assignment.activity.type)
+        ? null
+        : blocker;
+      const entry: SequenceEntry = { assignment, schedule, complete, lockedBy };
       if (!blocker && !complete && (schedule === "Open" || schedule === "Scheduled")) blocker = assignment;
       return entry;
     });
