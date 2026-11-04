@@ -35,10 +35,10 @@ describe('teacher report', () => {
       kind: 'quiz' as const, quizKey, score, questionTotal: 12, percentage: (score / 12) * 100, passed,
     })
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
-      ...report.students[1], attempts: [quizAttempt('a', 'bohr_models', 4, false), quizAttempt('b', 'lewis_ionic', 11, true), quizAttempt('c', 'future_quiz', 12, true)],
+      ...report.students[1], attempts: [quizAttempt('a', 'bohr_model_intro', 4, false), quizAttempt('b', 'bohr_model_stability', 11, true), quizAttempt('c', 'bohr_models', 12, true), quizAttempt('d', 'future_quiz', 12, true)],
     }] }} />)
-    for (const text of ['Bohr Models Quiz', '4/12 · Not passed', 'Ionic Compounds Quiz', '11/12 · Passed', '12/12 · Passed']) expect(html).toContain(text)
-    for (const key of ['bohr_models', 'lewis_ionic', 'future_quiz']) expect(html).not.toContain(key)
+    for (const text of ['Bohr Model Introduction Quiz', '4/12 · Not passed', 'Bohr Model Stability Quiz', '11/12 · Passed', 'Bohr Models Quiz', '12/12 · Passed']) expect(html).toContain(text)
+    for (const key of ['bohr_model_intro', 'bohr_model_stability', 'bohr_models', 'future_quiz']) expect(html).not.toContain(key)
   })
   it('shows a started quiz even before a result row exists and keeps both quiz timestamps', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{

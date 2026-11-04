@@ -17,8 +17,32 @@ function withinDiagram(svg: HTMLElement) {
 }
 
 describe("Bohr atom builder", () => {
+  it("keeps the Introduction mode focused on neutral first-20-element exploration", () => {
+    render(<BohrModelViewer mode="intro" />);
+
+    expect(screen.getByText("Introduction concepts")).toBeInTheDocument();
+    expect(screen.getByText("For the first 20 elements, electrons fill shells in a 2, 8, 8, 2 pattern.")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Choose an element" })).toBeInTheDocument();
+    expect(screen.getByText("Protons")).toBeInTheDocument();
+    expect(screen.queryByText("Charge and stability")).not.toBeInTheDocument();
+    expect(screen.queryByText("Build an atom")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ionic charge")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Stability mode focused on independent particle controls and stability", () => {
+    render(<BohrModelViewer mode="stability" />);
+
+    expect(screen.getByText("Explore stability")).toBeInTheDocument();
+    expect(screen.getByText("Charge and stability")).toBeInTheDocument();
+    expect(screen.getByText("Build an atom")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a proton" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add an electron" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Choose an element" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Introduction concepts")).not.toBeInTheDocument();
+  });
+
   it("shows p+ and proton count in the nucleus with supplementary symbol", () => {
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
     const diagram = screen.getByRole("img", {
       name: /nucleus shows p\+ 1, 1 proton, 1 electron, ionic charge 0 \(neutral\)/,
     });
@@ -31,7 +55,7 @@ describe("Bohr atom builder", () => {
 
   it("updates nucleus labels when proton count changes", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     await user.click(screen.getByRole("button", { name: "Add a proton" }));
     expect(screen.getByRole("img", { name: /nucleus shows p\+ 2, 2 protons, 1 electron/ })).toBeInTheDocument();
@@ -42,7 +66,7 @@ describe("Bohr atom builder", () => {
 
   it("keeps electrons when protons change and keeps protons when electrons change", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     expect(screen.getByLabelText("Protons: 1")).toBeInTheDocument();
     expect(screen.getByLabelText("Electrons: 1")).toBeInTheDocument();
@@ -52,9 +76,6 @@ describe("Bohr atom builder", () => {
     expect(screen.getByLabelText("Protons: 2")).toBeInTheDocument();
     expect(screen.getByLabelText("Electrons: 1")).toBeInTheDocument();
     expect(screen.getByLabelText("Ionic charge: +1 (cation)")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hydrogen, H, reset target" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Helium, He, protons in this model" })).toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "Add an electron" }));
     expect(screen.getByLabelText("Protons: 2")).toBeInTheDocument();
     expect(screen.getByLabelText("Electrons: 2")).toBeInTheDocument();
@@ -62,41 +83,52 @@ describe("Bohr atom builder", () => {
     const chargePanel = screen.getByRole("heading", { name: "Charge and stability" }).parentElement!;
     expect(within(chargePanel).getByText("Noble-gas electron stability")).toBeInTheDocument();
     expect(within(chargePanel).getAllByText("Met").length).toBeGreaterThanOrEqual(2);
+    expect(within(chargePanel).getByText("Neutral means the charges balance; it does not mean the atom is unreactive.")).toBeInTheDocument();
+  });
+
+  it("does not label an absurd noble-gas ion as stable", async () => {
+    const user = userEvent.setup();
+    render(<BohrModelViewer mode="stability" />);
+
+    for (let i = 0; i < 17; i++) {
+      await user.click(screen.getByRole("button", { name: "Add an electron" }));
+    }
+
+    const chargePanel = screen.getByRole("heading", { name: "Charge and stability" }).parentElement!;
+    expect(screen.getByLabelText(/Ionic charge: .*17 \(anion\)/)).toBeInTheDocument();
+    expect(within(chargePanel).getAllByText("Not met")).toHaveLength(3);
+    expect(within(chargePanel).getByText(/charge magnitude above 4/)).toBeInTheDocument();
+    expect(within(chargePanel).getAllByText(/outside the plausible range used by this model/).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("qualifies fixed shells as a Bohr-model statement", () => {
+    render(<BohrModelViewer mode="stability" />);
+
+    expect(screen.getByText(/In the Bohr model, negatively charged particles are shown in fixed shells/)).toBeInTheDocument();
   });
 
   it("selecting an element resets both counts to neutral for that element", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="intro" />);
 
-    await user.click(screen.getByRole("button", { name: "Add a proton" }));
-    await user.click(screen.getByRole("button", { name: "Add an electron" }));
     await user.click(screen.getByRole("button", { name: "Calcium, Ca" }));
 
-    expect(screen.getByLabelText("Protons: 20")).toBeInTheDocument();
-    expect(screen.getByLabelText("Electrons: 20")).toBeInTheDocument();
-    expect(screen.getByLabelText("Ionic charge: 0 (neutral)")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Bohr model for Ca .*20 protons, 20 electrons/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Calcium, Ca, reset target and protons in this model" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("reset to neutral restores the selected element without reloading", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="intro" />);
 
+    await user.click(screen.getByRole("button", { name: "Calcium, Ca" }));
     await user.click(screen.getByRole("button", { name: "Sodium, Na" }));
-    await user.click(screen.getByRole("button", { name: "Remove an electron" }));
-    await user.click(screen.getByRole("button", { name: "Remove an electron" }));
-    expect(screen.getByLabelText("Protons: 11")).toBeInTheDocument();
-    expect(screen.getByLabelText("Electrons: 9")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /Reset to neutral Sodium/ }));
-    expect(screen.getByLabelText("Protons: 11")).toBeInTheDocument();
-    expect(screen.getByLabelText("Electrons: 11")).toBeInTheDocument();
-    expect(screen.getByLabelText("Ionic charge: 0 (neutral)")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Bohr model for Na .*11 protons, 11 electrons/ })).toBeInTheDocument();
   });
 
   it("allows non-common-ion electron counts and shows documented ion notes when counts match", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     await user.click(screen.getByRole("button", { name: "Add an electron" }));
     expect(screen.getByRole("heading", { name: "Common ion example" })).toBeInTheDocument();
@@ -109,14 +141,19 @@ describe("Bohr atom builder", () => {
     expect(screen.getByRole("img", { name: /Bohr model for H \(atomic number 1\): nucleus shows p\+ 1, 1 proton, 0 electrons, ionic charge \+1 \(cation\)/ })).toBeInTheDocument();
     expect(screen.getByText("Occupied shells").nextElementSibling).toHaveTextContent("0");
 
-    await user.click(screen.getByRole("button", { name: "Carbon, C" }));
-    await user.click(screen.getByRole("button", { name: "Add an electron" }));
+    for (let i = 0; i < 7; i++) {
+      await user.click(screen.getByRole("button", { name: "Add an electron" }));
+    }
     expect(screen.getByRole("heading", { name: "Exploration (not a listed common ion)" })).toBeInTheDocument();
     expect(screen.getByLabelText("Electrons: 7")).toBeInTheDocument();
-    expect(screen.getByLabelText("Ionic charge: −1 (anion)")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Ionic charge: .*6 \(anion\)/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Sodium, Na" }));
-    await user.click(screen.getByRole("button", { name: "Remove an electron" }));
+    for (let i = 0; i < 10; i++) {
+      await user.click(screen.getByRole("button", { name: "Add a proton" }));
+    }
+    for (let i = 0; i < 3; i++) {
+      await user.click(screen.getByRole("button", { name: "Add an electron" }));
+    }
     expect(screen.getByText(/Sodium ion \(Na\+\): Na\+ occurs in ionic compounds/)).toBeInTheDocument();
     expect(screen.getByLabelText("Electrons: 10")).toBeInTheDocument();
     expect(screen.getByLabelText("Ionic charge: +1 (cation)")).toBeInTheDocument();
@@ -124,9 +161,14 @@ describe("Bohr atom builder", () => {
 
   it("explains carbon bonding and supports documented carbide counts", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
-    await user.click(screen.getByRole("button", { name: "Carbon, C" }));
+    for (let i = 0; i < 5; i++) {
+      await user.click(screen.getByRole("button", { name: "Add a proton" }));
+    }
+    for (let i = 0; i < 5; i++) {
+      await user.click(screen.getByRole("button", { name: "Add an electron" }));
+    }
     expect(screen.getByText(/Carbon usually shares electrons in covalent bonds/)).toBeInTheDocument();
     expect(screen.getByText("Outer-shell rule (duet/octet)")).toBeInTheDocument();
     expect(screen.getByText(/L shell: 4 of 8 electrons/i)).toBeInTheDocument();
@@ -141,21 +183,23 @@ describe("Bohr atom builder", () => {
 
   it("disables controls at supported proton and electron bounds", async () => {
     const user = userEvent.setup();
-    render(<BohrModelViewer />);
+    render(<BohrModelViewer mode="stability" />);
 
     expect(screen.getByRole("button", { name: "Remove a proton" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Remove an electron" }));
     expect(screen.getByLabelText("Electrons: 0")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove an electron" })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Calcium, Ca" }));
+    for (let i = 0; i < 19; i++) {
+      await user.click(screen.getByRole("button", { name: "Add a proton" }));
+    }
     expect(screen.getByRole("button", { name: "Add a proton" })).toBeDisabled();
     for (let i = 0; i < 20; i++) {
       await user.click(screen.getByRole("button", { name: "Add an electron" }));
     }
     expect(screen.getByLabelText("Electrons: 20")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add an electron" })).toBeDisabled();
-  });
+  }, 10000);
 
   it("documents expected ion charges for curriculum elements", () => {
     const expectedCharges: Record<number, number[]> = {

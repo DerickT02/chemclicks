@@ -22,6 +22,7 @@ import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import { measurementAttemptLabel, measurementQuizModeForActivity } from "@/lib/measurement/modes";
 import { getAssignmentGate } from "@/lib/assignments/prerequisites";
 import { assignmentPath } from "@/lib/assignments/sequence";
+import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 
 export const dynamic = "force-dynamic";
 
@@ -52,12 +53,17 @@ export default async function AssignmentPage({ params }: {
   const type = assignment.activity.type;
   const definition = getActivityDefinition(type);
   const explorer = definition?.explorer;
+  const bohrLessonMode = type === "bohr_model_stability" ? "stability" : "intro";
   const quizKind = lewisQuizForLesson(type);
   const measurementQuizMode = measurementQuizModeForActivity(type);
   const attempts = hasActivityContent(type) ? await getAssignmentAttempts(assignmentId) : [];
   // Quiz attempts share the table; exploration rows carry no quiz key.
   const explorationAttempts = attempts.filter((attempt) => !attempt.quiz_key);
-  const bohrQuizAttempts = attempts.filter((attempt) => attempt.quiz_key === "bohr_models");
+  const bohrQuizAttempts = attempts.filter((attempt) =>
+    attempt.quiz_key === BOHR_QUIZ_KEY
+      || attempt.quiz_key === BOHR_INTRO_QUIZ_KEY
+      || attempt.quiz_key === BOHR_STABILITY_QUIZ_KEY,
+  );
   const measurementAttempts = attempts.filter((attempt) => attempt.instrument !== null && attempt.instrument !== undefined);
   const latest = explorationAttempts[0];
   return (
@@ -81,7 +87,7 @@ export default async function AssignmentPage({ params }: {
               </p>
             ) : (
               <>
-                {explorer === "bohr" && <BohrModelViewer />}
+                {explorer === "bohr" && <BohrModelViewer mode={bohrLessonMode} />}
                 {explorer === "lewis-diagram" && <LewisDotExplorer />}
                 {explorer === "ionic" && <IonicCompoundExplorer />}
                 {explorer === "covalent" && <CovalentBondExplorer />}
@@ -101,7 +107,12 @@ export default async function AssignmentPage({ params }: {
             <AttemptControls key={latest.id} assignmentId={assignmentId} attemptId={latest.id} completed={false} />
           </section>}
           {hasActivityContent(type) && <AttemptHistory attempts={explorationAttempts} />}
-          {explorer === "bohr" && <QuizAttemptHistory title="Bohr quiz" attempts={bohrQuizAttempts} />}
+          {explorer === "bohr" && (
+            <QuizAttemptHistory
+              title={type === "bohr_model_stability" ? "Bohr Model Stability quiz" : "Bohr Model Introduction quiz"}
+              attempts={bohrQuizAttempts}
+            />
+          )}
           {measurementQuizMode && (
             <>
               <section aria-label="Measurement quiz history" className="rounded-xl border border-border bg-card p-6">
@@ -140,7 +151,9 @@ export default async function AssignmentPage({ params }: {
         {quizKind && <LewisQuizCard kind={quizKind} assignmentId={assignmentId} assignments={result.assignments} />}
         {explorer === "bohr" && (
           <section className="space-y-3 rounded-xl border border-border bg-card p-6">
-            <h2 className="text-lg font-semibold">Bohr Models Quiz</h2>
+            <h2 className="text-lg font-semibold">
+              {type === "bohr_model_stability" ? "Bohr Model Stability Quiz" : "Bohr Model Introduction Quiz"}
+            </h2>
             <Link href={`/student/quizzes/bohr?assignmentId=${encodeURIComponent(assignmentId)}`} prefetch={false}
               className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
               Start quiz

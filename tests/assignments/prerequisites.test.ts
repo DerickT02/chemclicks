@@ -37,8 +37,8 @@ const assignmentIds = (assignments: StudentAssignment[]) => assignments.map((ass
 
 describe("sectionQuizKey", () => {
   it.each([
-    ["bohr_model_intro", "bohr_models"],
-    ["bohr_model_stability", "bohr_models"],
+    ["bohr_model_intro", "bohr_model_intro"],
+    ["bohr_model_stability", "bohr_model_stability"],
     ["lewis_diagram", null],
     ["lewis_structures_covalent", "lewis_covalent"],
     ["lewis_structures_ionic", "lewis_ionic"],
@@ -69,6 +69,15 @@ describe("isSectionComplete", () => {
     expect(isSectionComplete(type, "completed", none)).toBe(false);
     expect(isSectionComplete(type, "completed", new Set(["some_other_quiz"]))).toBe(false);
     expect(isSectionComplete(type, null, none)).toBe(false);
+  });
+
+  it.each([
+    ["bohr_model_intro", "bohr_model_intro", "bohr_model_stability"],
+    ["bohr_model_stability", "bohr_model_stability", "bohr_model_intro"],
+  ] as const)("%s completes on its own split quiz or the legacy shared one, not the other lesson's", (type, own, other) => {
+    expect(isSectionComplete(type, null, new Set([own]))).toBe(true);
+    expect(isSectionComplete(type, null, new Set(["bohr_models"]))).toBe(true);
+    expect(isSectionComplete(type, "completed", new Set([other]))).toBe(false);
   });
 
   it("completes the Lewis dot diagram, which has no quiz, once its exploration is finished", () => {

@@ -18,6 +18,8 @@ export function clampElectronCount(count: number): number {
 
 /** Noble-gas stable (NGS) electron counts for this curriculum (He, Ne, Ar). */
 export const NOBLE_GAS_STABLE_ELECTRON_COUNTS = [2, 10, 18] as const;
+/** A charge magnitude above this is not treated as a plausible ion in this model. */
+export const MAX_PLAUSIBLE_IONIC_CHARGE_MAGNITUDE = 4;
 
 export type StabilityIndicator = {
   met: boolean;
@@ -47,14 +49,38 @@ export function isNobleGasStableElectronCount(electrons: number): boolean {
   return (NOBLE_GAS_STABLE_ELECTRON_COUNTS as readonly number[]).includes(electrons);
 }
 
-export function describeNobleGasStability(electrons: number): StabilityIndicator {
-  const met = isNobleGasStableElectronCount(electrons);
+export function isPlausibleIonicCharge(charge: number | null): boolean {
+  return (
+    charge !== null &&
+    Number.isInteger(charge) &&
+    Math.abs(charge) <= MAX_PLAUSIBLE_IONIC_CHARGE_MAGNITUDE
+  );
+}
+
+export function describeNobleGasStability(
+  electrons: number,
+  protons?: number,
+): StabilityIndicator {
+  const hasNobleGasCount = isNobleGasStableElectronCount(electrons);
+  const charge = protons === undefined ? null : calculateIonicCharge(protons, electrons);
+  const chargeIsPlausible = protons === undefined || isPlausibleIonicCharge(charge);
+  const met = hasNobleGasCount && chargeIsPlausible;
+
+  let explanation: string;
+  if (!hasNobleGasCount) {
+    explanation = `NGS is met for 2, 10, or 18 electrons; this model has ${electrons}.`;
+  } else if (!chargeIsPlausible) {
+    explanation = `This model has ${electrons} electrons, but its ionic charge is ${charge === null ? "unavailable" : describeIonicCharge(charge)}. A charge magnitude above ${MAX_PLAUSIBLE_IONIC_CHARGE_MAGNITUDE} is outside the plausible range used by this model.`;
+  } else if (charge !== null && charge !== 0) {
+    explanation = `This particle has ${electrons} electrons, an electron count isoelectronic with a noble gas, and ionic charge ${describeIonicCharge(charge)}. This can help explain common ions, but a noble-gas electron count alone does not prove an ion is stable.`;
+  } else {
+    explanation = `This particle has ${electrons} electrons, matching a noble-gas electron count (2, 10, or 18).`;
+  }
+
   return {
     met,
     label: met ? "NGS: met" : "NGS: not met",
-    explanation: met
-      ? `This particle has ${electrons} electrons, one of the noble-gas stable counts (2, 10, or 18).`
-      : `NGS is met when an atom or ion has 2, 10, or 18 electrons total; this model has ${electrons}.`,
+    explanation,
   };
 }
 
@@ -79,7 +105,7 @@ export function describeNeutralChargeStability(
     met,
     label: met ? "NCS: met" : "NCS: not met",
     explanation: met
-      ? "Protons equal electrons (neutral charge stability)."
+      ? "Protons equal electrons, so this particle has neutral charge."
       : `NCS is met when protons equal electrons; here ${protons} ${protons === 1 ? "proton" : "protons"} and ${electrons} ${electrons === 1 ? "electron" : "electrons"}.`,
   };
 }
@@ -100,12 +126,21 @@ export function nobleGasStabilityPanelText(
   electrons: number,
   indicator: StabilityIndicator,
 ): StabilityPanelText {
-  if (indicator.met) {
-    return { headline: indicator.explanation };
+  if (indicator.met && isNobleGasStableElectronCount(electrons)) {
+    return {
+      headline: indicator.explanation,
+      hint: "A noble-gas electron count can explain why some ions are common, but it does not by itself prove an ion is stable.",
+    };
+  }
+  if (isNobleGasStableElectronCount(electrons)) {
+    return {
+      headline: indicator.explanation,
+      hint: "Ions with very large charge mismatches are not treated as stable in this model.",
+    };
   }
   return {
-    headline: `${electrons} electrons in this model.`,
-    hint: "Noble-gas stability needs 2, 10, or 18 electrons total.",
+    headline: indicator.explanation,
+    hint: "Noble-gas electron counts in this model are 2, 10, or 18.",
   };
 }
 
@@ -121,7 +156,10 @@ export function neutralChargeStabilityPanelText(
   indicator: StabilityIndicator,
 ): StabilityPanelText {
   if (indicator.met) {
-    return { headline: indicator.explanation };
+    return {
+      headline: indicator.explanation,
+      hint: "Neutral means the charges balance; it does not mean the atom is unreactive.",
+    };
   }
   const protonWord = protons === 1 ? "proton" : "protons";
   const electronWord = electrons === 1 ? "electron" : "electrons";
@@ -163,6 +201,12 @@ export function outerShellRulePanelText(
 
   if (rule.meetsRule) {
     let headline = rule.explanation;
+    if (charge !== null && !isPlausibleIonicCharge(charge)) {
+      return {
+        headline: `${headline} The ionic charge is ${describeIonicCharge(charge)}, outside the plausible range used by this model, so this is not treated as a stable ion here.`,
+        hint: "An outer-shell pattern alone does not prove an ion is stable.",
+      };
+    }
     if (charge !== null && charge !== 0) {
       headline += " This electron arrangement does not prove the ion is stable on its own.";
     }
