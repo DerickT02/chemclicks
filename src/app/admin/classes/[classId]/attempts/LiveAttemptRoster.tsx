@@ -8,6 +8,7 @@ export function LiveAttemptRoster({ initialSummary }: { initialSummary: TeacherA
   const { data, failed } = useLiveTeacherProgress(
     `/admin/classes/${encodeURIComponent(initialSummary.classId)}/progress?assignmentId=${encodeURIComponent(initialSummary.assignmentId)}`,
     initialSummary,
+    { classId: initialSummary.classId, assignmentId: initialSummary.assignmentId },
   );
 
   return (
@@ -15,9 +16,9 @@ export function LiveAttemptRoster({ initialSummary }: { initialSummary: TeacherA
       <p role="status" className="mb-3 text-sm text-muted-foreground">
         {failed
           ? "Live updates interrupted. Showing last loaded attempts; retrying automatically."
-          : "Attempts update automatically every 5 seconds while this tab is visible."}
+          : "Attempts update live, with periodic checks while this tab is visible."}
       </p>
-      {data && <AttemptRoster summary={data} />}
+      {data && <AttemptRoster summary={data} lazyHistory />}
     </>
   );
 }

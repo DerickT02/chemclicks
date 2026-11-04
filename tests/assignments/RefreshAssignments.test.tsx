@@ -23,6 +23,13 @@ describe("simple dashboard refresh", () => {
     expect(mocks.router.refresh).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);
   });
+  it("can disable focus refresh for views that already subscribe to live updates", () => {
+    render(<RefreshAssignments label="Refresh classroom" refreshOnFocus={false} />);
+    fireEvent(window, new Event("focus"));
+    expect(mocks.router.refresh).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh classroom" }));
+    expect(mocks.router.refresh).toHaveBeenCalledTimes(1);
+  });
   it("supports a classroom label and cleans up focus listeners in StrictMode", () => {
     const view = render(<StrictMode><RefreshAssignments label="Refresh classroom" /></StrictMode>);
     expect(screen.getByRole("button", { name: "Refresh classroom" })).toBeInTheDocument();

@@ -26,6 +26,22 @@ describe('teacher attempt summary server boundary', () => {
       p_teacher_id: 'session-teacher', p_class_id: classId, p_assignment_id: assignmentId,
     })
   })
+  it('uses a lightweight RPC for live overviews, and scopes expanded history to one student', async () => {
+    mock.rpc.mockResolvedValue({ data: { students: [] }, error: null })
+    await getTeacherActivityAttemptSummary(classId, assignmentId, { live: true })
+    expect(mock.rpc).toHaveBeenLastCalledWith('teacher_activity_live_summary', {
+      p_teacher_id: 'session-teacher', p_class_id: classId, p_assignment_id: assignmentId,
+      p_include_attempts: false, p_student_id: null,
+    })
+    const studentId = '33333333-3333-4333-8333-333333333333'
+    await getTeacherActivityAttemptSummary(classId, assignmentId, { live: true, studentId })
+    expect(mock.rpc).toHaveBeenLastCalledWith('teacher_activity_live_summary', {
+      p_teacher_id: 'session-teacher', p_class_id: classId, p_assignment_id: assignmentId,
+      p_include_attempts: true, p_student_id: studentId,
+    })
+    await expect(getTeacherActivityAttemptSummary(classId, assignmentId, { live: true, studentId: 'invalid' })).rejects.toThrow('Invalid')
+    expect(mock.rpc).toHaveBeenCalledTimes(2)
+  })
   it.each([{ data: null, error: null }, { data: { id: classId }, error: { message: 'private details' } }])('blocks foreign, disabled or unavailable class reports before the RPC (%j)', async result => {
     mock.maybeSingle.mockResolvedValue(result)
     await expect(getTeacherActivityAttemptSummary(classId, assignmentId)).rejects.toThrow('Class access denied or unavailable')

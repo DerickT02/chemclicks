@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
   user: null as { id: string } | null,
-  admin: vi.fn(), student: vi.fn(), teacher: vi.fn(), studentEq: vi.fn(), teacherFrom: vi.fn(),
+  admin: vi.fn(), student: vi.fn(), teacher: vi.fn(), studentEq: vi.fn(), teacherFrom: vi.fn(), session: vi.fn(),
 }));
 // Every session response carries cookies as if updateSession had just refreshed
 // the session: a replacement token, and an old chunk being cleared.
@@ -19,6 +19,7 @@ const REFRESHED_COOKIES = [
 ] as const;
 vi.mock("@/lib/supabase/middleware", () => ({
   updateSession: async () => {
+    mocks.session();
     const response = NextResponse.next();
     for (const cookie of REFRESHED_COOKIES) response.cookies.set(cookie);
     return { response, user: mocks.user, supabase: { from: mocks.teacherFrom } };
@@ -93,6 +94,23 @@ describe("admin route proxy", () => {
     await proxy(request("/help"));
     expect(mocks.admin).not.toHaveBeenCalled();
     expect(mocks.teacherFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe("authorized live read handlers", () => {
+  it.each(["progress", "roster", "attempt-history"])("leaves GET %s authentication and cookie refresh to the handler", async endpoint => {
+    const response = await proxy(request(`/admin/classes/class/${endpoint}`));
+    expect(response.headers.get("location")).toBeNull();
+    expect(mocks.session).not.toHaveBeenCalled();
+    expect(mocks.admin).not.toHaveBeenCalled();
+    expect(mocks.teacherFrom).not.toHaveBeenCalled();
+  });
+  it("does not skip guards for actions or similarly named pages", async () => {
+    await proxy(new NextRequest("https://chemclicks.test/admin/classes/class/progress", { method: "POST" }));
+    await proxy(request("/admin/classes/class/progress/extra"));
+    await proxy(request("/admin/classes/class/attempts"));
+    expect(mocks.session).toHaveBeenCalledTimes(3);
+    expect(mocks.admin).toHaveBeenCalledTimes(3);
   });
 });
 

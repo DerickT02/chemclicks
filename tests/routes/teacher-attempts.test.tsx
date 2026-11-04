@@ -89,12 +89,12 @@ describe('teacher report', () => {
   })
   it('loads the explicitly selected assignment and keeps it selected', async () => {
     const html = renderToStaticMarkup(await Page(props('second')))
-    expect(mock.summary).toHaveBeenCalledWith('class', 'second')
+    expect(mock.summary).toHaveBeenCalledWith('class', 'second', { live: true })
     expect(html).toContain('value="second" selected=""')
   })
   it('defaults to the first assignment', async () => {
     await Page(props())
-    expect(mock.summary).toHaveBeenCalledWith('class', 'first')
+    expect(mock.summary).toHaveBeenCalledWith('class', 'first', { live: true })
   })
   it('rejects a foreign assignment instead of silently selecting another', async () => {
     await expect(Page(props('foreign'))).rejects.toThrow('access denied')

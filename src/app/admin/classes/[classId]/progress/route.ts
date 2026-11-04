@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ clas
     // every request. No client-supplied teacher identity is accepted.
     const data = assignmentId === null
       ? await getTeacherClassLessonProgress(classId)
-      : await getTeacherActivityAttemptSummary(classId, assignmentId);
+      : await getTeacherActivityAttemptSummary(classId, assignmentId, { live: true });
     return Response.json(data, { headers });
   } catch {
     // Do not expose student data or database details when access/read checks fail.

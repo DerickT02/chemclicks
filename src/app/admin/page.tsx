@@ -293,7 +293,7 @@ export default async function AdminPage({
                 <Link href={`/admin/classes/${selectedClass.id}/attempts`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
                   Activity attempts
                 </Link>
-                <div className="mt-4"><RefreshAssignments label="Refresh classroom" /></div>
+                <div className="mt-4"><RefreshAssignments label="Refresh classroom" refreshOnFocus={false} /></div>
                 <div className="mt-7">
                   <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
                   <div className="mt-4">

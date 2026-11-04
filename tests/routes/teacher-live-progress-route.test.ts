@@ -29,7 +29,7 @@ describe("live teacher progress reads", () => {
   it("scopes attempt reads to the requested class and assignment", async () => {
     mocks.attempts.mockResolvedValue({ classId, assignmentId, students: [] });
     expect((await request(`?assignmentId=${assignmentId}`)).status).toBe(200);
-    expect(mocks.attempts).toHaveBeenCalledExactlyOnceWith(classId, assignmentId);
+    expect(mocks.attempts).toHaveBeenCalledExactlyOnceWith(classId, assignmentId, { live: true });
     expect(mocks.lessons).not.toHaveBeenCalled();
   });
 

@@ -4,9 +4,10 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudentRoster as Roster } from "@/lib/server/student-roster";
 
-const mocks = vi.hoisted(() => ({ approve: vi.fn(), refresh: vi.fn() }));
+const mocks = vi.hoisted(() => ({ approve: vi.fn(), refresh: vi.fn(), subscribe: vi.fn() }));
 vi.mock("@/app/admin/classes/roster-actions", () => ({ approveStudent: mocks.approve }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
+vi.mock("@/lib/teacher-class-updates", () => ({ subscribeTeacherClass: mocks.subscribe }));
 import LiveStudentRoster from "@/app/admin/classes/LiveStudentRoster";
 
 const fetchMock = vi.fn();
@@ -15,7 +16,7 @@ const second = { ...student, id: "second", first_name: "Sam", student_id: "TEST2
 const empty: Roster = { pending: [], active: [] };
 const roster: Roster = { pending: [student], active: [] };
 const reply = (data: Roster) => ({ ok: true, redirected: false, json: async () => data });
-const tick = async (ms = 5_000) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+const tick = async (ms = 60_000) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 const pendingList = () => within(screen.getByRole("region", { name: "Pending students" }));
 const activeList = () => within(screen.getByRole("region", { name: "Active students" }));
 
@@ -24,6 +25,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockResolvedValue(reply(empty));
+  mocks.subscribe.mockReturnValue(() => {});
   vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
   vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
 });
@@ -73,7 +75,7 @@ describe("live student approvals", () => {
     expect(pendingList().getByRole("cell", { name: "TEST1" })).toBeInTheDocument();
     expect(screen.queryByText(/private connection/)).not.toBeInTheDocument();
     fetchMock.mockResolvedValue(reply({ pending: [student, second], active: [] }));
-    await tick();
+    await tick(120_000);
     expect(screen.queryByText(/Showing last loaded roster/)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pending (2)" })).toBeInTheDocument();
   });
@@ -86,7 +88,7 @@ describe("live student approvals", () => {
     expect(screen.getByRole("button", { name: "Retry student roster" })).toBeInTheDocument();
     expect(screen.queryByText("No pending students.")).not.toBeInTheDocument();
     fetchMock.mockResolvedValue(reply(roster));
-    await tick();
+    await tick(120_000);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(pendingList().getByRole("cell", { name: "TEST1" })).toBeInTheDocument();
   });
@@ -123,10 +125,11 @@ describe("live student approvals", () => {
     let resolveOld!: (response: ReturnType<typeof reply>) => void;
     fetchMock.mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }));
     const { rerender } = render(<LiveStudentRoster key="class-a" classId="class-a" initialRoster={roster} />);
+    await tick();
     const next: Roster = { pending: [second], active: [] };
     fetchMock.mockResolvedValue(reply(next));
     rerender(<LiveStudentRoster key="class-b" classId="class-b" initialRoster={next} />);
-    await tick(0);
+    await tick();
     await act(async () => { resolveOld(reply(roster)); });
     expect(pendingList().queryByRole("cell", { name: "TEST1" })).not.toBeInTheDocument();
     expect(pendingList().getByRole("cell", { name: "TEST2" })).toBeInTheDocument();

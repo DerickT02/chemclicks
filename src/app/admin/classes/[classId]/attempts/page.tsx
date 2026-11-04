@@ -14,7 +14,7 @@ export default async function ActivityAttemptsPage({ params, searchParams }: {
   if (selectedId && !classroom.assignments.some(item => item.id === selectedId)) {
     throw new Error('Activity access denied or unavailable.')
   }
-  const summary = selectedId ? await getTeacherActivityAttemptSummary(classId, selectedId) : null
+  const summary = selectedId ? await getTeacherActivityAttemptSummary(classId, selectedId, { live: true }) : null
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-foreground">
       <h1 className="text-3xl font-semibold">Activity attempts</h1>

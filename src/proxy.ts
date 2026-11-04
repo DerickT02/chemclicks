@@ -39,6 +39,12 @@ function redirectWithSession(response: NextResponse, url: URL): NextResponse {
  * @see https://nextjs.org/docs/messages/middleware-to-proxy
  */
 export default async function proxy(request: NextRequest) {
+  // These GET handlers authenticate, refresh cookies, and check ownership
+  // themselves. Avoid duplicating Auth/role lookups in the proxy. Keep this an
+  // explicit allowlist; pages, actions and every other route retain the guard.
+  if (request.method === "GET" && /^\/admin\/classes\/[^/]+\/(progress|roster|attempt-history)$/.test(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
   const { response, user, supabase } = await updateSession(request);
 
   const { pathname } = request.nextUrl;

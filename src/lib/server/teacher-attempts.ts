@@ -55,10 +55,11 @@ export type TeacherActivityAttemptSummary = {
 export async function getTeacherActivityAttemptSummary(
   classId: string,
   assignmentId: string,
+  options: { live?: boolean; studentId?: string } = {},
 ): Promise<TeacherActivityAttemptSummary> {
   const teacherId = await requireTeacherId()
   const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
-  if (!uuid.test(classId) || !uuid.test(assignmentId)) {
+  if (!uuid.test(classId) || !uuid.test(assignmentId) || (options.studentId !== undefined && !uuid.test(options.studentId))) {
     throw new Error('Invalid class or assignment.')
   }
   const client = createServiceClient()
@@ -66,10 +67,11 @@ export async function getTeacherActivityAttemptSummary(
     .select('id').eq('id', classId).eq('teacher_id', teacherId)
     .eq('is_active', true).maybeSingle()
   if (classError || !classroom) throw new Error('Class access denied or unavailable.')
-  const { data, error } = await client.rpc('teacher_activity_attempt_summary', {
+  const { data, error } = await client.rpc(options.live ? 'teacher_activity_live_summary' : 'teacher_activity_attempt_summary', {
     p_teacher_id: teacherId,
     p_class_id: classId,
     p_assignment_id: assignmentId,
+    ...(options.live ? { p_include_attempts: options.studentId !== undefined, p_student_id: options.studentId ?? null } : {}),
   })
   if (error || !data) throw new Error('Activity summary access denied or unavailable.')
   return data as TeacherActivityAttemptSummary

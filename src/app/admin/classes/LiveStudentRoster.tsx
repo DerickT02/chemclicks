@@ -11,6 +11,7 @@ export default function LiveStudentRoster({ classId, initialRoster }: Props) {
   const { data, failed } = useLiveTeacherProgress(
     `/admin/classes/${encodeURIComponent(classId)}/roster`,
     initialRoster,
+    { classId, resource: "roster" },
   );
 
   if (!data) {
@@ -20,7 +21,7 @@ export default function LiveStudentRoster({ classId, initialRoster }: Props) {
         <p role="alert" className="text-sm text-destructive">
           Student roster could not be loaded. Retrying automatically.
         </p>
-        <RefreshAssignments label="Retry student roster" />
+        <RefreshAssignments label="Retry student roster" refreshOnFocus={false} />
       </section>
     );
   }
@@ -31,7 +32,7 @@ export default function LiveStudentRoster({ classId, initialRoster }: Props) {
       roster={data}
       liveStatus={failed
         ? "Live updates interrupted. Showing last loaded roster; retrying automatically."
-        : "Student approval requests update automatically every 5 seconds while this tab is visible."}
+        : "Student approval requests update live, with periodic checks while this tab is visible."}
     />
   );
 }
