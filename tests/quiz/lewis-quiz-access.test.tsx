@@ -36,6 +36,9 @@ vi.mock("@/lib/assignments/prerequisites", async (importOriginal) => {
 vi.mock("@/lib/server/student-assignments", () => ({ getAssignmentAttempts: mocks.attempts }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
+  BOHR_QUIZ_KEY: "bohr_models",
+  BOHR_INTRO_QUIZ_KEY: "bohr_model_intro",
+  BOHR_STABILITY_QUIZ_KEY: "bohr_model_stability",
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
   listQuizQuestions: mocks.listQuestions,
