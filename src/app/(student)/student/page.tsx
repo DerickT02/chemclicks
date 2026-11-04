@@ -16,13 +16,11 @@ const ACTIONS = { not_started: "Open to start", in_progress: "Resume exploration
 
 function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; section: QueueSection }) {
   const available = OPEN_SECTIONS.includes(section);
-  const lockedBy = available ? assignment.lockedBy ?? null : null;
-  const unlocked = available && !lockedBy;
-  const quizKind = unlocked ? lewisQuizForLesson(assignment.activity.type) : null;
+  const quizKind = available ? lewisQuizForLesson(assignment.activity.type) : null;
   const quizQuery = `?assignmentId=${encodeURIComponent(assignment.id)}`;
   const quizPath = quizKind ? LEWIS_QUIZZES[quizKind].path
-    : unlocked && getActivityDefinition(assignment.activity.type)?.explorer === "bohr" ? "/student/quizzes/bohr" : null;
-  const action = !lockedBy && Object.hasOwn(ACTIONS, section) ? ACTIONS[section as keyof typeof ACTIONS] : null;
+    : available && getActivityDefinition(assignment.activity.type)?.explorer === "bohr" ? "/student/quizzes/bohr" : null;
+  const action = Object.hasOwn(ACTIONS, section) ? ACTIONS[section as keyof typeof ACTIONS] : null;
   return (
     <li className="space-y-3 rounded-xl border border-border bg-card p-5">
       <h3 className="text-lg font-semibold">{assignment.activity.title}</h3>
@@ -44,15 +42,6 @@ function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; 
       {section === "invalid" && <p className="text-sm text-muted-foreground">The schedule could not be confirmed. Refresh the page or ask your teacher.</p>}
       {!hasActivityContent(assignment.activity.type) && (
         <p className="text-sm text-muted-foreground">Exercise not available yet. {getNewAssignmentBlockReason(assignment.activity.type)}</p>
-      )}
-      {lockedBy && (
-        <p className="text-sm text-muted-foreground" role="status">
-          Locked: finish{" "}
-          <Link href={`/student/assignments/${lockedBy.id}`} prefetch={false} className="font-semibold text-foreground underline">
-            {lockedBy.activity.title}
-          </Link>{" "}
-          first.
-        </p>
       )}
       {action && (
         <Link href={`/student/assignments/${assignment.id}`} prefetch={false}

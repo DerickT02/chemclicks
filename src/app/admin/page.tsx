@@ -304,9 +304,12 @@ export default async function AdminPage({
                   <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
                   <div className="mt-4">
                     {lessonProgressLoadFailed ? (
-                      <p role="alert" className="text-sm text-destructive">
-                        Student progress could not be loaded. Please refresh the page.
-                      </p>
+                      <div className="space-y-3">
+                        <p role="alert" className="text-sm text-destructive">
+                          Student progress could not be loaded. Please try again.
+                        </p>
+                        <RefreshAssignments label="Retry student progress" />
+                      </div>
                     ) : (
                       <div className="max-h-[480px] overflow-y-auto rounded-lg border border-border p-4">
                         <LessonProgressList students={lessonProgressStudents} />

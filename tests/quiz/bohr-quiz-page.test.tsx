@@ -50,12 +50,10 @@ describe("Bohr quiz page", () => {
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
-  it("does not read questions while the quiz is locked", async () => {
+  it("sends an unassigned quiz back to the assignments page without reading questions", async () => {
     getAccess.mockResolvedValue({ status: "locked" });
 
-    const html = renderToStaticMarkup(await BohrModelQuizPage());
-
-    expect(html).toContain("This quiz is locked");
+    await expect(BohrModelQuizPage()).rejects.toThrow("REDIRECT:/student");
     expect(listQuestions).not.toHaveBeenCalled();
   });
 

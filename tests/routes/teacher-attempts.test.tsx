@@ -44,13 +44,9 @@ describe('teacher report', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
       ...report.students[0],
       overallStatus: 'taking_quiz',
+      progressStage: 'quiz_in_progress',
       explorationStatus: 'completed',
-      explorationDurationSeconds: 125,
-      passingQuizAttemptNumber: 1,
-      passingQuizScore: 10,
-      passingQuizTotal: 12,
-      passingQuizPercentage: 83.33,
-      passingQuizCompletedAt: '2026-09-23T12:05:00Z',
+      explorationDurationSeconds: 3661,
       failedQuizAttemptCount: 1,
       stage: 'Taking quiz',
       firstQuizStartedAt: '2026-09-23T12:00:00Z',
@@ -59,30 +55,50 @@ describe('teacher report', () => {
       timeToFirstQuizSeconds: 3661,
     }] }} />)
 
-    expect(html).toContain('Assignment stage:</dt><dd>Taking quiz</dd>')
+    expect(html).toContain('Taking the quiz</span>')
     expect(html).toContain('Quiz started; no result submitted yet.')
     expect(html).toContain('Exploration started')
     expect(html).toContain('First quiz started')
     expect(html).toContain('Latest quiz started')
     expect(html).toContain('Exploration to first quiz:</dt><dd>1h 1m')
-    expect(html).toContain('Passed on attempt 1: 10/12 (83.33%)')
-    expect(html).toContain('Exploration:</dt><dd>2m 5s')
+    expect(html).toContain('Quiz:</dt><dd>In progress · 1 attempt not passed')
+  })
+  it('shows a single exploration figure from the saved exploration-to-first-quiz interval', () => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], progressStage: 'completed', overallStatus: 'completed',
+      explorationDurationSeconds: 125, timeToFirstQuizSeconds: 125,
+    }] }} />)
+    expect(html.match(/2m 5s/g)).toHaveLength(1)
+    expect(html).not.toContain('Exploration:</dt>')
   })
   it.each([
-    ['Not started', 'Not started'],
-    ['Exploring', 'Exploring'],
-    ['Taking quiz', 'Taking quiz'],
-    ['Needs retry', 'Needs retry'],
-    ['Completed', 'Completed'],
-  ] as const)('renders the server-derived stage %s', (stage, label) => {
+    ['not_started', 'Not started'],
+    ['exploring', 'Started the assignment'],
+    ['explored', 'Exploration finished, quiz not started'],
+    ['quiz_in_progress', 'Taking the quiz'],
+    ['needs_retry', 'Quiz not passed, needs retry'],
+    ['completed', 'Completed'],
+  ] as const)('renders the server-derived stage %s', (progressStage, label) => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
-      ...report.students[0], stage,
+      ...report.students[0], progressStage,
     }] }} />)
-    expect(html).toContain(`Assignment stage:</dt><dd>${label}</dd>`)
+    expect(html).toContain(`${label}</span>`)
+  })
+  it.each([
+    ['not_started', 'Not started'],
+    ['exploring', 'Started the assignment'],
+    ['taking_quiz', 'Taking the quiz'],
+    ['needs_retry', 'Quiz not passed, needs retry'],
+    ['completed', 'Completed'],
+  ] as const)('falls back to overallStatus %s on a database without progressStage', (overallStatus, label) => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], overallStatus,
+    }] }} />)
+    expect(html).toContain(`${label}</span>`)
   })
   it.each([0, -1, 59, 60])('formats unusual timer values safely (%s seconds)', seconds => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
-      ...report.students[0], timeToFirstQuizSeconds: seconds,
+      ...report.students[0], progressStage: 'quiz_in_progress', timeToFirstQuizSeconds: seconds,
     }] }} />)
     const expected = seconds <= 0 ? '0s' : seconds < 60 ? `${seconds}s` : '1m 0s'
     expect(html).toContain(`Exploration to first quiz:</dt><dd>${expected}`)
@@ -113,38 +129,54 @@ describe('teacher report', () => {
   it('shows the unified status for each student instead of just raw counts', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
     expect(html).toContain('Not started')
-    expect(html).toContain('Exploring')
+    expect(html).toContain('Started the assignment')
   })
-  it('shows exploration duration, or In progress/Not started instead of a fabricated duration', () => {
+  it('says when history is unknown instead of fabricating times', () => {
     const student = (overrides: Partial<TeacherActivityAttemptSummary['students'][number]>) => ({
       ...report.students[0], ...overrides,
     })
     const notStarted = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({})] }} />)
-    expect(notStarted).toContain('Not started')
-    const inProgress = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
-      overallStatus: 'exploring', explorationStatus: 'in_progress',
+    expect(notStarted).toContain('Exploration started:</dt><dd>Not started')
+    expect(notStarted).not.toContain('Exploration to first quiz')
+    const exploring = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      progressStage: 'exploring', explorationStartedAt: null,
     })] }} />)
-    expect(inProgress).toContain('In progress')
-    const completed = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
-      overallStatus: 'completed', explorationStatus: 'completed', explorationDurationSeconds: 125,
+    expect(exploring).toContain('Start time not recorded')
+    expect(exploring).toContain('Exploration to first quiz:</dt><dd>Quiz not started')
+    const historical = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
+      progressStage: 'completed', passingQuizAttemptNumber: 1, passingQuizScore: 11, passingQuizTotal: 12,
+      passingQuizPercentage: 91.67, completedAt: null,
     })] }} />)
-    expect(completed).toContain('2m 5s')
+    expect(historical).toContain('Exploration to first quiz:</dt><dd>Not recorded')
+    expect(historical).toContain('Completed:</dt><dd>Time not recorded')
+  })
+  it('shows the completion time from the saved record', () => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], progressStage: 'completed', completedAt: '2026-09-25T08:30:00Z',
+    }] }} />)
+    expect(html).toContain('dateTime="2026-09-25T08:30:00Z"')
   })
   it('shows the passing quiz attempt distinctly from a not-yet-passed failed-attempt count', () => {
     const student = (overrides: Partial<TeacherActivityAttemptSummary['students'][number]>) => ({
       ...report.students[0], ...overrides,
     })
     const needsRetry = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
-      overallStatus: 'needs_retry', failedQuizAttemptCount: 2,
+      progressStage: 'needs_retry', overallStatus: 'needs_retry', failedQuizAttemptCount: 2,
     })] }} />)
-    expect(needsRetry).toContain('Not yet passed')
-    expect(needsRetry).toContain('2 failed attempts')
+    expect(needsRetry).toContain('Not passed yet · 2 attempts submitted')
+    expect(needsRetry).not.toContain('Completed')
     const passed = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [student({
-      overallStatus: 'completed', passingQuizAttemptNumber: 2, passingQuizScore: 10, passingQuizTotal: 12,
+      progressStage: 'completed', overallStatus: 'completed', passingQuizAttemptNumber: 2, passingQuizScore: 10, passingQuizTotal: 12,
       passingQuizPercentage: 83.33, passingQuizCompletedAt: '2026-09-23T12:05:00Z', failedQuizAttemptCount: 1,
     })] }} />)
-    expect(passed).toContain('Passed on attempt 2: 10/12')
-    expect(passed).toContain('83.33%')
+    expect(passed).toContain('Passed on attempt 2: 10/12 (83.33%)')
+  })
+  it('does not show a pass or score for a student with no submitted quiz', () => {
+    const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
+      ...report.students[0], progressStage: 'explored',
+    }] }} />)
+    expect(html).toContain('Quiz:</dt><dd>Not started')
+    expect(html).not.toMatch(/\d+\/\d+/)
   })
   it('provides accessible loading and retry states without showing raw errors', () => {
     expect(renderToStaticMarkup(<Loading />)).toContain('role="status"')

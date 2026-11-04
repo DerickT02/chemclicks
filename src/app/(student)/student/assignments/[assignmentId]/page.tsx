@@ -15,7 +15,6 @@ import IonicCompoundExplorer from "@/components/lewis/IonicCompoundExplorer";
 import CovalentBondExplorer from "@/components/lewis/CovalentBondExplorer";
 import LewisQuizCard from "@/components/quiz/lewis/LewisQuizCard";
 import MeasurementQuiz from "@/components/measurement/MeasurementQuiz";
-import LockedSection from "@/components/assignments/LockedSection";
 
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
@@ -46,18 +45,10 @@ export default async function AssignmentPage({ params }: {
       <p role="status">This activity is not available right now. Check its schedule on My assignments or ask your teacher.</p>
     </main>
   );
-  // Earlier sections must be finished first, even when this URL is opened directly.
+  // Completion and the next section, for the "continue" link below.
   const gate = await getAssignmentGate(assignmentId);
   if (gate.status === "unauthenticated") redirect("/login/student");
   if (gate.status === "error") throw new Error(gate.message);
-  if (gate.status === "locked") return (
-    <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <h1 className="text-3xl font-semibold">{assignment.activity.title}</h1>
-        <LockedSection blocker={gate.blocker} />
-      </div>
-    </main>
-  );
   const type = assignment.activity.type;
   const definition = getActivityDefinition(type);
   const explorer = definition?.explorer;

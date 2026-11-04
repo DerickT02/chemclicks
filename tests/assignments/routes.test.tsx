@@ -243,27 +243,15 @@ describe("student assignment pages", () => {
   });
 });
 
-describe("prerequisite gating", () => {
+describe("section navigation", () => {
   const blocker = { ...assignment, id: "bohr-intro", activity: { ...assignment.activity, id: "bohr", title: "Bohr Intro", type: "bohr_model_intro" } };
 
-  it("shows a locked panel instead of the exercise when an earlier section is unfinished", async () => {
-    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
-    gate.mockResolvedValue({ status: "locked", blocker });
-    const html = renderToStaticMarkup(await page());
-    expect(gate).toHaveBeenCalledWith(assignment.id);
-    expect(html).toContain("This section is locked.");
-    expect(html).toContain('href="/student/assignments/bohr-intro"');
-    expect(html).toContain('href="/student"');
-    expect(html).not.toContain("Cylinder exercise");
-    expect(html).not.toContain("Start exploration");
-    expect(attempts).not.toHaveBeenCalled();
-  });
   it("sends a signed-out gate result to the student login", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     gate.mockResolvedValue({ status: "unauthenticated" });
     await expect(page()).rejects.toThrow("REDIRECT:/login/student");
   });
-  it("links a completed section to the next unlocked one", async () => {
+  it("links a completed section to the next unfinished one", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     gate.mockResolvedValue({ status: "open", entry: { complete: true }, next: { assignment: blocker } });
     const html = renderToStaticMarkup(await page());
@@ -277,15 +265,13 @@ describe("prerequisite gating", () => {
     expect(html).toContain("finished all open sections");
     expect(html).toContain('href="/student"');
   });
-  it("hides start and quiz links on locked queue cards and names the blocking section", async () => {
+  it("offers start and quiz links on every open queue card", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [{
       ...assignment, id: "lesson", activity: { ...assignment.activity, type: "lewis_structures_covalent" },
-      lockedBy: { id: "bohr-intro", activity: { title: "Bohr Intro" } },
     }] });
     const html = renderToStaticMarkup(await StudentPage());
-    expect(html).toContain("Locked: finish");
-    expect(html).toContain('href="/student/assignments/bohr-intro"');
-    expect(html).not.toContain('href="/student/assignments/lesson"');
-    expect(html).not.toContain("Take quiz");
+    expect(html).not.toContain("Locked");
+    expect(html).toContain('href="/student/assignments/lesson"');
+    expect(html).toContain("Take quiz");
   });
 });

@@ -18,8 +18,6 @@ export type SequenceEntry = {
   assignment: StudentAssignment;
   schedule: ScheduleStatus;
   complete: boolean;
-  /** The first earlier section the student still has to finish, if any. */
-  lockedBy: StudentAssignment | null;
 };
 
 const NO_QUIZZES: ReadonlySet<string> = new Set();
@@ -33,49 +31,48 @@ export function sectionQuizKey(type: ActivityType): string | null {
   return mode ? `measurement_${mode.key}` : null;
 }
 
-/** Same completion rules as the teacher's lesson progress view (teacher_class_lesson_progress). */
+/**
+ * A section with a quiz is complete once that quiz is passed; one without a
+ * quiz is complete once its exploration is finished. Same rule as the
+ * teacher views (public.assignment_progress_state).
+ */
 export function isSectionComplete(
   type: ActivityType,
   progress: ProgressStatus | null,
   passedQuizKeys: ReadonlySet<string>,
 ): boolean {
-  const explored = progress === "completed";
-  if (getActivityDefinition(type)?.explorer === "bohr") return explored || passedQuizKeys.has(BOHR_QUIZ_KEY);
-  const lewis = lewisQuizForLesson(type);
-  if (lewis) return explored && passedQuizKeys.has(LEWIS_QUIZZES[lewis].quizKey);
-  return explored;
+  const quizKey = sectionQuizKey(type);
+  return quizKey ? passedQuizKeys.has(quizKey) : progress === "completed";
 }
 
 /**
- * Orders the student's sections and locks each one behind the first earlier
- * section that is still unfinished. A closed section never blocks (a missed
- * deadline must not lock the rest of the course); a scheduled one does.
- * Assignments without content are left out so a placeholder cannot block.
+ * Orders the student's sections and marks each one complete or not. Sections
+ * are never locked behind earlier ones. Assignments without content are left
+ * out.
  */
 export function resolveSequence(
   assignments: readonly StudentAssignment[],
   records: ReadonlyMap<string, SectionRecord>,
   now: number,
 ): SequenceEntry[] {
-  let blocker: StudentAssignment | null = null;
   return assignments
     .filter((assignment) => hasActivityContent(assignment.activity.type))
     .sort((a, b) => a.activity.order_index - b.activity.order_index || a.id.localeCompare(b.id))
     .map((assignment) => {
-      const schedule = scheduleStatus(assignment, now);
       const record = records.get(assignment.id);
-      const complete = isSectionComplete(
-        assignment.activity.type,
-        record?.progress ?? null,
-        record?.passedQuizKeys ?? NO_QUIZZES,
-      );
-      const entry: SequenceEntry = { assignment, schedule, complete, lockedBy: blocker };
-      if (!blocker && !complete && (schedule === "Open" || schedule === "Scheduled")) blocker = assignment;
-      return entry;
+      return {
+        assignment,
+        schedule: scheduleStatus(assignment, now),
+        complete: isSectionComplete(
+          assignment.activity.type,
+          record?.progress ?? null,
+          record?.passedQuizKeys ?? NO_QUIZZES,
+        ),
+      };
     });
 }
 
-/** The next open, unlocked, unfinished section after the given one. */
+/** The next open, unfinished section after the given one. */
 export function nextSection(
   entries: readonly SequenceEntry[],
   assignmentId: string,
@@ -83,7 +80,7 @@ export function nextSection(
   const index = entries.findIndex((entry) => entry.assignment.id === assignmentId);
   if (index < 0) return null;
   return entries.slice(index + 1).find(
-    (entry) => entry.schedule === "Open" && !entry.lockedBy && !entry.complete,
+    (entry) => entry.schedule === "Open" && !entry.complete,
   ) ?? null;
 }
 

@@ -1,7 +1,9 @@
 import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
 
+import { AssignmentProgressDetails } from '@/components/assignments/AssignmentProgressDetails'
 import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
 import { LEWIS_QUIZZES } from '@/lib/assignments/lewis-quizzes'
+import { ASSIGNMENT_STAGES, type AssignmentStage } from '@/lib/assignments/stages'
 import { BOHR_QUIZ_KEY } from '@/lib/db/quiz-questions'
 import { measurementAttemptLabel } from '@/lib/measurement/modes'
 
@@ -12,57 +14,24 @@ const QUIZ_TITLES: Record<string, string> = {
   [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
 }
 
-function formatDuration(seconds: number): string {
-  const total = Math.max(0, Math.trunc(seconds))
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  const remainder = total % 60
-
-  if (hours > 0) return `${hours}h ${minutes}m`
-  if (minutes > 0) return `${minutes}m ${remainder}s`
-  return `${remainder}s`
-}
-
 type Student = TeacherActivityAttemptSummary['students'][number]
 
-const STATUS_LABEL: Record<Student['overallStatus'], string> = {
-  not_started: 'Not started',
-  exploring: 'Exploring',
-  taking_quiz: 'Taking quiz',
-  needs_retry: 'Needs retry',
-  completed: 'Completed',
+// Used when the database has not been migrated to return progressStage yet.
+const STAGE_FROM_STATUS: Record<Student['overallStatus'], AssignmentStage> = {
+  not_started: 'not_started',
+  exploring: 'exploring',
+  taking_quiz: 'quiz_in_progress',
+  needs_retry: 'needs_retry',
+  completed: 'completed',
 }
 
-const STATUS_CLASS: Record<Student['overallStatus'], string> = {
+const STAGE_CLASS: Record<AssignmentStage, string> = {
   not_started: 'border-border bg-muted text-muted-foreground',
   exploring: 'border-ring bg-muted text-foreground',
-  taking_quiz: 'border-ring bg-muted text-foreground',
+  explored: 'border-ring bg-muted text-foreground',
+  quiz_in_progress: 'border-ring bg-muted text-foreground',
   needs_retry: 'border-destructive bg-destructive/10 text-destructive',
   completed: 'border-accent bg-accent/15 text-accent',
-}
-
-function ExplorationDuration({ student }: { student: Student }) {
-  if (student.explorationStatus === 'not_started') return <>Not started</>
-  if (student.explorationStatus === 'in_progress') return <>In progress</>
-  return <>{student.explorationDurationSeconds !== null ? formatDuration(student.explorationDurationSeconds) : 'Completed'}</>
-}
-
-function QuizPassSummary({ student }: { student: Student }) {
-  if (student.passingQuizAttemptNumber !== null) {
-    return (
-      <>
-        Passed on attempt {student.passingQuizAttemptNumber}: {student.passingQuizScore}/{student.passingQuizTotal}
-        {student.passingQuizPercentage !== null ? ` (${student.passingQuizPercentage}%)` : ''}
-        {student.passingQuizCompletedAt ? <> · <LocalizedTimestamp value={student.passingQuizCompletedAt} /></> : ''}
-      </>
-    )
-  }
-  return (
-    <>
-      Not yet passed
-      {student.failedQuizAttemptCount > 0 ? ` · ${student.failedQuizAttemptCount} failed ${student.failedQuizAttemptCount === 1 ? 'attempt' : 'attempts'}` : ''}
-    </>
-  )
 }
 
 export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
@@ -72,33 +41,32 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
       <p className="mt-2 text-sm text-muted-foreground">{summary.students.length} students enrolled.</p>
       {summary.students.length === 0 ? <p className="mt-5">No students enrolled in this class yet.</p> : (
         <ul className="mt-5 divide-y divide-border">
-          {summary.students.map(student => (
+          {summary.students.map(student => {
+            const stageKey = student.progressStage ?? STAGE_FROM_STATUS[student.overallStatus]
+            return (
             <li key={student.studentId} className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="font-semibold">{student.firstName} {student.lastName}</h3>
-                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[student.overallStatus]}`}>
-                  {STATUS_LABEL[student.overallStatus]}
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${STAGE_CLASS[stageKey]}`}>
+                  {ASSIGNMENT_STAGES[stageKey].label}
                 </span>
               </div>
-              <dl className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <div className="flex flex-wrap gap-x-2">
-                  <dt className="font-medium text-foreground/80">Exploration:</dt>
-                  <dd><ExplorationDuration student={student} /></dd>
-                </div>
-                <div className="flex flex-wrap gap-x-2">
-                  <dt className="font-medium text-foreground/80">Quiz:</dt>
-                  <dd><QuizPassSummary student={student} /></dd>
-                </div>
-                <div className="flex flex-wrap gap-x-2">
-                  <dt className="font-medium text-foreground/80">Assignment stage:</dt>
-                  <dd>{student.stage ?? STATUS_LABEL[student.overallStatus]}</dd>
-                </div>
-                {student.explorationStartedAt && (
-                  <div className="flex flex-wrap gap-x-2">
-                    <dt className="font-medium text-foreground/80">Exploration started:</dt>
-                    <dd><LocalizedTimestamp value={student.explorationStartedAt} /></dd>
-                  </div>
-                )}
+              <AssignmentProgressDetails
+                className="mt-2 space-y-1 text-sm text-muted-foreground"
+                facts={{
+                  stage: stageKey,
+                  explorationStartedAt: student.explorationStartedAt ?? null,
+                  firstQuizStartedAt: student.firstQuizStartedAt ?? null,
+                  timeToFirstQuizSeconds: student.timeToFirstQuizSeconds ?? null,
+                  passingQuizAttemptNumber: student.passingQuizAttemptNumber,
+                  passingQuizScore: student.passingQuizScore,
+                  passingQuizTotal: student.passingQuizTotal,
+                  passingQuizPercentage: student.passingQuizPercentage,
+                  failedQuizAttemptCount: student.failedQuizAttemptCount,
+                  completedAt: student.completedAt ?? null,
+                }}
+              />
+              <dl className="mt-1 space-y-1 text-sm text-muted-foreground">
                 {student.firstQuizStartedAt && (
                   <div className="flex flex-wrap gap-x-2">
                     <dt className="font-medium text-foreground/80">First quiz started:</dt>
@@ -109,12 +77,6 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                   <div className="flex flex-wrap gap-x-2">
                     <dt className="font-medium text-foreground/80">Latest quiz started:</dt>
                     <dd><LocalizedTimestamp value={student.quizStartedAt} /></dd>
-                  </div>
-                )}
-                {student.timeToFirstQuizSeconds != null && (
-                  <div className="flex flex-wrap gap-x-2">
-                    <dt className="font-medium text-foreground/80">Exploration to first quiz:</dt>
-                    <dd>{formatDuration(student.timeToFirstQuizSeconds)}</dd>
                   </div>
                 )}
               </dl>
@@ -130,7 +92,7 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                 )
               })()}
               {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">
-                {student.stage === 'Taking quiz' || student.overallStatus === 'taking_quiz' ? 'Quiz started; no result submitted yet.' : 'No attempts yet.'}
+                {stageKey === 'quiz_in_progress' ? 'Quiz started; no result submitted yet.' : 'No attempts yet.'}
               </p> : (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm underline">View attempt history for {student.firstName} {student.lastName}</summary>
@@ -159,7 +121,8 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                 </details>
               )}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </section>

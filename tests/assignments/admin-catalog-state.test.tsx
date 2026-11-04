@@ -127,9 +127,10 @@ describe("teacher enrollment and lesson progress", () => {
     const html = await render();
     expect(html).toContain("Student progress");
     expect(html).toContain("Mina Chen");
-    expect(html).toContain("20% complete");
-    expect(html).toContain("Lewis Diagrams: Completed");
-    expect(html).toContain("Graduated Cylinder: Not started");
+    expect(html).toContain("1 of 2 completed");
+    expect(html).toContain('aria-label="Mina Chen, Lewis Diagrams"');
+    expect(html).toContain("Completed · 100%");
+    expect(html).toContain("Not started · 0%");
     expect(html).toContain("1 student enrolled");
     expect(html).toContain("Active students");
     expect(mocks.lessonProgress).toHaveBeenCalledWith(classId);
@@ -166,13 +167,13 @@ describe("teacher enrollment and lesson progress", () => {
     expect(html).toContain("1 student enrolled");
     expect(html).toContain("Student progress could not be loaded");
     expect(html).not.toContain("No students in this class yet.");
-    expect(html).not.toContain("% complete");
+    expect(html).not.toContain('role="progressbar"');
     expect(html).not.toContain("private RPC");
   });
   it("loads the requested class alongside the class list, without reading it twice", async () => {
     populateClass();
     const html = await render();
-    expect(html).toContain("Lewis Diagrams: Completed");
+    expect(html).toContain('aria-label="Mina Chen, Lewis Diagrams"');
     expect(mocks.teacher).toHaveBeenCalledTimes(1);
     // Counts need the service role, and only ever for the verified teacher's own classes.
     expect(mocks.classes).toHaveBeenCalledWith({ role: "service" }, "teacher");

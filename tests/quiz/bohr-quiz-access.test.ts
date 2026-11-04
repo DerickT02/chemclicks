@@ -87,14 +87,14 @@ describe("Bohr quiz access", () => {
     expect(sectionAccess).not.toHaveBeenCalled();
   });
 
-  it("passes the chosen lesson through the prerequisite gate", async () => {
+  it("passes the chosen lesson through the schedule check", async () => {
     const lewis = assignment("lewis_diagram", "lewis");
     const stability = assignment("bohr_model_stability", "stability");
     assignmentsReader.mockResolvedValue({ status: "ok", assignments: [lewis, stability] });
-    sectionAccess.mockResolvedValue({ status: "blocked", assignment: stability, blocker: lewis });
+    sectionAccess.mockResolvedValue({ status: "available", assignment: stability });
 
     await expect(getBohrQuizAccess("stability"))
-      .resolves.toEqual({ status: "blocked", assignment: stability, blocker: lewis });
+      .resolves.toEqual({ status: "available", assignment: stability });
     expect(sectionAccess).toHaveBeenCalledWith(stability);
   });
 
