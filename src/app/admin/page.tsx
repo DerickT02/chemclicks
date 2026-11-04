@@ -14,7 +14,7 @@ import { listActiveClassesForTeacher } from "@/lib/db/classes";
 import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
-import { LessonProgressList } from "@/app/admin/LessonProgressList";
+import { ActivityProgressSummary } from "@/app/admin/ActivityProgressSummary";
 import StudentRoster from "@/app/admin/classes/StudentRoster";
 import { getOwnedStudentRoster } from "@/lib/server/student-roster";
 
@@ -92,7 +92,7 @@ export default async function AdminPage({
   const catalogLoadFailed = Boolean(catalogResult.error) || catalogResult.data === null;
   const assignmentsLoadFailed = Boolean(assignmentsResult.error) || assignmentsResult.data === null;
   const lessonProgressLoadFailed = Boolean(lessonProgressResult.error);
-  const lessonProgressStudents = lessonProgressResult.data?.students ?? [];
+  const lessonProgressStudents = lessonProgressLoadFailed ? null : lessonProgressResult.data?.students ?? [];
   // Request-time status snapshot; dashboard refreshes update it.
   // eslint-disable-next-line react-hooks/purity -- This server-only clock read is not a client render-time side effect.
   const scheduleRenderedAt = Date.now();
@@ -208,6 +208,15 @@ export default async function AdminPage({
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
+                  {lessonProgressLoadFailed && (
+                    <div className="space-y-3">
+                      <p role="alert" className="text-sm text-destructive">
+                        Student progress could not be loaded. Please try again.
+                      </p>
+                      <RefreshAssignments label="Retry student progress" />
+                    </div>
+                  )}
+
                   {catalogLoadFailed && (
                     <p role="alert" className="text-sm text-destructive">
                       The activity catalog could not be loaded. Please refresh the page.
@@ -280,6 +289,12 @@ export default async function AdminPage({
                                     assignment={assignment}
                                     renderedAt={scheduleRenderedAt}
                                   />
+                                  <ActivityProgressSummary
+                                    classId={selectedClass.id}
+                                    assignmentId={assignment.id}
+                                    activityTitle={activity?.title ?? "Assigned activity"}
+                                    students={lessonProgressStudents}
+                                  />
                                 </div>
                                 <div className="shrink-0">
                                   <UnassignActivityForm
@@ -296,27 +311,7 @@ export default async function AdminPage({
                         })
                       )}
                 </section>
-                <Link href={`/admin/classes/${selectedClass.id}/attempts`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
-                  Activity attempts
-                </Link>
-                <div className="mt-4"><RefreshAssignments label="Refresh classroom" /></div>
-                <div className="mt-7">
-                  <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
-                  <div className="mt-4">
-                    {lessonProgressLoadFailed ? (
-                      <div className="space-y-3">
-                        <p role="alert" className="text-sm text-destructive">
-                          Student progress could not be loaded. Please try again.
-                        </p>
-                        <RefreshAssignments label="Retry student progress" />
-                      </div>
-                    ) : (
-                      <div className="max-h-[480px] overflow-y-auto rounded-lg border border-border p-4">
-                        <LessonProgressList students={lessonProgressStudents} />
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <div className="mt-5"><RefreshAssignments label="Refresh classroom" /></div>
               </>
             )}
           </section>

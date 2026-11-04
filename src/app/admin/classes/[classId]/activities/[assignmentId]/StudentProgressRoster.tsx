@@ -1,9 +1,10 @@
 import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
 
 import { AssignmentProgressDetails } from '@/components/assignments/AssignmentProgressDetails'
+import { StageBar } from '@/components/assignments/StageBar'
 import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
 import { LEWIS_QUIZZES } from '@/lib/assignments/lewis-quizzes'
-import { ASSIGNMENT_STAGES, type AssignmentStage } from '@/lib/assignments/stages'
+import type { AssignmentStage } from '@/lib/assignments/stages'
 import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from '@/lib/db/quiz-questions'
 import { measurementAttemptLabel } from '@/lib/measurement/modes'
 
@@ -27,32 +28,26 @@ const STAGE_FROM_STATUS: Record<Student['overallStatus'], AssignmentStage> = {
   completed: 'completed',
 }
 
-const STAGE_CLASS: Record<AssignmentStage, string> = {
-  not_started: 'border-border bg-muted text-muted-foreground',
-  exploring: 'border-ring bg-muted text-foreground',
-  explored: 'border-ring bg-muted text-foreground',
-  quiz_in_progress: 'border-ring bg-muted text-foreground',
-  needs_retry: 'border-destructive bg-destructive/10 text-destructive',
-  completed: 'border-accent bg-accent/15 text-accent',
+export function studentStage(student: Student): AssignmentStage {
+  return student.progressStage ?? STAGE_FROM_STATUS[student.overallStatus]
 }
 
-export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
+/** Every enrolled student's progress on one activity, with their attempt history. */
+export function StudentProgressRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
   return (
-    <section aria-labelledby="activity-title" className="rounded-xl border border-border bg-card p-5">
-      <h2 id="activity-title" className="text-xl font-semibold">{summary.activityTitle}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{summary.students.length} students enrolled.</p>
-      {summary.students.length === 0 ? <p className="mt-5">No students enrolled in this class yet.</p> : (
-        <ul className="mt-5 divide-y divide-border">
+    <section aria-label={`Student progress for ${summary.activityTitle}`} className="rounded-xl border border-border bg-card p-5">
+      {summary.students.length === 0 ? <p>No students enrolled in this class yet.</p> : (
+        <ul className="divide-y divide-border">
           {summary.students.map(student => {
-            const stageKey = student.progressStage ?? STAGE_FROM_STATUS[student.overallStatus]
+            const stageKey = studentStage(student)
+            const name = `${student.firstName} ${student.lastName}`
             return (
-            <li key={student.studentId} className="py-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold">{student.firstName} {student.lastName}</h3>
-                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${STAGE_CLASS[stageKey]}`}>
-                  {ASSIGNMENT_STAGES[stageKey].label}
-                </span>
-              </div>
+            <li key={student.studentId} className="py-4 first:pt-0 last:pb-0">
+              <StageBar
+                stage={stageKey}
+                label={`${name}, ${summary.activityTitle}`}
+                title={<h3 className="text-base font-semibold">{name}</h3>}
+              />
               <AssignmentProgressDetails
                 className="mt-2 space-y-1 text-sm text-muted-foreground"
                 facts={{
@@ -88,7 +83,7 @@ export function AttemptRoster({ summary }: { summary: TeacherActivityAttemptSumm
                 const quizCount = student.quizAttemptCount
                   ?? student.attempts.filter((attempt) => attempt.kind === 'quiz' || (attempt.kind === undefined && attempt.quizKey != null)).length
                 return (
-                  <p className="mt-1">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {student.attemptCount} {student.attemptCount === 1 ? 'attempt' : 'attempts'} · {explorationCount} exploration {explorationCount === 1 ? 'attempt' : 'attempts'} · {quizCount} quiz {quizCount === 1 ? 'attempt' : 'attempts'} · {student.completedCount} completed · {student.inProgressCount} in progress
                   </p>
                 )

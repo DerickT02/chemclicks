@@ -4,10 +4,17 @@ import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempt
 const mock = vi.hoisted(() => ({ activities: vi.fn(), summary: vi.fn() }))
 vi.mock('@/lib/server/teacher-activities', () => ({ getTeacherClassActivities: mock.activities }))
 vi.mock('@/lib/server/teacher-attempts', () => ({ getTeacherActivityAttemptSummary: mock.summary }))
-import Page from '@/app/admin/classes/[classId]/attempts/page'
-import { AttemptRoster } from '@/app/admin/classes/[classId]/attempts/AttemptRoster'
-import Loading from '@/app/admin/classes/[classId]/attempts/loading'
-import ErrorPage from '@/app/admin/classes/[classId]/attempts/error'
+vi.mock('next/navigation', () => ({
+  redirect: (path: string) => { throw new Error(`REDIRECT:${path}`) },
+  notFound: () => { throw new Error('NOT_FOUND') },
+  useRouter: () => ({ refresh: () => {} }),
+}))
+import Page, { generateMetadata } from '@/app/admin/classes/[classId]/activities/[assignmentId]/page'
+import { StudentProgressRoster as AttemptRoster } from '@/app/admin/classes/[classId]/activities/[assignmentId]/StudentProgressRoster'
+import Loading from '@/app/admin/classes/[classId]/activities/[assignmentId]/loading'
+import ErrorPage from '@/app/admin/classes/[classId]/activities/[assignmentId]/error'
+import NotFound from '@/app/admin/classes/[classId]/activities/[assignmentId]/not-found'
+import AttemptsRedirect from '@/app/admin/classes/[classId]/attempts/page'
 const report: TeacherActivityAttemptSummary = {
   classId: 'class', className: 'Chemistry', assignmentId: 'second', activityId: 'activity', activityTitle: 'Lewis diagrams',
   students: [
@@ -23,8 +30,9 @@ beforeEach(() => {
   mock.activities.mockResolvedValue({ id: 'class', name: 'Chemistry', assignments: [{ id: 'first', title: 'Ruler' }, { id: 'second', title: 'Lewis diagrams' }] })
   mock.summary.mockResolvedValue(report)
 })
-const props = (assignmentId?: string) => ({ params: Promise.resolve({ classId: 'class' }), searchParams: Promise.resolve({ assignmentId }) })
-describe('teacher report', () => {
+const props = (assignmentId: string) => ({ params: Promise.resolve({ classId: 'class', assignmentId }) })
+const legacy = (assignmentId?: string | string[]) => ({ params: Promise.resolve({ classId: 'class' }), searchParams: Promise.resolve({ assignmentId }) })
+describe('activity student progress page', () => {
   it('renders zeros, statuses and readable timestamps with a timezone', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={report} />)
     for (const text of ['0 attempts', 'No attempts yet.', '2 attempts', '1 exploration attempt', '1 quiz attempt', '4/5 · Passed', '1 completed', '1 in progress', 'Ruler · tenths (0.1 cm)', 'Not completed', '2026-09-23 12:00:00 UTC', 'UTC', '<details ', 'dateTime="2026-09-23T12:05:00Z"']) expect(html).toContain(text)
@@ -55,7 +63,7 @@ describe('teacher report', () => {
       timeToFirstQuizSeconds: 3661,
     }] }} />)
 
-    expect(html).toContain('Taking the quiz</span>')
+    expect(html).toContain('aria-valuetext="Taking the quiz"')
     expect(html).toContain('Quiz started; no result submitted yet.')
     expect(html).toContain('Exploration started')
     expect(html).toContain('First quiz started')
@@ -82,7 +90,7 @@ describe('teacher report', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
       ...report.students[0], progressStage,
     }] }} />)
-    expect(html).toContain(`${label}</span>`)
+    expect(html).toContain(`aria-valuetext="${label}"`)
   })
   it.each([
     ['not_started', 'Not started'],
@@ -94,7 +102,7 @@ describe('teacher report', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
       ...report.students[0], overallStatus,
     }] }} />)
-    expect(html).toContain(`${label}</span>`)
+    expect(html).toContain(`aria-valuetext="${label}"`)
   })
   it.each([0, -1, 59, 60])('formats unusual timer values safely (%s seconds)', seconds => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
@@ -103,27 +111,66 @@ describe('teacher report', () => {
     const expected = seconds <= 0 ? '0s' : seconds < 60 ? `${seconds}s` : '1m 0s'
     expect(html).toContain(`Exploration to first quiz:</dt><dd>${expected}`)
   })
-  it('loads the explicitly selected assignment and keeps it selected', async () => {
+  it('shows the roster for the activity in the URL, with its title and class', async () => {
     const html = renderToStaticMarkup(await Page(props('second')))
+    expect(mock.activities).toHaveBeenCalledWith('class')
     expect(mock.summary).toHaveBeenCalledWith('class', 'second')
-    expect(html).toContain('value="second" selected=""')
+    expect(html).toContain('<h1 class="mt-4 text-3xl font-semibold">Lewis diagrams</h1>')
+    expect(html).toContain('Student progress · Chemistry')
+    expect(html).toContain('href="/admin?classId=class"')
+    expect(html).toContain('aria-label="Student progress for Lewis diagrams"')
   })
-  it('defaults to the first assignment', async () => {
-    await Page(props())
-    expect(mock.summary).toHaveBeenCalledWith('class', 'first')
+  it('links to every other activity in the class and marks the current one', async () => {
+    const html = renderToStaticMarkup(await Page(props('second')))
+    expect(html).toContain('href="/admin/classes/class/activities/first"')
+    const anchor = (id: string) => html.match(new RegExp(`<a[^>]*href="/admin/classes/class/activities/${id}"[^>]*>`))?.[0] ?? ''
+    expect(anchor('second')).toContain('aria-current="page"')
+    expect(anchor('first')).not.toContain('aria-current')
   })
-  it('rejects a foreign assignment instead of silently selecting another', async () => {
-    await expect(Page(props('foreign'))).rejects.toThrow('access denied')
+  it('summarises the class: completed out of enrolled, then the other stages', async () => {
+    mock.summary.mockResolvedValue({ ...report, students: [
+      { ...report.students[0], studentId: 'a', progressStage: 'completed' },
+      { ...report.students[0], studentId: 'b', progressStage: 'needs_retry' },
+      { ...report.students[0], studentId: 'c', progressStage: 'not_started' },
+    ] })
+    const html = renderToStaticMarkup(await Page(props('second')))
+    expect(html).toContain('1 of 3</span> completed · 1 quiz not passed, needs retry · 1 not started')
+  })
+  it('shows 404 for an activity that is not assigned to this teacher\'s class, without reading progress', async () => {
+    await expect(Page(props('foreign'))).rejects.toThrow('NOT_FOUND')
     expect(mock.summary).not.toHaveBeenCalled()
   })
-  it('propagates database failures to the error boundary', async () => {
+  it('propagates ownership and database failures to the error boundary', async () => {
+    mock.activities.mockRejectedValue(new Error('Class access denied or unavailable.'))
+    await expect(Page(props('second'))).rejects.toThrow('access denied')
+    mock.activities.mockResolvedValue({ id: 'class', name: 'Chemistry', assignments: [{ id: 'second', title: 'Lewis diagrams' }] })
     mock.summary.mockRejectedValue(new Error('unavailable'))
-    await expect(Page(props())).rejects.toThrow('unavailable')
+    await expect(Page(props('second'))).rejects.toThrow('unavailable')
   })
-  it('distinguishes no assignments from no students', async () => {
+  it('distinguishes a class with no students from a load failure', async () => {
+    mock.summary.mockResolvedValue({ ...report, students: [] })
+    const html = renderToStaticMarkup(await Page(props('second')))
+    expect(html).toContain('No students enrolled yet.')
+    expect(html).toContain('No students enrolled in this class yet.')
+  })
+  it('names the activity in the browser tab, falling back when it cannot be read', async () => {
+    expect(await generateMetadata(props('second'))).toEqual({ title: 'Lewis diagrams · Student progress | ChemClicks' })
+    expect(await generateMetadata(props('foreign'))).toEqual({ title: 'Student progress | ChemClicks' })
+    mock.activities.mockRejectedValue(new Error('private details'))
+    expect(await generateMetadata(props('second'))).toEqual({ title: 'Student progress | ChemClicks' })
+  })
+  it('redirects the old attempts URL to the matching activity page', async () => {
+    await expect(AttemptsRedirect(legacy('second'))).rejects.toThrow('REDIRECT:/admin/classes/class/activities/second')
+    await expect(AttemptsRedirect(legacy(['second', 'x']))).rejects.toThrow('REDIRECT:/admin/classes/class/activities/second')
+    await expect(AttemptsRedirect(legacy('a/../b'))).rejects.toThrow('REDIRECT:/admin/classes/class/activities/a%2F..%2Fb')
+    expect(mock.activities).not.toHaveBeenCalled()
+  })
+  it('sends an old attempts URL without an activity to the first one, or back to the class', async () => {
+    await expect(AttemptsRedirect(legacy())).rejects.toThrow('REDIRECT:/admin/classes/class/activities/first')
     mock.activities.mockResolvedValue({ id: 'class', name: 'Chemistry', assignments: [] })
-    expect(renderToStaticMarkup(await Page(props()))).toContain('No activities assigned')
-    expect(mock.summary).not.toHaveBeenCalled()
+    await expect(AttemptsRedirect(legacy())).rejects.toThrow('REDIRECT:/admin?classId=class')
+  })
+  it('renders an empty roster message', () => {
     expect(renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [] }} />)).toContain('No students enrolled')
   })
   it('shows the unified status for each student instead of just raw counts', () => {
@@ -178,7 +225,8 @@ describe('teacher report', () => {
     expect(html).toContain('Quiz:</dt><dd>Not started')
     expect(html).not.toMatch(/\d+\/\d+/)
   })
-  it('provides accessible loading and retry states without showing raw errors', () => {
+  it('provides accessible loading, retry and not-found states without showing raw errors', () => {
+    expect(renderToStaticMarkup(<NotFound />)).toContain('Activity not found')
     expect(renderToStaticMarkup(<Loading />)).toContain('role="status"')
     const html = renderToStaticMarkup(<ErrorPage reset={() => {}} />)
     expect(html).toContain('role="alert"')
