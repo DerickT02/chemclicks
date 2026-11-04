@@ -13,7 +13,7 @@ const LESSON_CONTENT = {
   stability: {
     title: "Bohr Model Stability",
     description:
-      "Adjust proton and electron counts independently to explore noble-gas stability, neutral charge, and ionic charge.",
+      "Adjust proton and electron counts independently to compare noble-gas electron counts, neutral charge, ionic charge, and common-ion examples.",
   },
 } as const;
 

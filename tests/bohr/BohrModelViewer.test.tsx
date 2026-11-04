@@ -83,6 +83,28 @@ describe("Bohr atom builder", () => {
     const chargePanel = screen.getByRole("heading", { name: "Charge and stability" }).parentElement!;
     expect(within(chargePanel).getByText("Noble-gas electron stability")).toBeInTheDocument();
     expect(within(chargePanel).getAllByText("Met").length).toBeGreaterThanOrEqual(2);
+    expect(within(chargePanel).getByText("Neutral means the charges balance; it does not mean the atom is unreactive.")).toBeInTheDocument();
+  });
+
+  it("does not label an absurd noble-gas ion as stable", async () => {
+    const user = userEvent.setup();
+    render(<BohrModelViewer mode="stability" />);
+
+    for (let i = 0; i < 17; i++) {
+      await user.click(screen.getByRole("button", { name: "Add an electron" }));
+    }
+
+    const chargePanel = screen.getByRole("heading", { name: "Charge and stability" }).parentElement!;
+    expect(screen.getByLabelText(/Ionic charge: .*17 \(anion\)/)).toBeInTheDocument();
+    expect(within(chargePanel).getAllByText("Not met")).toHaveLength(3);
+    expect(within(chargePanel).getByText(/charge magnitude above 4/)).toBeInTheDocument();
+    expect(within(chargePanel).getAllByText(/outside the plausible range used by this model/).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("qualifies fixed shells as a Bohr-model statement", () => {
+    render(<BohrModelViewer mode="stability" />);
+
+    expect(screen.getByText(/In the Bohr model, negatively charged particles are shown in fixed shells/)).toBeInTheDocument();
   });
 
   it("selecting an element resets both counts to neutral for that element", async () => {

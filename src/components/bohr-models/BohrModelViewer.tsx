@@ -15,6 +15,7 @@ import {
   describeProtonElectronDifference,
   chargeFromParticlesPanelText,
   evaluateNobleGasRule,
+  isPlausibleIonicCharge,
   neutralChargeStabilityPanelText,
   nobleGasStabilityPanelText,
   outerShellRulePanelText,
@@ -310,9 +311,10 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
   const charge = calculateIonicCharge(protons, electronCount);
   const chargeDescription = charge === null ? "unavailable" : describeIonicCharge(charge);
   const chargeDifference = describeProtonElectronDifference(protons, electronCount);
-  const nobleGasStability = describeNobleGasStability(electronCount);
+  const nobleGasStability = describeNobleGasStability(electronCount, protons);
   const neutralChargeStability = describeNeutralChargeStability(protons, electronCount);
   const shellRule = evaluateNobleGasRule(electronCount);
+  const outerShellRuleMeetsStability = shellRule?.meetsRule === true && isPlausibleIonicCharge(charge);
   const chargePanelText = chargeFromParticlesPanelText(protons, electronCount, charge);
   const accessibilitySummary = `${nobleGasStability.label}; ${neutralChargeStability.label}; ${chargeDifference ?? "charge unavailable"}`;
   const ionContextHeading = selectedIon
@@ -334,7 +336,7 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
         <h2 className="text-sm font-semibold text-foreground mb-4">Key Concepts</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { icon: "🔵", title: "Electron (e⁻)",    body: "Negatively charged particles that orbit the nucleus in fixed shells. Neutral atoms have as many electrons as protons; changing electrons creates an ion." },
+            { icon: "🔵", title: "Electron (e⁻)",    body: "In the Bohr model, negatively charged particles are shown in fixed shells around the nucleus. Neutral atoms have as many electrons as protons; changing electrons creates an ion." },
             { icon: "⚡", title: "Valence Electrons", body: "Electrons in the outermost shell. They determine how an element bonds and reacts with other elements." },
             { icon: "🏠", title: "Shell Capacity",    body: "K, L, M, and N can hold up to 2, 8, 18, and 32 electrons. For the first 20 elements, their electron counts go up to 2, 8, 8, and 2." },
             { icon: "🛡️", title: "Ions and Stability",  body: "Common ions occur in compounds, but a full electron shell alone cannot tell us whether an isolated ion is stable." },
@@ -426,7 +428,8 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
           <h2 className="text-sm font-semibold text-foreground">Explore stability</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Adjust protons and electrons independently below. Compare noble-gas electron counts,
-            neutral charge, and the resulting ionic charge.
+            neutral charge, the resulting ionic charge, and common-ion examples. A noble-gas
+            electron count alone does not prove that an ion is stable.
           </p>
         </section>
       )}
@@ -527,7 +530,7 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
                 />
                 <StabilityInsight
                   title="Outer-shell rule (duet/octet)"
-                  met={shellRule?.meetsRule ?? false}
+                  met={outerShellRuleMeetsStability}
                   {...outerShellRulePanelText(electronCount, charge)}
                 />
               </div>
