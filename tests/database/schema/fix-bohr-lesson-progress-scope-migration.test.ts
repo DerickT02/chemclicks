@@ -8,7 +8,7 @@ const read = (name: string) =>
     .replace(/\s+/g, " ")
     .toLowerCase();
 
-const hotfix = read("20261104000000_fix_bohr_lesson_progress_scope.sql");
+const hotfix = read("20261104000100_fix_bohr_lesson_progress_scope.sql");
 
 // The quiz filter of each version of teacher_class_lesson_progress, from the
 // progress-row condition to the end of the lateral subquery.
@@ -47,7 +47,7 @@ describe("fix Bohr lesson progress scope migration", () => {
   });
 
   it("is not undone by the later shared-state migration", () => {
-    const shared = read("20261104020000_shared_assignment_progress_state.sql");
+    const shared = read("20261104000200_shared_assignment_progress_state.sql");
     expect(shared).toContain("when 'bohr_model_stability' then array['bohr_models', 'bohr_model_stability']");
     // Every quiz read stays on the student's own progress row.
     expect(shared.match(/sa\.quiz_key = any \(v_quiz_keys\)/g)?.length)

@@ -16,7 +16,7 @@ export type TeacherClassLessonProgress = {
     verified: boolean
     overallPercent: number
     // stage and the timing/result facts are absent until the stage
-    // migration (20261104020000) reaches the database.
+    // migration (20261104000200) reaches the database.
     lessons: ({
       assignmentId: string
       activityId: string

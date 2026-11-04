@@ -18,7 +18,7 @@
 --
 -- Every count reads only the student's own progress row for the assignment,
 -- so another student's or another lesson's pass never completes this one
--- (see 20261104000000).
+-- (see 20261104000100).
 --
 -- Exploration time is student_progress.exploration_duration_seconds (first
 -- exploration start to first quiz start, SCRUM-232) everywhere.
@@ -133,7 +133,7 @@ REVOKE ALL ON FUNCTION public.assignment_progress_state(uuid, text)
 GRANT EXECUTE ON FUNCTION public.assignment_progress_state(uuid, text)
   TO service_role;
 
--- Same roster, ordering, archive filter and ownership check as 20261104000000;
+-- Same roster, ordering, archive filter and ownership check as 20261104000100;
 -- status, stage and the timing/result fields now come from the shared state.
 CREATE OR REPLACE FUNCTION public.teacher_class_lesson_progress(
   p_teacher_id uuid, p_class_id uuid
