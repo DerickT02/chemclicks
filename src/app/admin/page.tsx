@@ -15,7 +15,7 @@ import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import { LiveLessonProgress } from "@/app/admin/LiveLessonProgress";
-import StudentRoster from "@/app/admin/classes/StudentRoster";
+import LiveStudentRoster from "@/app/admin/classes/LiveStudentRoster";
 import { getOwnedStudentRoster } from "@/lib/server/student-roster";
 
 
@@ -194,15 +194,11 @@ export default async function AdminPage({
                   {selectedClass.student_count} {selectedClass.student_count === 1 ? "student" : "students"} enrolled
                 </p>
                 <div className="mt-4"><CopyClassCode key={selectedClass.id} code={selectedClass.class_code} /></div>
-                {rosterResult.error || !rosterResult.data ? (
-                  <section aria-label="Students & approvals" className="mt-7 space-y-3">
-                    <h3 className="text-lg font-semibold">Students & approvals</h3>
-                    <p role="alert" className="text-sm text-destructive">Student roster could not be loaded. Please try again.</p>
-                    <RefreshAssignments label="Retry student roster" />
-                  </section>
-                ) : (
-                  <StudentRoster key={selectedClass.id} classId={selectedClass.id} roster={rosterResult.data} />
-                )}
+                <LiveStudentRoster
+                  key={selectedClass.id}
+                  classId={selectedClass.id}
+                  initialRoster={rosterResult.data}
+                />
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
