@@ -5,6 +5,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AuthSessionMissingError, AuthWeakPasswordError } from "@supabase/supabase-js";
 import { TEACHER_PASSWORD_MIN_LENGTH } from "@/lib/auth/validate-teacher-signup";
+import { GENERIC_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 // SCRUM-55: the teacher password policy as enforced today by the signup and
 // reset forms (validateTeacherPassword), and how Auth rejections surface.
@@ -189,6 +190,28 @@ describe("teacher password reset policy", () => {
     mocks.updateUser.mockResolvedValue({ data: { user: null }, error: new AuthSessionMissingError() });
     await submitReset(VALID_PASSWORD);
     expect(await screen.findByRole("alert")).toHaveTextContent("Your reset link is invalid or has expired.");
+    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+    expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it("recovers from thrown password update failures without claiming success", async () => {
+    mocks.updateUser.mockRejectedValue(new Error("network failure"));
+    await submitReset(VALID_PASSWORD);
+    expect(await screen.findByRole("alert")).toHaveTextContent(GENERIC_RETRY_MESSAGE);
+    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+    expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it("does not navigate to sign-in success when session cleanup fails after update", async () => {
+    mocks.signOut.mockRejectedValue(new Error("sign-out failure"));
+    await submitReset(VALID_PASSWORD);
+    expect(await screen.findByRole("alert")).toHaveTextContent(GENERIC_RETRY_MESSAGE);
+    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
+    expect(mocks.updateUser).toHaveBeenCalledWith({ password: VALID_PASSWORD });
     expect(mocks.push).not.toHaveBeenCalled();
     expectPasswordNotExposed(VALID_PASSWORD);
   });

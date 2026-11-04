@@ -53,25 +53,38 @@ export default function TeacherResetPasswordPage() {
 
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password });
 
-    if (error) {
-      setFormError(
-        isAuthSessionMissingError(error)
-          ? EXPIRED_LINK_MESSAGE
-          : error.message || GENERIC_RETRY_MESSAGE,
-      );
+      if (error) {
+        setFormError(
+          isAuthSessionMissingError(error)
+            ? EXPIRED_LINK_MESSAGE
+            : error.message || GENERIC_RETRY_MESSAGE,
+        );
+        setPassword("");
+        setConfirmPassword("");
+        return;
+      }
+
+      // End the recovery session so the teacher signs in through the normal
+      // login flow, which checks for an approved teacher record.
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        setFormError(GENERIC_RETRY_MESSAGE);
+        return;
+      }
+
+      router.push("/login/teacher?password=reset");
+    } catch {
+      setFormError(GENERIC_RETRY_MESSAGE);
       setPassword("");
       setConfirmPassword("");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    // End the recovery session so the teacher signs in through the normal
-    // login flow, which checks for an approved teacher record.
-    await supabase.auth.signOut();
-    router.push("/login/teacher?password=reset");
   }
 
   return (
