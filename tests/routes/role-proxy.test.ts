@@ -98,7 +98,7 @@ describe("admin route proxy", () => {
 });
 
 describe("authorized live read handlers", () => {
-  it.each(["progress", "roster", "attempt-history"])("leaves GET %s authentication and cookie refresh to the handler", async endpoint => {
+  it.each(["progress", "roster", "attempt-history", "updates"])("leaves GET %s authentication and cookie refresh to the handler", async endpoint => {
     const response = await proxy(request(`/admin/classes/class/${endpoint}`));
     expect(response.headers.get("location")).toBeNull();
     expect(mocks.session).not.toHaveBeenCalled();

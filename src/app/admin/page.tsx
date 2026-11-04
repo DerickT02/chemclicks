@@ -15,6 +15,7 @@ import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import { LiveLessonProgress } from "@/app/admin/LiveLessonProgress";
+import { LiveClassroomProvider } from "@/app/admin/LiveClassroomProvider";
 import LiveStudentRoster from "@/app/admin/classes/LiveStudentRoster";
 import { getOwnedStudentRoster } from "@/lib/server/student-roster";
 
@@ -177,7 +178,12 @@ export default async function AdminPage({
                 </p>
               </div>
             ) : (
-              <>
+              <LiveClassroomProvider
+                key={selectedClass.id}
+                classId={selectedClass.id}
+                initialRoster={rosterResult.data}
+                initialProgress={lessonProgressResult.data}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-semibold text-foreground">{selectedClass.name}</h2>
@@ -304,7 +310,7 @@ export default async function AdminPage({
                     />
                   </div>
                 </div>
-              </>
+              </LiveClassroomProvider>
             )}
           </section>
         </div>

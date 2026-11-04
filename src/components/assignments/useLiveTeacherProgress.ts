@@ -9,11 +9,13 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const DEBOUNCE_MS = 250;
 const MIN_REQUEST_GAP_MS = 5_000;
 
-type Options = {
+type Options<T> = {
   classId?: string;
   resource?: "roster" | "progress";
   assignmentId?: string;
   enabled?: boolean;
+  getCursor?: (data: T | null) => string | undefined;
+  merge?: (previous: T | null, delta: T) => T;
 };
 
 type Snapshot<T> = { url: string; seed: T | null; data: T | null; failed: boolean };
@@ -21,8 +23,8 @@ type Snapshot<T> = { url: string; seed: T | null; data: T | null; failed: boolea
 // Server-rendered snapshots avoid a redundant mount fetch. Broadcasts are only
 // invalidation hints; every data read still checks teacher ownership server-side.
 export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
-  classId, resource = "progress", assignmentId, enabled = true,
-}: Options = {}): { data: T | null; failed: boolean } {
+  classId, resource = "progress", assignmentId, enabled = true, getCursor, merge,
+}: Options<T> = {}): { data: T | null; failed: boolean } {
   const [snapshot, setSnapshot] = useState<Snapshot<T> | null>(null);
   const latestSnapshot = useRef<Snapshot<T> | null>(null);
 
@@ -81,16 +83,19 @@ export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
       controller = new AbortController();
       requestTimeout = window.setTimeout(() => controller?.abort(), REQUEST_TIMEOUT_MS);
       try {
-        const response = await fetch(url, {
+        const cursor = getCursor?.(lastData);
+        const requestUrl = cursor === undefined ? url : `${url}${url.includes("?") ? "&" : "?"}after=${encodeURIComponent(cursor)}`;
+        const response = await fetch(requestUrl, {
           cache: "no-store", credentials: "same-origin", signal: controller.signal,
           headers: { Accept: "application/json" },
         });
         if (!response.ok || response.redirected) throw new Error("Data unavailable");
         const data: T = await response.json();
         if (!disposed) {
+          const next = merge ? merge(lastData, data) : data;
           failures = 0;
           notBefore = 0;
-          publish(data, false);
+          publish(next, false);
         }
       } catch {
         if (!disposed) {
@@ -148,7 +153,7 @@ export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
       window.removeEventListener("online", resume);
       window.removeEventListener("offline", resume);
     };
-  }, [url, initialData, classId, resource, assignmentId, enabled]);
+  }, [url, initialData, classId, resource, assignmentId, enabled, getCursor, merge]);
 
   if (snapshot?.url === url && snapshot.seed === initialData) return { data: snapshot.data, failed: snapshot.failed };
   return { data: initialData, failed: initialData === null };

@@ -1,5 +1,6 @@
 "use client";
 
+import { useLiveClassroom } from "@/app/admin/LiveClassroomProvider";
 import StudentRoster from "@/app/admin/classes/StudentRoster";
 import RefreshAssignments from "@/components/assignments/RefreshAssignments";
 import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherProgress";
@@ -8,11 +9,14 @@ import type { StudentRoster as Roster } from "@/lib/server/student-roster";
 type Props = { classId: string; initialRoster: Roster | null };
 
 export default function LiveStudentRoster({ classId, initialRoster }: Props) {
-  const { data, failed } = useLiveTeacherProgress(
+  const shared = useLiveClassroom();
+  const standalone = useLiveTeacherProgress(
     `/admin/classes/${encodeURIComponent(classId)}/roster`,
     initialRoster,
-    { classId, resource: "roster" },
+    { classId, resource: "roster", enabled: !shared },
   );
+  const data = shared ? shared.data?.roster ?? initialRoster : standalone.data;
+  const failed = shared ? shared.failed || !data : standalone.failed;
 
   if (!data) {
     return (

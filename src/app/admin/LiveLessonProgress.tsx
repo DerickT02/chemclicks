@@ -1,5 +1,6 @@
 "use client";
 
+import { useLiveClassroom } from "@/app/admin/LiveClassroomProvider";
 import { LessonProgressList } from "@/app/admin/LessonProgressList";
 import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherProgress";
 import type { TeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
@@ -10,11 +11,14 @@ type Props = {
 };
 
 export function LiveLessonProgress({ classId, initialProgress }: Props) {
-  const { data, failed } = useLiveTeacherProgress(
+  const shared = useLiveClassroom();
+  const standalone = useLiveTeacherProgress(
     `/admin/classes/${encodeURIComponent(classId)}/progress`,
     initialProgress,
-    { classId },
+    { classId, enabled: !shared },
   );
+  const data = shared ? shared.data?.progress ?? initialProgress : standalone.data;
+  const failed = shared ? shared.failed || !data : standalone.failed;
 
   return (
     <>

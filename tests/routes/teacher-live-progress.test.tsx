@@ -275,7 +275,9 @@ describe("teacher live views", () => {
     await tick(299_000);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("table")).toBeNull();
-    fetchMock.mockImplementation(async (url: string) => reply(url.includes("attempt-history") ? [{ id: "attempt", attemptNumber: 1, status: "in_progress", startedAt: "2026-09-23T12:00:00Z", completedAt: null }] : summary));
+    fetchMock.mockImplementation(async (url: string) => reply(url.includes("attempt-history") ? [{ id: "attempt", attemptNumber: 1, status: "in_progress", startedAt: "2026-09-23T12:00:00Z", completedAt: null }] : {
+      classId: "class", revision: "1", reset: true, removedStudentIds: [], roster: null, progress: null, attempts: summary,
+    }));
     const details = screen.getByText("View attempt history for Mina Chen").closest("details")!;
     act(() => { details.open = true; fireEvent(details, new Event("toggle")); });
     await tick(0);
