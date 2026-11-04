@@ -20,14 +20,27 @@
   and focus events respect this backoff. Hidden/offline tabs make no data reads.
 - Unchanged responses do not update React state. Classroom refresh buttons remain
   available but no longer also refresh the entire page on focus.
-- Idle classroom views make **two fallback HTTP reads per five minutes** (24/hour),
-  versus 24/minute (1,440/hour) with the original five-second polling. Initial subscription catch-up, actual changes,
-  focus, and expanded histories add reads. This is a request-budget comparison,
-  not a production latency/throughput benchmark.
+- Roster and lesson progress share **one background request and one server Auth
+  verification**, rather than independent requests. The initial server page still
+  uses its existing readers and request-scoped Auth cache; one combined catch-up
+  read establishes an atomic revision baseline for subsequent updates. Explicit
+  page refreshes and existing Server Action revalidation can still load a full
+  server-rendered page; this optimization targets background updates.
+- Idle classroom views make **one fallback HTTP read per five minutes** (12/hour),
+  versus 24/minute (1,440/hour) with the original five-second polling. Initial
+  catch-up, actual changes, focus, and expanded histories add reads. This is a
+  request-budget comparison, not a production latency/throughput benchmark.
+- Subsequent reads send an opaque revision cursor and return **only changed
+  students** for roster/progress or the selected attempt overview. No-change
+  reads return just a small version envelope, not a full class report. Missing
+  notifications are recovered from the private revision index; deletions and
+  class transfers use tombstones. Assignment/catalog changes or invalid future
+  cursors require a full replacement snapshot. Timing is unchanged: no new
+  toggle or 15-second refresh interval is introduced.
 - Attempt overview reads return counts/grades/stages but skip history JSON
   aggregation. Histories load for one student only while expanded, and stop
   fetching on collapse. The legacy full-history RPC is unchanged.
-- Three explicit GET endpoints (`progress`, `roster`, `attempt-history`) own their
+- Four explicit GET endpoints (`updates`, `progress`, `roster`, `attempt-history`) own their
   authentication and mutable cookie refresh. The proxy skips its duplicate checks
   only for those endpoints; pages/actions retain the existing proxy guards.
 
@@ -55,12 +68,19 @@ assignments/month × 10 emitted hints/assignment × (one sender + one teacher
 recipient) = 120,000 messages, about 6% of the Free message quota. Extra teacher
 windows, retries, more assignments and other project features add usage.
 
-**Illustrative idle egress:** 10 visible teacher tabs × 4 hours/day × 20 days ×
-12 fallback check pairs/hour × 50 KB combined roster/progress payload = about
-480 MB/month of data payload. Auth responses, protocol overhead, initial loads,
-expanded histories and activity-triggered refetches are additional. The assumed
-50 KB must be measured for your actual class sizes; large reports can make
-egress the tighter limit even when message usage is low.
+**Illustrative idle response budget:** 10 visible teacher tabs × 4 hours/day ×
+20 days × 12 combined checks/hour × an assumed 1 KB unchanged response = about
+9.6 MB/month. This is not a total Supabase egress estimate: Auth responses,
+protocol overhead, initial snapshots, changed-student payloads and expanded
+histories are additional. Measure these for your actual classes. Large reports
+can make egress the tighter limit even when message usage is low.
+
+Incremental tracking adds a compact private row per class/student and a class
+counter update per writing transaction; a student's repeated changes update the
+same index row. It trades some write work/storage for much smaller repeated
+reads and egress. Deletion tombstones remain until a class-wide reset prunes old
+entries, and class deletion cascades the tracking data. This is not a free or
+zero-overhead cache: monitor database size, write load and class-row contention.
 
 These safeguards reduce usage; they cannot guarantee the organization stays
 within quota. Monitor **Organization → Usage** for Realtime messages, peak
@@ -104,10 +124,24 @@ No additional environment variables or service-role browser keys are needed.
      savepoint, so later changes are not accidentally suppressed.
    - No table RLS or authorization policies are changed.
 
-Apply all three approved migrations **before** deploying the new frontend: the live
-attempt overview and history endpoints require the new RPC. If only Broadcast is
-unavailable, data reads still work through the fallback. If the RPC migration is
-missing, the new attempts page cannot load; fallback is not a substitute for it.
+4. `supabase/migrations/20261027030000_teacher_student_revisions.sql`
+   - Adds two RLS-protected, non-browser-accessible private tracking tables, a
+     revision index, and one additional catalog-update trigger. Existing trigger
+     paths record latest changed student IDs, retaining deletion tombstones.
+   - A per-class counter row lock orders committed revisions; transaction-local
+     caches avoid repeated counter/journal writes for the same scope. Full resets
+     prune older tracking entries. Broadcast content and authorization are unchanged.
+5. `supabase/migrations/20261027040000_teacher_incremental_reads.sql`
+   - Adds the service-role-only `teacher_class_updates` RPC and private filtered
+     aggregation helpers. One MVCC snapshot covers revision, membership and data;
+     the RPC independently checks active class ownership and assignment access.
+   - Preserves existing lesson grades and attempt grades/timers. The original
+     live-summary RPC becomes a compatible wrapper around the filtered helper.
+
+Apply all five approved migrations **before** deploying the new frontend. The
+`updates` endpoint requires the new revision tables/RPC; fallback polling is not
+a substitute for those migrations. Realtime itself may be unavailable and data
+will still recover through the same combined delta endpoint on fallback.
 
 Broadcast permissions are cached by Realtime until a JWT refresh/rejoin. A revoked
 listener may briefly continue receiving non-sensitive invalidation hints, but
@@ -129,7 +163,8 @@ npm run typecheck
 A local-only SQL fixture builds a minimal empty schema and **stubs**
 `realtime.send` to record hints. It checks actual SQL execution, RLS (including
 pre-existing broad policies), old/new class routing, no-op suppression, report
-counts/grades/history ordering, and RPC grants. It is not a certified application
+counts/grades/history ordering, combined/delta/idle reads, missed notifications,
+transfers/deletions, assignment/catalog resets, and RPC grants. It is not a certified application
 baseline or a hosted Realtime delivery test. It is excluded from `npm test`.
 
 With local PostgreSQL binaries installed, run it in a disposable socket-only

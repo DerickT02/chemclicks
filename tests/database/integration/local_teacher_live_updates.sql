@@ -12,8 +12,8 @@ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(
 CREATE FUNCTION realtime.topic() RETURNS text LANGUAGE sql STABLE AS $$ SELECT current_setting('realtime.topic', true) $$;
 CREATE TABLE public.teachers (id uuid PRIMARY KEY REFERENCES auth.users(id));
 CREATE TABLE public.classes (id uuid PRIMARY KEY, teacher_id uuid REFERENCES public.teachers(id), name text, is_active boolean DEFAULT true);
-CREATE TABLE public.activities (id uuid PRIMARY KEY, title text, type text);
-CREATE TABLE public.class_activities (id uuid PRIMARY KEY, class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE, activity_id uuid REFERENCES public.activities(id), archived_at timestamptz);
+CREATE TABLE public.activities (id uuid PRIMARY KEY, title text, type text, order_index integer DEFAULT 0);
+CREATE TABLE public.class_activities (id uuid PRIMARY KEY, class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE, activity_id uuid REFERENCES public.activities(id), archived_at timestamptz, created_at timestamptz DEFAULT now());
 CREATE TABLE public.students (id uuid PRIMARY KEY, class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE, first_name text, last_name text, student_id text, verified boolean DEFAULT false, auth_user_id uuid REFERENCES auth.users(id));
 CREATE TABLE public.student_progress (id uuid PRIMARY KEY, student_id uuid REFERENCES public.students(id) ON DELETE CASCADE, class_activity_id uuid REFERENCES public.class_activities(id) ON DELETE CASCADE, status text DEFAULT 'not_started', started_at timestamptz, completed_at timestamptz, quiz_started_at timestamptz, first_quiz_started_at timestamptz, exploration_started_at timestamptz, exploration_duration_seconds integer);
 CREATE TABLE public.student_attempts (id uuid PRIMARY KEY, progress_id uuid REFERENCES public.student_progress(id) ON DELETE CASCADE, attempt_number integer, status text, started_at timestamptz, completed_at timestamptz, created_at timestamptz DEFAULT now(), quiz_key text, instrument text, precision_mode text, score integer, question_total integer, percentage numeric, passed boolean);
@@ -34,6 +34,8 @@ $$;
 \ir ../../../supabase/migrations/20261027000000_teacher_class_broadcasts.sql
 \ir ../../../supabase/migrations/20261027010000_teacher_live_attempt_summary.sql
 \ir ../../../supabase/migrations/20261027020000_budget_teacher_notifications.sql
+\ir ../../../supabase/migrations/20261027030000_teacher_student_revisions.sql
+\ir ../../../supabase/migrations/20261027040000_teacher_incremental_reads.sql
 
 INSERT INTO auth.users VALUES
 ('00000000-0000-4000-8000-000000000001', now(), false),
@@ -49,8 +51,8 @@ INSERT INTO public.classes VALUES
 ('10000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000003', 'Legacy student-owned class', true),
 ('10000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000004', 'Unverified owner class', true),
 ('10000000-0000-4000-8000-000000000006', '00000000-0000-4000-8000-000000000005', 'Anonymous owner class', true);
-INSERT INTO public.activities VALUES ('20000000-0000-4000-8000-000000000001', 'Covalent', 'lewis_structures_covalent');
-INSERT INTO public.class_activities VALUES
+INSERT INTO public.activities(id, title, type) VALUES ('20000000-0000-4000-8000-000000000001', 'Covalent', 'lewis_structures_covalent');
+INSERT INTO public.class_activities(id, class_id, activity_id, archived_at) VALUES
 ('30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', NULL),
 ('30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', NULL);
 INSERT INTO public.students VALUES
@@ -193,3 +195,4 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 SELECT 'PASS: private hints, old/new scopes, no-op updates, owner/foreign/student/unverified/anonymous/disabled RLS, client spoof denial, lightweight summaries and scoped histories' AS result;
+\ir local_teacher_delta_updates.sql
