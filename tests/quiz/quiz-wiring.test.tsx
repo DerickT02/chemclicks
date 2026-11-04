@@ -7,6 +7,7 @@ vi.mock("@/components/quiz/RandomizedQuiz", () => ({
 }));
 
 import BohrModelsQuiz from "@/components/quiz/bohr/BohrModelsQuiz";
+import { BOHR_INTRO_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 import LewisQuiz from "@/components/quiz/lewis/LewisQuiz";
 import type { QuizQuestion } from "@/components/quiz/types";
 
@@ -20,10 +21,13 @@ const questions: QuizQuestion[] = [
 ];
 
 describe("quiz submission wiring", () => {
-  it("connects Bohr quizzes to the bohr_models server key", () => {
-    const rendered = BohrModelsQuiz({ assignmentId: "assignment-bohr", questions });
+  it.each([
+    ["intro", BOHR_INTRO_QUIZ_KEY],
+    ["stability", BOHR_STABILITY_QUIZ_KEY],
+  ])("connects Bohr %s quizzes to their server key", (_, quizKey) => {
+    const rendered = BohrModelsQuiz({ assignmentId: "assignment-bohr", questions, quizKey });
     expect(rendered.props.assignmentId).toBe("assignment-bohr");
-    expect(rendered.props.quizKey).toBe("bohr_models");
+    expect(rendered.props.quizKey).toBe(quizKey);
   });
 
   it.each([

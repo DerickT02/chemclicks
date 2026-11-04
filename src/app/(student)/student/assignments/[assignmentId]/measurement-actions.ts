@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertAssignmentUnlocked, getQuizProgression } from "@/lib/assignments/prerequisites";
+import { getQuizProgression } from "@/lib/assignments/prerequisites";
 import {
   completeStudentMeasurementQuiz,
   recordStudentMeasurementAnswer,
@@ -9,7 +9,6 @@ import {
 } from "@/lib/server/student-measurement-quizzes";
 
 export async function startMeasurementQuizAction(assignmentId: string, mode: string) {
-  await assertAssignmentUnlocked(assignmentId);
   return startStudentMeasurementQuiz(assignmentId, mode);
 }
 

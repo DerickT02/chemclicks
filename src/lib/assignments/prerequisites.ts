@@ -29,7 +29,6 @@ export type AssignmentGate =
   | { status: "missing" }
   | { status: "scheduled"; entry: SequenceEntry }
   | { status: "closed"; entry: SequenceEntry }
-  | { status: "locked"; entry: SequenceEntry; blocker: StudentAssignment }
   | { status: "open"; entry: SequenceEntry; next: SequenceEntry | null };
 
 /** Whether a quiz for this lesson assignment can be taken now. */
@@ -38,10 +37,8 @@ export type SectionAccess =
   | { status: "error"; message: string }
   | { status: "scheduled"; assignment: StudentAssignment }
   | { status: "closed"; assignment: StudentAssignment }
-  | { status: "blocked"; assignment: StudentAssignment; blocker: StudentAssignment }
   | { status: "available"; assignment: StudentAssignment };
 
-export const LOCKED_MESSAGE = "Finish the earlier sections first.";
 const LOAD_ERROR = "Your assignments could not be loaded. Please try again.";
 
 type ProgressRow = { id: string; class_activity_id: string; status: ProgressStatus };
@@ -49,7 +46,7 @@ type PassedAttemptRow = { progress_id: string; quiz_key: string };
 
 /**
  * The signed-in student's own sections in lesson order, each with its
- * completion and lock state. Never accepts student or class IDs from callers.
+ * completion state. Never accepts student or class IDs from callers.
  */
 export async function getAssignmentSequence(): Promise<AssignmentSequenceResult> {
   const session = await getStudentSession();
@@ -109,38 +106,23 @@ export async function getAssignmentGate(assignmentId: string): Promise<Assignmen
     case "Closed":
       return { status: "closed", entry };
     case "Open":
-      return entry.lockedBy
-        ? { status: "locked", entry, blocker: entry.lockedBy }
-        : { status: "open", entry, next: nextSection(sequence.entries, assignmentId) };
+      return { status: "open", entry, next: nextSection(sequence.entries, assignmentId) };
     default:
       return { status: "missing" };
   }
 }
 
-/** Schedule first, then prerequisites, for one of the student's own assignments. */
+/** Whether one of the student's own assignments is open now. */
 export async function getSectionAccess(assignment: StudentAssignment): Promise<SectionAccess> {
   const status = scheduleStatus(assignment, Date.now());
   if (status === "Scheduled") return { status: "scheduled", assignment };
   if (status !== "Open") return { status: "closed", assignment };
-  const gate = await getAssignmentGate(assignment.id);
-  if (gate.status === "unauthenticated" || gate.status === "error") return gate;
-  if (gate.status === "locked") return { status: "blocked", assignment, blocker: gate.blocker };
   return { status: "available", assignment };
 }
 
 /**
- * Server-side prerequisite check for actions that begin new work. Missing,
- * scheduled, and closed assignments are left to the existing access checks.
- */
-export async function assertAssignmentUnlocked(assignmentId: string): Promise<void> {
-  const gate = await getAssignmentGate(assignmentId);
-  if (gate.status === "locked") throw new Error(LOCKED_MESSAGE);
-  if (gate.status === "error") throw new Error(gate.message);
-}
-
-/**
  * Resolves the next section only after the authenticated student's own
- * persisted quiz attempt has passed. The destination is open and unlocked.
+ * persisted quiz attempt has passed. The destination is open and unfinished.
  */
 export async function getQuizProgression(
   assignmentId: string,

@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import LockedSection from "@/components/assignments/LockedSection";
 import BohrModelsQuiz from "@/components/quiz/bohr/BohrModelsQuiz";
 import { getBohrQuizAccess } from "@/lib/assignments/bohr-quiz-access";
 import { assignmentPath } from "@/lib/assignments/sequence";
-import { BOHR_QUIZ_KEY, listQuizQuestions, type QuizQuestionsResult } from "@/lib/db/quiz-questions";
+import {
+  BOHR_INTRO_QUIZ_KEY,
+  BOHR_STABILITY_QUIZ_KEY,
+  BOHR_QUIZ_KEY,
+  listQuizQuestions,
+  type QuizQuestionsResult,
+} from "@/lib/db/quiz-questions";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
@@ -18,6 +23,16 @@ export const dynamic = "force-dynamic";
 const LOAD_ERROR_MESSAGE =
   "We couldn't load the quiz questions. Please try again.";
 
+function quizDetails(type: string) {
+  if (type === "bohr_model_stability") {
+    return { key: BOHR_STABILITY_QUIZ_KEY, title: "Bohr Model Stability Quiz" };
+  }
+  if (type === "bohr_model_intro") {
+    return { key: BOHR_INTRO_QUIZ_KEY, title: "Bohr Model Introduction Quiz" };
+  }
+  return { key: BOHR_QUIZ_KEY, title: "Bohr Models Quiz" };
+}
+
 type Props = {
   searchParams?: Promise<{ assignmentId?: string | string[] }>;
 };
@@ -28,6 +43,8 @@ export default async function BohrModelQuizPage({ searchParams }: Props = {}) {
   const assignmentId = Array.isArray(rawAssignmentId) ? rawAssignmentId[0] : rawAssignmentId;
   const access = await getBohrQuizAccess(assignmentId);
   if (access.status === "unauthenticated") redirect("/login/student");
+  // No Bohr lesson is assigned: there is nothing to take here.
+  if (access.status === "locked") redirect("/student");
 
   if (access.status !== "available") {
     return (
@@ -52,10 +69,6 @@ export default async function BohrModelQuizPage({ searchParams }: Props = {}) {
                 ))}
               </ul>
             </div>
-          ) : access.status === "blocked" ? (
-            <div className="mt-6">
-              <LockedSection blocker={access.blocker} />
-            </div>
           ) : (
             <div className="mt-6 space-y-4">
               <p role={access.status === "error" ? "alert" : "status"} className="text-muted-foreground">
@@ -65,9 +78,7 @@ export default async function BohrModelQuizPage({ searchParams }: Props = {}) {
                   ? "This Bohr assignment is missing or you no longer have access to it."
                   : access.status === "scheduled"
                   ? "This Bohr quiz is scheduled but is not open yet."
-                  : access.status === "closed"
-                  ? "This Bohr quiz is closed. Previously saved results remain available."
-                  : "This quiz is locked until your teacher assigns a Bohr Models lesson."}
+                  : "This Bohr quiz is closed. Previously saved results remain available."}
               </p>
               <div className="flex flex-wrap gap-3">
                 {(access.status === "scheduled" || access.status === "closed") && (
@@ -87,9 +98,10 @@ export default async function BohrModelQuizPage({ searchParams }: Props = {}) {
   }
 
   // Client sessions cannot read these rows; load them only after access passes.
+  const quiz = quizDetails(access.assignment.activity.type);
   let questionsResult: QuizQuestionsResult;
   try {
-    questionsResult = await listQuizQuestions(createAdminClient(), BOHR_QUIZ_KEY);
+    questionsResult = await listQuizQuestions(createAdminClient(), quiz.key);
   } catch {
     questionsResult = { data: null, error: { code: "unavailable", message: LOAD_ERROR_MESSAGE } };
   }
@@ -99,12 +111,14 @@ export default async function BohrModelQuizPage({ searchParams }: Props = {}) {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-foreground">
-            Bohr Models Quiz
+            {quiz.title}
           </h1>
         </header>
 
         <BohrModelsQuiz
           assignmentId={access.assignment.id}
+          title={quiz.title}
+          quizKey={quiz.key}
           questions={questionsResult.error ? [] : questionsResult.data ?? []}
           loadError={questionsResult.error ? LOAD_ERROR_MESSAGE : null}
         />
