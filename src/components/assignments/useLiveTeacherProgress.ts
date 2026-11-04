@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { subscribeTeacherClass } from "@/lib/teacher-class-updates";
 
-const FALLBACK_INTERVAL_MS = 60_000;
-const MAX_RETRY_MS = 300_000;
+const FALLBACK_INTERVAL_MS = 300_000;
+const MAX_RETRY_MS = 900_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const DEBOUNCE_MS = 250;
-const MIN_REQUEST_GAP_MS = 2_000;
+const MIN_REQUEST_GAP_MS = 5_000;
 
 type Options = {
   classId?: string;
@@ -113,7 +113,13 @@ export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
     if (initialData === null) void refresh();
     else scheduleFallback();
     let unsubscribe: (() => void) | undefined;
-    if (classId) {
+    function syncSubscription() {
+      if (document.visibilityState === "hidden" || !navigator.onLine) {
+        unsubscribe?.();
+        unsubscribe = undefined;
+        return;
+      }
+      if (!classId || unsubscribe) return;
       try {
         unsubscribe = subscribeTeacherClass(classId, change => {
           if (change.kind === "progress" && (resource === "roster"
@@ -124,10 +130,12 @@ export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
         // Missing/unavailable Realtime must never break the read-only fallback.
       }
     }
-    const resume = () => invalidate();
+    syncSubscription();
+    const resume = () => { syncSubscription(); invalidate(); };
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("focus", resume);
     window.addEventListener("online", resume);
+    window.addEventListener("offline", resume);
     return () => {
       disposed = true;
       window.clearTimeout(fallback);
@@ -138,6 +146,7 @@ export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("focus", resume);
       window.removeEventListener("online", resume);
+      window.removeEventListener("offline", resume);
     };
   }, [url, initialData, classId, resource, assignmentId, enabled]);
 

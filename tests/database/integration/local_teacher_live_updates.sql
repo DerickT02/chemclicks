@@ -33,6 +33,7 @@ RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
 $$;
 \ir ../../../supabase/migrations/20261027000000_teacher_class_broadcasts.sql
 \ir ../../../supabase/migrations/20261027010000_teacher_live_attempt_summary.sql
+\ir ../../../supabase/migrations/20261027020000_budget_teacher_notifications.sql
 
 INSERT INTO auth.users VALUES
 ('00000000-0000-4000-8000-000000000001', now(), false),
@@ -74,7 +75,32 @@ BEGIN
   SELECT count(*) INTO n FROM realtime.messages;
   INSERT INTO public.measurement_quiz_sessions VALUES ('70000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000001', 'in_progress');
   DELETE FROM public.measurement_quiz_sessions;
-  IF (SELECT count(*) FROM realtime.messages) <> n + 2 THEN RAISE EXCEPTION 'Measurement start/end hints missing'; END IF;
+  IF (SELECT count(*) FROM realtime.messages) <> n + 1 THEN RAISE EXCEPTION 'Measurement transaction hints not coalesced'; END IF;
+END $$;
+
+-- A 100-student bulk operation produces one roster hint, not 100. Further
+-- updates/deletes in that transaction still need only that single hint.
+DO $$
+DECLARE n integer;
+BEGIN
+  SELECT count(*) INTO n FROM realtime.messages;
+  INSERT INTO public.students(id, class_id, first_name, last_name, student_id)
+  SELECT gen_random_uuid(), '10000000-0000-4000-8000-000000000001', 'Bulk', 'Budget test', 'BULK' || i FROM generate_series(1,100) i;
+  UPDATE public.students SET verified = true WHERE first_name = 'Bulk';
+  DELETE FROM public.students WHERE first_name = 'Bulk';
+  IF (SELECT count(*) FROM realtime.messages) <> n + 1 THEN RAISE EXCEPTION 'Bulk operation wasted broadcast messages'; END IF;
+END $$;
+-- Local deduplication state must reset at commit and roll back at savepoints.
+DO $$
+DECLARE n integer;
+BEGIN
+  SELECT count(*) INTO n FROM realtime.messages;
+  BEGIN
+    UPDATE public.students SET verified = true WHERE student_id = 'TEST1';
+    RAISE EXCEPTION 'Test rollback';
+  EXCEPTION WHEN raise_exception THEN NULL; END;
+  UPDATE public.students SET verified = true WHERE student_id = 'TEST1';
+  IF (SELECT count(*) FROM realtime.messages) <> n + 1 THEN RAISE EXCEPTION 'Previous transaction/savepoint suppressed a valid hint'; END IF;
 END $$;
 
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000001', false);

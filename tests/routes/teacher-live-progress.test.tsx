@@ -14,7 +14,7 @@ import { LiveAttemptRoster } from "@/app/admin/classes/[classId]/attempts/LiveAt
 const fetchMock = vi.fn();
 const seed = { value: "initial" };
 const reply = (data: unknown) => ({ ok: true, redirected: false, json: async () => data });
-const tick = async (ms = 60_000) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+const tick = async (ms = 300_000) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 const change = async (event: ClassChange) => {
   act(() => { realtime.subscribe.mock.calls.forEach(([, callback]) => callback(event)); });
   await tick(250);
@@ -37,15 +37,15 @@ afterEach(() => {
 });
 
 describe("event-driven teacher progress", () => {
-  it("reuses SSR data and makes only one fallback request per minute", async () => {
+  it("reuses SSR data and makes only one fallback request per five minutes", async () => {
     const { result } = renderHook(() => useLiveTeacherProgress("/progress", seed));
-    await tick(59_999);
+    await tick(299_999);
     expect(fetchMock).not.toHaveBeenCalled();
     fetchMock.mockResolvedValue(reply({ value: "completed" }));
     await tick(1);
     expect(result.current).toEqual({ data: { value: "completed" }, failed: false });
     expect(fetchMock).toHaveBeenLastCalledWith("/progress", expect.objectContaining({ cache: "no-store", credentials: "same-origin", signal: expect.any(AbortSignal) }));
-    await tick(120_000);
+    await tick(600_000);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -59,7 +59,7 @@ describe("event-driven teacher progress", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("/attempts");
     await change({ kind: "roster" });
-    await tick(2_000);
+    await tick(5_000);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/attempts", "/roster", "/attempts"]);
   });
 
@@ -68,25 +68,25 @@ describe("event-driven teacher progress", () => {
     renderHook(() => { renders++; return useLiveTeacherProgress("/progress", seed); });
     const initialRenders = renders;
     fetchMock.mockImplementation(async () => reply({ ...seed }));
-    await tick(180_000);
+    await tick(900_000);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(renders).toBe(initialRenders);
   });
 
-  it("retains good data on failure, backs off 2/4/5 minutes, and clears warnings on recovery", async () => {
+  it("retains good data on failure, backs off 10/15/15 minutes, and clears warnings on recovery", async () => {
     const { result } = renderHook(() => useLiveTeacherProgress("/progress", seed, { classId: "class" }));
     fetchMock.mockRejectedValue(new Error("offline"));
     await tick();
     expect(result.current).toEqual({ data: seed, failed: true });
     await change({ kind: "sync" });
-    await tick(119_749);
+    await tick(599_749);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await tick(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    await tick(240_000);
+    await tick(900_000);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     fetchMock.mockResolvedValue(reply({ value: "completed" }));
-    await tick(300_000);
+    await tick(900_000);
     expect(result.current.failed).toBe(false);
     expect(result.current.data?.value).toBe("completed");
     await tick();
@@ -107,7 +107,7 @@ describe("event-driven teacher progress", () => {
   it("pauses hidden/offline reads and coalesces visibility, focus and online events", async () => {
     const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
     renderHook(() => useLiveTeacherProgress("/progress", seed));
-    await tick(120_000);
+    await tick(600_000);
     expect(fetchMock).not.toHaveBeenCalled();
     visibility.mockReturnValue("visible");
     act(() => { document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("focus")); });
@@ -122,6 +122,41 @@ describe("event-driven teacher progress", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("releases paid message recipients while hidden/offline and rejoins on return", async () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get");
+    const online = vi.spyOn(navigator, "onLine", "get");
+    renderHook(() => useLiveTeacherProgress("/progress", seed, { classId: "class" }));
+    expect(realtime.subscribe).toHaveBeenCalledTimes(1);
+    visibility.mockReturnValue("hidden");
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    expect(realtime.unsubscribe).toHaveBeenCalledTimes(1);
+    await tick(900_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+    visibility.mockReturnValue("visible");
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    await tick(250);
+    expect(realtime.subscribe).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    online.mockReturnValue(false);
+    act(() => { window.dispatchEvent(new Event("offline")); });
+    expect(realtime.unsubscribe).toHaveBeenCalledTimes(2);
+    await tick();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    online.mockReturnValue(true);
+    act(() => { window.dispatchEvent(new Event("online")); });
+    await tick(250);
+    expect(realtime.subscribe).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not join Realtime for a tab that starts hidden", async () => {
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    renderHook(() => useLiveTeacherProgress("/progress", seed, { classId: "class" }));
+    await tick(900_000);
+    expect(realtime.subscribe).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("queues changes arriving during an in-flight read without overlapping requests", async () => {
     let finish!: (value: ReturnType<typeof reply>) => void;
     fetchMock.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
@@ -129,7 +164,7 @@ describe("event-driven teacher progress", () => {
     await change({ kind: "progress" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await act(async () => { finish(reply(seed)); });
-    await tick(2_000);
+    await tick(5_000);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -153,7 +188,7 @@ describe("event-driven teacher progress", () => {
     await tick(15_000);
     expect(result.current.failed).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await tick(120_000);
+    await tick(600_000);
     expect(result.current.failed).toBe(false);
   });
 
@@ -223,7 +258,7 @@ describe("teacher live views", () => {
     expect(screen.getByText(/Student progress could not be loaded/)).toBeTruthy();
     expect(screen.queryByText("No students in this class yet.")).toBeNull();
     fetchMock.mockResolvedValue(reply(progress));
-    await tick(120_000);
+    await tick(600_000);
     expect(screen.getByText("Mina Chen")).toBeTruthy();
   });
 
@@ -237,7 +272,7 @@ describe("teacher live views", () => {
     };
     const summary: TeacherActivityAttemptSummary = { classId: "class", className: "Chemistry", assignmentId: "selected", activityId: "activity", activityTitle: "Bohr Models", students: [student] };
     render(<LiveAttemptRoster initialSummary={summary} />);
-    await tick(59_000);
+    await tick(299_000);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("table")).toBeNull();
     fetchMock.mockImplementation(async (url: string) => reply(url.includes("attempt-history") ? [{ id: "attempt", attemptNumber: 1, status: "in_progress", startedAt: "2026-09-23T12:00:00Z", completedAt: null }] : summary));
@@ -247,11 +282,11 @@ describe("teacher live views", () => {
     expect(screen.getByRole("table")).toBeTruthy();
     expect(fetchMock.mock.calls[0][0]).toBe("/admin/classes/class/attempt-history?assignmentId=selected&studentId=student");
     await change({ kind: "progress", assignmentId: "selected" });
-    await tick(2_000);
+    await tick(5_000);
     expect(details.open).toBe(true);
     act(() => { details.open = false; fireEvent(details, new Event("toggle")); });
     const historyRequests = fetchMock.mock.calls.filter(([url]) => url.includes("attempt-history")).length;
-    await tick(120_000);
+    await tick(600_000);
     expect(fetchMock.mock.calls.filter(([url]) => url.includes("attempt-history"))).toHaveLength(historyRequests);
   });
 });

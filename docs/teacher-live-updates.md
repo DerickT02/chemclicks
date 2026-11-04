@@ -2,22 +2,26 @@
 
 ## Design and cost
 
-- One **private Supabase Broadcast channel per class per browser tab**, shared by
-  the roster, lesson progress, overview, and expanded histories.
+- One **private Supabase Broadcast channel per class per visible browser tab**,
+  shared by the roster, lesson progress, overview, and expanded histories. Hidden
+  and offline tabs release their subscriptions and rejoin/catch up on return.
 - Database triggers publish only `{ kind, assignmentId }` invalidation hints,
   never student names/IDs, account details, answers, or grades. Each subsequent
   read authenticates the teacher and checks ownership on the server.
 - Notifications are coalesced for 250 ms and reads are limited to one per resource
-  every two seconds. Changes received during a read trigger a follow-up read.
+  every five seconds. Changes received during a read trigger a follow-up read.
+- Hints are also coalesced **in the database per transaction/class/resource/
+  assignment**: approving 100 students in one statement sends one roster hint,
+  not 100. Client-side debounce alone would not reduce billable messages.
 - The server-rendered snapshot is reused on mount. Subscription/reconnection
   triggers a catch-up read to close the SSR/subscription gap.
-- A one-minute fallback covers unavailable Realtime and missed events. Failed
-  reads back off to 2, 4, then 5 minutes, retaining last-loaded data. Notifications
+- A five-minute fallback covers unavailable Realtime and missed events. Failed
+  reads back off to 10, then 15 minutes, retaining last-loaded data. Notifications
   and focus events respect this backoff. Hidden/offline tabs make no data reads.
 - Unchanged responses do not update React state. Classroom refresh buttons remain
   available but no longer also refresh the entire page on focus.
-- Idle classroom views make **two fallback HTTP reads/minute**, versus 24 with the
-  original five-second polling. Initial subscription catch-up, actual changes,
+- Idle classroom views make **two fallback HTTP reads per five minutes** (24/hour),
+  versus 24/minute (1,440/hour) with the original five-second polling. Initial subscription catch-up, actual changes,
   focus, and expanded histories add reads. This is a request-budget comparison,
   not a production latency/throughput benchmark.
 - Attempt overview reads return counts/grades/stages but skip history JSON
@@ -26,6 +30,46 @@
 - Three explicit GET endpoints (`progress`, `roster`, `attempt-history`) own their
   authentication and mutable cookie refresh. The proxy skips its duplicate checks
   only for those endpoints; pages/actions retain the existing proxy guards.
+
+## Free-plan budget
+
+Checked against Supabase's currently published limits (verify again before rollout):
+
+- [Realtime messages](https://supabase.com/docs/guides/platform/manage-your-usage/realtime-messages):
+  2 million per billing cycle on Free. Broadcast counts one sent message plus one
+  for each receiving client. Tiny payloads still count as messages. Database
+  triggers publish even when no teacher is listening, so idle delivery savings
+  do not eliminate the sender count.
+- [Realtime limits](https://supabase.com/docs/guides/realtime/limits): 200 concurrent
+  connections and 100 messages/second on Free. This feature subscribes teacher
+  tabs only, not every student. Bulk-operation deduplication reduces bursts, but
+  simultaneous independent transactions can still hit the rate limit.
+- [Egress](https://supabase.com/docs/guides/platform/manage-your-usage/egress): 5 GB
+  uncached per billing cycle, shared across Database, Auth, Realtime and other
+  services. Cached Storage egress is a separate allowance; it does not pay for
+  these authenticated reads. API requests are not themselves Realtime messages,
+  but their responses and repeated Auth checks consume compute and egress.
+
+**Illustrative message budget, not a measured workload:** 300 students × 20
+assignments/month × 10 emitted hints/assignment × (one sender + one teacher
+recipient) = 120,000 messages, about 6% of the Free message quota. Extra teacher
+windows, retries, more assignments and other project features add usage.
+
+**Illustrative idle egress:** 10 visible teacher tabs × 4 hours/day × 20 days ×
+12 fallback check pairs/hour × 50 KB combined roster/progress payload = about
+480 MB/month of data payload. Auth responses, protocol overhead, initial loads,
+expanded histories and activity-triggered refetches are additional. The assumed
+50 KB must be measured for your actual class sizes; large reports can make
+egress the tighter limit even when message usage is low.
+
+These safeguards reduce usage; they cannot guarantee the organization stays
+within quota. Monitor **Organization → Usage** for Realtime messages, peak
+connections, database size, and egress after a small-class rollout. The quotas
+are shared with other usage/projects as described in Supabase's billing docs.
+Free-plan overages can lead to service restrictions, not unlimited free usage.
+Normal live delivery remains quick; if Realtime fails, the budget-conscious
+fallback can leave data up to five minutes old (longer after repeated read
+failures). Manual refresh is still available.
 
 ## Database changes and deployment
 
@@ -53,7 +97,14 @@ No additional environment variables or service-role browser keys are needed.
      one student's rows. The existing `teacher_activity_attempt_summary` remains
      compatible with older clients.
 
-Apply the approved migrations **before** deploying the new frontend: the live
+3. `supabase/migrations/20261027020000_budget_teacher_notifications.sql`
+   - Replaces the trigger function with transaction-local hint deduplication.
+     Bulk approvals and related progress/attempt writes in one transaction share
+     one hint per scope. The state resets at commit and rolls back with a
+     savepoint, so later changes are not accidentally suppressed.
+   - No table RLS or authorization policies are changed.
+
+Apply all three approved migrations **before** deploying the new frontend: the live
 attempt overview and history endpoints require the new RPC. If only Broadcast is
 unavailable, data reads still work through the fallback. If the RPC migration is
 missing, the new attempts page cannot load; fallback is not a substitute for it.

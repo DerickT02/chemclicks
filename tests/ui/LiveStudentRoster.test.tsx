@@ -16,7 +16,7 @@ const second = { ...student, id: "second", first_name: "Sam", student_id: "TEST2
 const empty: Roster = { pending: [], active: [] };
 const roster: Roster = { pending: [student], active: [] };
 const reply = (data: Roster) => ({ ok: true, redirected: false, json: async () => data });
-const tick = async (ms = 60_000) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+const tick = async (ms = 300_000) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 const pendingList = () => within(screen.getByRole("region", { name: "Pending students" }));
 const activeList = () => within(screen.getByRole("region", { name: "Active students" }));
 
@@ -75,7 +75,7 @@ describe("live student approvals", () => {
     expect(pendingList().getByRole("cell", { name: "TEST1" })).toBeInTheDocument();
     expect(screen.queryByText(/private connection/)).not.toBeInTheDocument();
     fetchMock.mockResolvedValue(reply({ pending: [student, second], active: [] }));
-    await tick(120_000);
+    await tick(600_000);
     expect(screen.queryByText(/Showing last loaded roster/)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pending (2)" })).toBeInTheDocument();
   });
@@ -88,7 +88,7 @@ describe("live student approvals", () => {
     expect(screen.getByRole("button", { name: "Retry student roster" })).toBeInTheDocument();
     expect(screen.queryByText("No pending students.")).not.toBeInTheDocument();
     fetchMock.mockResolvedValue(reply(roster));
-    await tick(120_000);
+    await tick(600_000);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(pendingList().getByRole("cell", { name: "TEST1" })).toBeInTheDocument();
   });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 const read = (name: string) => readFileSync(new URL(`../../supabase/migrations/${name}.sql`, import.meta.url), "utf8").replace(/\s+/g, " ").toLowerCase();
 const broadcast = read("20261027000000_teacher_class_broadcasts");
 const summary = read("20261027010000_teacher_live_attempt_summary");
+const budget = read("20261027020000_budget_teacher_notifications");
 
 describe("teacher live update migration contracts", () => {
   it("authorizes private topics using verified, non-student, owning teachers and active classes", () => {
@@ -29,6 +30,15 @@ describe("teacher live update migration contracts", () => {
     expect(summary).toContain("from public, anon, authenticated");
     expect(summary).toContain("to service_role");
     expect(summary).not.toContain("create or replace function public.teacher_activity_attempt_summary");
+  });
+  it("coalesces hints at the database source for the whole transaction", () => {
+    expect(budget).toContain("current_setting('chemclicks.teacher_broadcasts', true)");
+    expect(budget).toContain("and not (seen ? hint_key)");
+    expect(budget).toContain("set_config('chemclicks.teacher_broadcasts', seen::text, true)");
+    expect(budget).toContain("coalesce(assignment_id::text, 'all')");
+    expect(budget).toContain("jsonb_build_array(to_jsonb(old), to_jsonb(new))");
+    expect(budget).toContain("revoke all on function private.broadcast_teacher_class_change() from public, anon, authenticated");
+    expect(budget).not.toContain("create policy");
   });
   it("preserves the canonical grade and timer CASE expressions", () => {
     const canonical = read("20261026043835_jira_232_live_compatibility");
