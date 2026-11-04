@@ -1,6 +1,6 @@
 import { getTeacherClassActivities } from '@/lib/server/teacher-activities'
 import { getTeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
-import { AttemptRoster } from './AttemptRoster'
+import { LiveAttemptRoster } from '@/app/admin/classes/[classId]/attempts/LiveAttemptRoster'
 
 export default async function ActivityAttemptsPage({ params, searchParams }: {
   params: Promise<{ classId: string }>
@@ -33,7 +33,7 @@ export default async function ActivityAttemptsPage({ params, searchParams }: {
             </div>
             <button className="rounded-md bg-primary px-4 py-2 text-primary-foreground" type="submit">View attempts</button>
           </form>
-          {summary && <AttemptRoster summary={summary} />}
+          {summary && <LiveAttemptRoster key={summary.assignmentId} initialSummary={summary} />}
         </>
       )}
     </main>

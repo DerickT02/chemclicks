@@ -14,7 +14,7 @@ import { listActiveClassesForTeacher } from "@/lib/db/classes";
 import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
-import { LessonProgressList } from "@/app/admin/LessonProgressList";
+import { LiveLessonProgress } from "@/app/admin/LiveLessonProgress";
 import StudentRoster from "@/app/admin/classes/StudentRoster";
 import { getOwnedStudentRoster } from "@/lib/server/student-roster";
 
@@ -91,8 +91,6 @@ export default async function AdminPage({
   );
   const catalogLoadFailed = Boolean(catalogResult.error) || catalogResult.data === null;
   const assignmentsLoadFailed = Boolean(assignmentsResult.error) || assignmentsResult.data === null;
-  const lessonProgressLoadFailed = Boolean(lessonProgressResult.error);
-  const lessonProgressStudents = lessonProgressResult.data?.students ?? [];
   // Request-time status snapshot; dashboard refreshes update it.
   // eslint-disable-next-line react-hooks/purity -- This server-only clock read is not a client render-time side effect.
   const scheduleRenderedAt = Date.now();
@@ -303,15 +301,11 @@ export default async function AdminPage({
                 <div className="mt-7">
                   <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
                   <div className="mt-4">
-                    {lessonProgressLoadFailed ? (
-                      <p role="alert" className="text-sm text-destructive">
-                        Student progress could not be loaded. Please refresh the page.
-                      </p>
-                    ) : (
-                      <div className="max-h-[480px] overflow-y-auto rounded-lg border border-border p-4">
-                        <LessonProgressList students={lessonProgressStudents} />
-                      </div>
-                    )}
+                    <LiveLessonProgress
+                      key={selectedClass.id}
+                      classId={selectedClass.id}
+                      initialProgress={lessonProgressResult.data}
+                    />
                   </div>
                 </div>
               </>
