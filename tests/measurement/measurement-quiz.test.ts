@@ -286,6 +286,70 @@ describe("quizReducer", () => {
     expect(currentReading(retry)).toBe(47.9);
   });
 
+  it("resumes a saved attempt at its first unanswered question with the saved score", () => {
+    const question = asQuestion(quizReducer(INITIAL_QUIZ_STATE, {
+      type: "start",
+      instrument: "ruler",
+      mode: "ruler_hundredths",
+      readings: READINGS.ruler,
+      attemptId: "attempt-1",
+      attemptNumber: 2,
+      saved: [
+        { answer: "4.37", correct: true },
+        { answer: "1.00", correct: false },
+        { answer: null, correct: null },
+        { answer: null, correct: null },
+        { answer: null, correct: null },
+      ],
+    }));
+
+    expect(question).toMatchObject({
+      questionIndex: 2,
+      answer: "",
+      result: null,
+      firstTryCorrect: null,
+      score: 1,
+      attemptId: "attempt-1",
+      attemptNumber: 2,
+    });
+    expect(isAnswerLocked(question)).toBe(false);
+  });
+
+  it("resumes a fully answered attempt on its last question, locked with the saved answer", () => {
+    const question = asQuestion(quizReducer(INITIAL_QUIZ_STATE, {
+      type: "start",
+      instrument: "cylinder",
+      mode: "cylinder_whole",
+      readings: [24, 37, 13, 46, 7],
+      saved: [
+        { answer: "24", correct: true },
+        { answer: "36", correct: true },
+        { answer: "20", correct: false },
+        { answer: "46", correct: true },
+        { answer: "9", correct: true },
+      ],
+    }));
+
+    expect(question).toMatchObject({ questionIndex: 4, answer: "9", firstTryCorrect: true, score: 4 });
+    expect(question.result?.status).toBe("correct");
+    expect(isAnswerLocked(question)).toBe(true);
+    expect(quizReducer(question, { type: "submit" })).toBe(question);
+    expect(quizReducer(question, { type: "next" })).toMatchObject({ phase: "results", score: 4, total: 5 });
+  });
+
+  it("credits a replayed answer by its saved grade when the first response was lost", () => {
+    const started = run(INITIAL_QUIZ_STATE, start("ruler"));
+    const replayed = asQuestion(quizReducer(started, {
+      type: "server-submit",
+      result: { status: "correct", message: "Your first answer was already saved." },
+      counted: false,
+      firstTryCorrect: true,
+    }));
+
+    expect(replayed).toMatchObject({ firstTryCorrect: true, score: 1 });
+    expect(isAnswerLocked(replayed)).toBe(true);
+  });
+
   it("returns to the chooser when the student picks a different instrument", () => {
     const started = run(INITIAL_QUIZ_STATE, start("ruler"));
 
