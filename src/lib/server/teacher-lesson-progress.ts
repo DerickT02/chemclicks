@@ -1,12 +1,12 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/server/database'
 import { requireTeacherId } from '@/lib/server/teacher'
-import type { AssignmentProgressFacts } from '@/components/assignments/AssignmentProgressDetails'
+import { normalizeAssignmentProgress, type AssignmentProgressFacts } from '@/lib/assignments/progress'
 import type { AssignmentStage } from '@/lib/assignments/stages'
 
-export type LessonStatus = 'not_started' | 'in_progress' | 'completed'
+type LessonStatus = 'not_started' | 'in_progress' | 'completed'
 
-export type TeacherClassLessonProgress = {
+type LessonProgressResponse = {
   classId: string
   className: string
   students: {
@@ -28,6 +28,17 @@ export type TeacherClassLessonProgress = {
   }[]
 }
 
+type Student = LessonProgressResponse['students'][number]
+type Lesson = Student['lessons'][number]
+
+export type TeacherClassLessonProgress = Omit<LessonProgressResponse, 'students'> & {
+  students: (Omit<Student, 'lessons'> & {
+    lessons: (Pick<Lesson, 'assignmentId' | 'activityId' | 'activityTitle'> & {
+      progress: AssignmentProgressFacts
+    })[]
+  })[]
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
 
 // Named, per-lesson progress for every enrolled student in a teacher-owned
@@ -47,5 +58,17 @@ export async function getTeacherClassLessonProgress(
   if (error || !data) {
     throw new Error('Class progress access denied or unavailable.')
   }
-  return data as TeacherClassLessonProgress
+  const response = data as LessonProgressResponse
+  return {
+    ...response,
+    students: response.students.map(student => ({
+      ...student,
+      lessons: student.lessons.map(lesson => ({
+        assignmentId: lesson.assignmentId,
+        activityId: lesson.activityId,
+        activityTitle: lesson.activityTitle,
+        progress: normalizeAssignmentProgress(lesson, lesson.status),
+      })),
+    })),
+  }
 }
