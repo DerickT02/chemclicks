@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AttemptHistoryTable } from "@/app/admin/classes/[classId]/attempts/AttemptHistoryTable";
+import { AttemptHistoryTable } from "@/app/admin/classes/[classId]/activities/[assignmentId]/AttemptHistoryTable";
 import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherProgress";
 import type { TeacherActivityAttemptSummary } from "@/lib/server/teacher-attempts";
 

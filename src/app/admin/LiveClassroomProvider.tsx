@@ -6,7 +6,13 @@ import { classSnapshotCursor, mergeClassSnapshot, type TeacherClassSnapshot } fr
 import type { StudentRoster } from "@/lib/server/student-roster";
 import type { TeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 
-type LiveClassroom = { data: TeacherClassSnapshot | null; failed: boolean };
+type LiveClassroom = {
+  /** Latest roster: live data, else the server-rendered roster, else null. */
+  roster: StudentRoster | null;
+  /** Latest class progress: live data, else the server-rendered progress, else null. */
+  progress: TeacherClassLessonProgress | null;
+  failed: boolean;
+};
 const Context = createContext<LiveClassroom | null>(null);
 
 type Props = {
@@ -16,14 +22,20 @@ type Props = {
   children: ReactNode;
 };
 
+/** One combined, revision-based live read shared by every view of a class. */
 export function LiveClassroomProvider({ classId, initialRoster, initialProgress, children }: Props) {
+  // A missing server-rendered resource leaves no seed, so the first read runs
+  // immediately and returns both resources from one database snapshot.
   const initial = useMemo<TeacherClassSnapshot | null>(() => !initialRoster || !initialProgress ? null : {
     classId, revision: null, reset: true, removedStudentIds: [],
     roster: initialRoster, progress: initialProgress, attempts: null,
   }, [classId, initialRoster, initialProgress]);
-  const value = useLiveTeacherProgress(`/admin/classes/${encodeURIComponent(classId)}/updates`, initial, {
+  const { data, failed } = useLiveTeacherProgress(`/admin/classes/${encodeURIComponent(classId)}/updates`, initial, {
     classId, getCursor: classSnapshotCursor, merge: mergeClassSnapshot,
   });
+  const roster = data?.roster ?? initialRoster;
+  const progress = data?.progress ?? initialProgress;
+  const value = useMemo(() => ({ roster, progress, failed }), [roster, progress, failed]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

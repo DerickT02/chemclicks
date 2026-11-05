@@ -1,11 +1,14 @@
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { LEWIS_QUIZZES } from "@/lib/assignments/lewis-quizzes";
-import { BOHR_QUIZ_KEY } from "@/lib/db/quiz-questions";
+import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 import { measurementAttemptLabel } from "@/lib/measurement/modes";
 import type { TeacherActivityAttemptSummary } from "@/lib/server/teacher-attempts";
 
+// Names a teacher recognises; the stored key is an internal identifier.
 const QUIZ_TITLES: Record<string, string> = {
   [BOHR_QUIZ_KEY]: "Bohr Models Quiz",
+  [BOHR_INTRO_QUIZ_KEY]: "Bohr Model Introduction Quiz",
+  [BOHR_STABILITY_QUIZ_KEY]: "Bohr Model Stability Quiz",
   [LEWIS_QUIZZES.covalent.quizKey]: LEWIS_QUIZZES.covalent.title,
   [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
 };

@@ -98,7 +98,7 @@ describe("admin route proxy", () => {
 });
 
 describe("authorized live read handlers", () => {
-  it.each(["progress", "roster", "attempt-history", "updates"])("leaves GET %s authentication and cookie refresh to the handler", async endpoint => {
+  it.each(["attempt-history", "updates"])("leaves GET %s authentication and cookie refresh to the handler", async endpoint => {
     const response = await proxy(request(`/admin/classes/class/${endpoint}`));
     expect(response.headers.get("location")).toBeNull();
     expect(mocks.session).not.toHaveBeenCalled();
@@ -106,11 +106,14 @@ describe("authorized live read handlers", () => {
     expect(mocks.teacherFrom).not.toHaveBeenCalled();
   });
   it("does not skip guards for actions or similarly named pages", async () => {
-    await proxy(new NextRequest("https://chemclicks.test/admin/classes/class/progress", { method: "POST" }));
-    await proxy(request("/admin/classes/class/progress/extra"));
+    await proxy(new NextRequest("https://chemclicks.test/admin/classes/class/updates", { method: "POST" }));
+    await proxy(request("/admin/classes/class/updates/extra"));
     await proxy(request("/admin/classes/class/attempts"));
-    expect(mocks.session).toHaveBeenCalledTimes(3);
-    expect(mocks.admin).toHaveBeenCalledTimes(3);
+    // Removed live endpoints must not stay exempt from the guard.
+    await proxy(request("/admin/classes/class/progress"));
+    await proxy(request("/admin/classes/class/roster"));
+    expect(mocks.session).toHaveBeenCalledTimes(5);
+    expect(mocks.admin).toHaveBeenCalledTimes(5);
   });
 });
 

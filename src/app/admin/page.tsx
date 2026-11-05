@@ -14,7 +14,7 @@ import { listActiveClassesForTeacher } from "@/lib/db/classes";
 import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
-import { LiveLessonProgress } from "@/app/admin/LiveLessonProgress";
+import { LiveActivityProgressSummary, LiveProgressStatus } from "@/app/admin/LiveActivityProgress";
 import { LiveClassroomProvider } from "@/app/admin/LiveClassroomProvider";
 import LiveStudentRoster from "@/app/admin/classes/LiveStudentRoster";
 import { getOwnedStudentRoster } from "@/lib/server/student-roster";
@@ -200,13 +200,11 @@ export default async function AdminPage({
                   {selectedClass.student_count} {selectedClass.student_count === 1 ? "student" : "students"} enrolled
                 </p>
                 <div className="mt-4"><CopyClassCode key={selectedClass.id} code={selectedClass.class_code} /></div>
-                <LiveStudentRoster
-                  key={selectedClass.id}
-                  classId={selectedClass.id}
-                  initialRoster={rosterResult.data}
-                />
+                <LiveStudentRoster key={selectedClass.id} classId={selectedClass.id} />
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
+
+                  <LiveProgressStatus />
 
                   {catalogLoadFailed && (
                     <p role="alert" className="text-sm text-destructive">
@@ -280,6 +278,11 @@ export default async function AdminPage({
                                     assignment={assignment}
                                     renderedAt={scheduleRenderedAt}
                                   />
+                                  <LiveActivityProgressSummary
+                                    classId={selectedClass.id}
+                                    assignmentId={assignment.id}
+                                    activityTitle={activity?.title ?? "Assigned activity"}
+                                  />
                                 </div>
                                 <div className="shrink-0">
                                   <UnassignActivityForm
@@ -296,20 +299,7 @@ export default async function AdminPage({
                         })
                       )}
                 </section>
-                <Link href={`/admin/classes/${selectedClass.id}/attempts`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
-                  Activity attempts
-                </Link>
-                <div className="mt-4"><RefreshAssignments label="Refresh classroom" refreshOnFocus={false} /></div>
-                <div className="mt-7">
-                  <h3 className="text-lg font-semibold text-foreground">Student progress</h3>
-                  <div className="mt-4">
-                    <LiveLessonProgress
-                      key={selectedClass.id}
-                      classId={selectedClass.id}
-                      initialProgress={lessonProgressResult.data}
-                    />
-                  </div>
-                </div>
+                <div className="mt-5"><RefreshAssignments label="Refresh classroom" refreshOnFocus={false} /></div>
               </LiveClassroomProvider>
             )}
           </section>

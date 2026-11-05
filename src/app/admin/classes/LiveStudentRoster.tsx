@@ -3,22 +3,15 @@
 import { useLiveClassroom } from "@/app/admin/LiveClassroomProvider";
 import StudentRoster from "@/app/admin/classes/StudentRoster";
 import RefreshAssignments from "@/components/assignments/RefreshAssignments";
-import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherProgress";
-import type { StudentRoster as Roster } from "@/lib/server/student-roster";
 
-type Props = { classId: string; initialRoster: Roster | null };
+type Props = { classId: string };
 
-export default function LiveStudentRoster({ classId, initialRoster }: Props) {
-  const shared = useLiveClassroom();
-  const standalone = useLiveTeacherProgress(
-    `/admin/classes/${encodeURIComponent(classId)}/roster`,
-    initialRoster,
-    { classId, resource: "roster", enabled: !shared },
-  );
-  const data = shared ? shared.data?.roster ?? initialRoster : standalone.data;
-  const failed = shared ? shared.failed || !data : standalone.failed;
+/** The class roster from the shared live classroom read. */
+export default function LiveStudentRoster({ classId }: Props) {
+  const classroom = useLiveClassroom();
+  const roster = classroom?.roster ?? null;
 
-  if (!data) {
+  if (!roster) {
     return (
       <section aria-label="Students & approvals" className="mt-7 space-y-3">
         <h3 className="text-lg font-semibold">Students & approvals</h3>
@@ -33,8 +26,8 @@ export default function LiveStudentRoster({ classId, initialRoster }: Props) {
   return (
     <StudentRoster
       classId={classId}
-      roster={data}
-      liveStatus={failed
+      roster={roster}
+      liveStatus={classroom?.failed
         ? "Live updates interrupted. Showing last loaded roster; retrying automatically."
         : "Student approval requests update live, with periodic checks while this tab is visible."}
     />

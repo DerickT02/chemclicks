@@ -12,7 +12,6 @@ export type LewisQuizAccess =
   | { status: "missing" }
   | { status: "scheduled"; assignment: StudentAssignment }
   | { status: "closed"; assignment: StudentAssignment }
-  | { status: "blocked"; assignment: StudentAssignment; blocker: StudentAssignment }
   | { status: "available"; assignment: StudentAssignment };
 
 /**

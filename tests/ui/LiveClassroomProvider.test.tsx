@@ -10,13 +10,14 @@ vi.mock("@/app/admin/classes/roster-actions", () => ({ approveStudent: mocks.app
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 import { LiveClassroomProvider } from "@/app/admin/LiveClassroomProvider";
 import LiveStudentRoster from "@/app/admin/classes/LiveStudentRoster";
-import { LiveLessonProgress } from "@/app/admin/LiveLessonProgress";
+import { LiveActivityProgressSummary, LiveProgressStatus } from "@/app/admin/LiveActivityProgress";
 
 const alice = { id: "alice", first_name: "Alice", last_name: "Student", student_id: "A", verified: false };
 const bob = { ...alice, id: "bob", first_name: "Bob", student_id: "B" };
 const progressStudent = (student: typeof alice) => ({ studentId: student.id, firstName: student.first_name, lastName: student.last_name,
   verified: student.verified, overallPercent: 0,
-  lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models", status: "not_started" as const }],
+  lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models",
+    status: "not_started" as const, stage: "not_started" as const }],
 });
 const baseline: TeacherClassSnapshot = { classId: "class", revision: "1", reset: true, removedStudentIds: [], attempts: null,
   roster: { pending: [alice, bob], active: [] }, progress: { classId: "class", className: "Chemistry", students: [progressStudent(alice), progressStudent(bob)] },
@@ -29,8 +30,9 @@ const sync = async () => {
   await tick(250);
 };
 const view = (initial = baseline) => <LiveClassroomProvider classId="class" initialRoster={initial.roster} initialProgress={initial.progress}>
-  <LiveStudentRoster classId="class" initialRoster={initial.roster} />
-  <LiveLessonProgress classId="class" initialProgress={initial.progress} />
+  <LiveStudentRoster classId="class" />
+  <LiveProgressStatus />
+  <LiveActivityProgressSummary classId="class" assignmentId="assignment" activityTitle="Bohr Models" />
 </LiveClassroomProvider>;
 
 beforeEach(() => {
@@ -63,7 +65,7 @@ describe("one shared classroom data stream", () => {
     fetchMock.mockResolvedValue(reply({ ...baseline, revision: "2", reset: false,
       roster: { pending: [], active: [{ ...alice, verified: true }] },
       progress: { ...baseline.progress!, students: [{ ...progressStudent(alice), verified: true, overallPercent: 100,
-        lessons: [{ ...progressStudent(alice).lessons[0], status: "completed" }] }] },
+        lessons: [{ ...progressStudent(alice).lessons[0], status: "completed", stage: "completed" }] }] },
     }));
     act(() => { mocks.subscribe.mock.calls[0][1]({ kind: "progress", assignmentId: "assignment" }); });
     await tick(5_000);
@@ -71,9 +73,9 @@ describe("one shared classroom data stream", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/admin/classes/class/updates?after=1");
     expect(screen.getByRole("heading", { name: "Pending (1)" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Active (1)" })).toBeInTheDocument();
-    expect(screen.getByText("100% complete")).toBeInTheDocument();
+    // Alice's changed row merges in; Bob's unchanged row is kept.
+    expect(screen.getByText("2 students · 1 completed · 1 not started")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approve Bob Student, Student ID B" })).toBeEnabled();
-    expect(screen.getByText("Bohr Models: Not started")).toBeInTheDocument();
   });
   it("removes transferred/deleted students and keeps both views on a shared revision", async () => {
     render(view()); await sync();
@@ -83,6 +85,7 @@ describe("one shared classroom data stream", () => {
     await tick();
     expect(screen.queryByText("Alice Student")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pending (1)" })).toBeInTheDocument();
+    expect(screen.getByText("1 student · 1 not started")).toBeInTheDocument();
     await tick();
     expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("/admin/classes/class/updates?after=2");
   });
@@ -114,7 +117,7 @@ describe("one shared classroom data stream", () => {
   });
   it("immediately recovers a missing SSR resource without hiding the other valid resource", async () => {
     render(view({ ...baseline, roster: null }));
-    expect(screen.getAllByText("Bohr Models: Not started")).toHaveLength(2);
+    expect(screen.getByText("2 students · 2 not started")).toBeInTheDocument();
     await tick(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("heading", { name: "Pending (2)" })).toBeInTheDocument();

@@ -5,11 +5,13 @@ import type { ClassChange } from "@/lib/teacher-class-updates";
 import type { TeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import type { TeacherActivityAttemptSummary } from "@/lib/server/teacher-attempts";
 
-const realtime = vi.hoisted(() => ({ subscribe: vi.fn(), unsubscribe: vi.fn() }));
+const realtime = vi.hoisted(() => ({ subscribe: vi.fn(), unsubscribe: vi.fn(), refresh: vi.fn() }));
 vi.mock("@/lib/teacher-class-updates", () => ({ subscribeTeacherClass: realtime.subscribe }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: realtime.refresh }) }));
 import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherProgress";
-import { LiveLessonProgress } from "@/app/admin/LiveLessonProgress";
-import { LiveAttemptRoster } from "@/app/admin/classes/[classId]/attempts/LiveAttemptRoster";
+import { LiveActivityProgressSummary, LiveProgressStatus } from "@/app/admin/LiveActivityProgress";
+import { LiveClassroomProvider } from "@/app/admin/LiveClassroomProvider";
+import { LiveStudentProgress } from "@/app/admin/classes/[classId]/activities/[assignmentId]/LiveStudentProgress";
 
 const fetchMock = vi.fn();
 const seed = { value: "initial" };
@@ -23,6 +25,7 @@ const change = async (event: ClassChange) => {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.resetAllMocks();
+  revision = 0;
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockResolvedValue(reply(seed));
   realtime.subscribe.mockReturnValue(realtime.unsubscribe);
@@ -231,35 +234,47 @@ describe("event-driven teacher progress", () => {
 const progress: TeacherClassLessonProgress = {
   classId: "class", className: "Chemistry", students: [{
     studentId: "student", firstName: "Mina", lastName: "Chen", verified: true, overallPercent: 0,
-    lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models", status: "not_started" }],
+    lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models", status: "not_started", stage: "not_started" }],
   }],
 };
+let revision = 0;
+const snapshot = (data: TeacherClassLessonProgress) => ({
+  classId: "class", revision: String(++revision), reset: true, removedStudentIds: [],
+  roster: { pending: [], active: [] }, progress: data, attempts: null,
+});
+const classView = (initialProgress: TeacherClassLessonProgress | null) => (
+  <LiveClassroomProvider classId="class" initialRoster={{ pending: [], active: [] }} initialProgress={initialProgress}>
+    <LiveProgressStatus />
+    <LiveActivityProgressSummary classId="class" assignmentId="assignment" activityTitle="Bohr Models" />
+  </LiveClassroomProvider>
+);
 
 describe("teacher live views", () => {
   it("updates named statuses and percentages on broadcast, and displays stale-data warnings", async () => {
-    render(<LiveLessonProgress classId="class" initialProgress={progress} />);
-    expect(screen.getByText("Bohr Models: Not started")).toBeTruthy();
-    fetchMock.mockResolvedValue(reply({ ...progress, students: [{ ...progress.students[0], overallPercent: 100,
-      lessons: [{ ...progress.students[0].lessons[0], status: "completed" }],
-    }] }));
+    render(classView(progress));
+    expect(screen.getByText("1 student · 1 not started")).toBeTruthy();
+    fetchMock.mockResolvedValue(reply(snapshot({ ...progress, students: [{ ...progress.students[0], overallPercent: 100,
+      lessons: [{ ...progress.students[0].lessons[0], status: "completed", stage: "completed" }],
+    }] })));
     await change({ kind: "progress" });
-    expect(screen.getByText("Bohr Models: Completed")).toBeTruthy();
-    expect(screen.getByText("100% complete")).toBeTruthy();
+    expect(screen.getByText("1 student · 1 completed")).toBeTruthy();
     fetchMock.mockRejectedValue(new Error("offline"));
     await tick();
     expect(screen.getByRole("status").textContent).toContain("Showing last loaded progress");
-    expect(screen.getByText("100% complete")).toBeTruthy();
+    expect(screen.getByText("1 student · 1 completed")).toBeTruthy();
   });
 
   it("recovers automatically from an initial lesson-load failure", async () => {
     fetchMock.mockRejectedValue(new Error("unavailable"));
-    render(<LiveLessonProgress classId="class" initialProgress={null} />);
+    render(classView(null));
     await tick(0);
     expect(screen.getByText(/Student progress could not be loaded/)).toBeTruthy();
+    expect(screen.getByText("Progress unavailable.")).toBeTruthy();
     expect(screen.queryByText("No students in this class yet.")).toBeNull();
-    fetchMock.mockResolvedValue(reply(progress));
+    fetchMock.mockResolvedValue(reply(snapshot(progress)));
     await tick(600_000);
-    expect(screen.getByText("Mina Chen")).toBeTruthy();
+    expect(screen.queryByText(/Student progress could not be loaded/)).toBeNull();
+    expect(screen.getByText("1 student · 1 not started")).toBeTruthy();
   });
 
   it("fetches history only while expanded and keeps it open across overview updates", async () => {
@@ -271,7 +286,7 @@ describe("teacher live views", () => {
       failedQuizAttemptCount: 0, attempts: [],
     };
     const summary: TeacherActivityAttemptSummary = { classId: "class", className: "Chemistry", assignmentId: "selected", activityId: "activity", activityTitle: "Bohr Models", students: [student] };
-    render(<LiveAttemptRoster initialSummary={summary} />);
+    render(<LiveStudentProgress initialSummary={summary} />);
     await tick(299_000);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("table")).toBeNull();

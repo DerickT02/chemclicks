@@ -1,6 +1,7 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/server/database'
 import { requireTeacherId } from '@/lib/server/teacher'
+import type { AssignmentStage } from '@/lib/assignments/stages'
 
 export type TeacherActivityAttemptSummary = {
   classId: string
@@ -19,7 +20,12 @@ export type TeacherActivityAttemptSummary = {
     completedCount: number
     inProgressCount: number
     overallStatus: 'not_started' | 'exploring' | 'taking_quiz' | 'needs_retry' | 'completed'
+    // Shared stage from assignment_progress_state (20261104000200); absent on
+    // databases without that migration.
+    progressStage?: AssignmentStage
+    completedAt?: string | null
     explorationStatus: 'not_started' | 'in_progress' | 'completed'
+    // Since 20261104000200 this is the saved exploration-to-first-quiz interval.
     explorationDurationSeconds: number | null
     passingQuizAttemptNumber: number | null
     passingQuizScore: number | null

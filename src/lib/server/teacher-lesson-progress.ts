@@ -1,6 +1,8 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/server/database'
 import { requireTeacherId } from '@/lib/server/teacher'
+import type { AssignmentProgressFacts } from '@/components/assignments/AssignmentProgressDetails'
+import type { AssignmentStage } from '@/lib/assignments/stages'
 
 export type LessonStatus = 'not_started' | 'in_progress' | 'completed'
 
@@ -13,12 +15,16 @@ export type TeacherClassLessonProgress = {
     lastName: string
     verified: boolean
     overallPercent: number
-    lessons: {
+    // stage and the timing/result facts are absent until the stage
+    // migration (20261104000200) reaches the database.
+    lessons: ({
       assignmentId: string
       activityId: string
       activityTitle: string
       status: LessonStatus
-    }[]
+      stage?: AssignmentStage
+      quizStartedAt?: string | null
+    } & Partial<Omit<AssignmentProgressFacts, 'stage'>>)[]
   }[]
 }
 

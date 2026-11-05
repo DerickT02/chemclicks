@@ -18,24 +18,17 @@ vi.mock("@/lib/db/student-assignments", () => ({
 vi.mock("@/lib/assignments/prerequisites", async (importOriginal) => {
   // Keep the real schedule checks; stub only the progress-backed gate.
   const actual = await importOriginal<typeof import("@/lib/assignments/prerequisites")>();
-  const { scheduleStatus } = await import("@/lib/assignments/schedule");
   return {
     ...actual,
     getAssignmentGate: mocks.gate,
-    getSectionAccess: async (assignment: { id: string; opens_at: string | null; closes_at: string | null }) => {
-      const status = scheduleStatus(assignment, Date.now());
-      if (status === "Scheduled") return { status: "scheduled", assignment };
-      if (status !== "Open") return { status: "closed", assignment };
-      const gate = await mocks.gate(assignment.id);
-      return gate.status === "locked"
-        ? { status: "blocked", assignment, blocker: gate.blocker }
-        : { status: "available", assignment };
-    },
   };
 });
 vi.mock("@/lib/server/student-assignments", () => ({ getAssignmentAttempts: mocks.attempts }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
+  BOHR_QUIZ_KEY: "bohr_models",
+  BOHR_INTRO_QUIZ_KEY: "bohr_model_intro",
+  BOHR_STABILITY_QUIZ_KEY: "bohr_model_stability",
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
   listQuizQuestions: mocks.listQuestions,
@@ -103,21 +96,21 @@ const QUIZZES = [
   },
 ];
 
-describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, title, quizKey, lesson, otherLesson, lessonTitle, path }) => {
+describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, title, quizKey, lesson, otherLesson, path }) => {
   const renderQuiz = () => renderQuizFor(kind);
   const started = `Started ${title}`;
 
-  function expectLocked(html: string) {
-    expect(html).toContain("This quiz is locked.");
-    expect(html).toContain(`Your teacher must assign the ${lessonTitle} lesson to your class`);
-    expect(html).not.toContain("Started ");
+  // With no lesson for this quiz assigned, the page sends the student back to
+  // their assignments without loading any quiz content.
+  async function expectSentToAssignments() {
+    await expect(renderQuiz()).rejects.toThrow("REDIRECT:/student");
     expect(mocks.listQuestions).not.toHaveBeenCalled();
   }
 
-  it("is locked when neither lesson is assigned", async () => {
+  it("sends the student to their assignments when neither lesson is assigned", async () => {
     withAssignments([]);
     expect(await getLewisQuizAccess(kind)).toEqual({ status: "locked" });
-    expectLocked(await renderQuiz());
+    await expectSentToAssignments();
   });
 
   it("opens when its lesson is assigned to the student's class, loading its questions on the server", async () => {
@@ -128,28 +121,26 @@ describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, titl
     expect(mocks.listQuestions).toHaveBeenCalledWith(mocks.adminClient, quizKey);
   });
 
-  it("stays locked when only the other lesson is assigned", async () => {
+  it("sends the student away when only the other lesson is assigned", async () => {
     withAssignments([otherLesson]);
     expect(await getLewisQuizAccess(kind)).toEqual({ status: "locked" });
-    expectLocked(await renderQuiz());
+    await expectSentToAssignments();
   });
 
-  it("stays locked when only the Lewis dot diagram lesson is assigned", async () => {
+  it("sends the student away when only the Lewis dot diagram lesson is assigned", async () => {
     withAssignments([diagram]);
-    expectLocked(await renderQuiz());
+    await expectSentToAssignments();
   });
 
-  it("stays locked when only another class has the lesson assigned", async () => {
+  it("sends the student away when only another class has the lesson assigned", async () => {
     // The server reader returns only the signed-in student's own class rows.
     withAssignments([]);
-    const html = await renderQuiz();
-    expectLocked(html);
-    expect(html).toContain('href="/student"');
+    await expectSentToAssignments();
   });
 
   it("blocks direct route access while unassigned without rendering quiz content", async () => {
     withAssignments([diagram, otherLesson]);
-    expectLocked(await renderQuiz());
+    await expectSentToAssignments();
   });
 
   it("redirects unauthenticated or inactive-class requests to login", async () => {
@@ -173,12 +164,12 @@ describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, titl
     expect(await renderQuiz()).toContain(started);
   });
 
-  it("locks again once the lesson assignment is removed or closed", async () => {
+  it("sends the student away again once the lesson assignment is removed, and reports a closed one", async () => {
     withAssignments([lesson]);
     expect(await renderQuiz()).toContain(started);
     vi.clearAllMocks();
     withAssignments([]);
-    expectLocked(await renderQuiz());
+    await expectSentToAssignments();
     withAssignments([{ ...lesson, closes_at: iso(-1000) }]);
     expect(await renderQuiz()).toContain("This quiz is closed.");
     expect(mocks.listQuestions).not.toHaveBeenCalled();
@@ -197,7 +188,6 @@ describe("Lewis quiz assignment routing", () => {
   it("opens the quiz for the lesson it was started from", async () => {
     withAssignments([covalentLesson]);
     expect(await getLewisQuizAccess("covalent", covalentLesson.id)).toEqual({ status: "available", assignment: covalentLesson });
-    expect(mocks.gate).toHaveBeenCalledWith(covalentLesson.id);
   });
 
   it("treats another quiz's lesson or a foreign id as missing", async () => {
@@ -211,17 +201,13 @@ describe("Lewis quiz assignment routing", () => {
     expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
 
-  it("blocks the quiz until earlier sections are finished", async () => {
-    const blocker = assignmentOf("lewis_diagram");
+  it("opens the quiz even when an earlier section is unfinished", async () => {
     withAssignments([diagram, covalentLesson]);
-    mocks.gate.mockResolvedValue({ status: "locked", blocker });
     expect(await getLewisQuizAccess("covalent", covalentLesson.id))
-      .toEqual({ status: "blocked", assignment: covalentLesson, blocker });
+      .toEqual({ status: "available", assignment: covalentLesson });
     const html = renderToStaticMarkup(await LewisQuizPage({ kind: "covalent", assignmentId: covalentLesson.id }));
-    expect(html).toContain("This section is locked.");
-    expect(html).toContain(`href="/student/assignments/${blocker.id}"`);
-    expect(html).not.toContain("Started ");
-    expect(mocks.listQuestions).not.toHaveBeenCalled();
+    expect(html).not.toContain("This section is locked.");
+    expect(mocks.gate).not.toHaveBeenCalled();
   });
 });
 

@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-const mocks = vi.hoisted(() => ({ schedules: vi.fn(), attempts: vi.fn(), gate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ schedules: vi.fn(), attempts: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/assignments/prerequisites", () => ({ getAssignmentGate: mocks.gate }));
 vi.mock("@/lib/db/student-assignments", () => ({ getStudentAssignmentSchedules: mocks.schedules }));
 vi.mock("@/lib/server/student-assignments", () => ({ getAssignmentAttempts: mocks.attempts }));
 vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); }, notFound: () => { throw new Error("NOT_FOUND"); } }));
@@ -46,16 +45,11 @@ describe("read-only saved exploration history", () => {
     await expect(page()).rejects.toThrow("Unavailable");
     expect(mocks.attempts).not.toHaveBeenCalled();
   });
-  it("keeps closed history reviewable without checking prerequisites", async () => {
-    renderToStaticMarkup(await page());
-    expect(mocks.gate).not.toHaveBeenCalled();
-  });
-  it("locks an open section's history behind its prerequisites", async () => {
+  it("shows an open section's history without checking earlier sections", async () => {
     mocks.schedules.mockResolvedValue({ status: "ok", assignments: [{ ...assignment, opens_at: null, closes_at: null }] });
-    mocks.gate.mockResolvedValue({ status: "locked", blocker: { ...assignment, id: "first", activity: { ...assignment.activity, title: "Bohr Intro" } } });
     const html = renderToStaticMarkup(await page());
-    expect(html).toContain("This section is locked.");
-    expect(html).toContain('href="/student/assignments/first"');
-    expect(mocks.attempts).not.toHaveBeenCalled();
+    expect(html).not.toContain("locked");
+    expect(html).toContain("Attempt 1: Completed");
+    expect(mocks.attempts).toHaveBeenCalledWith("own");
   });
 });
