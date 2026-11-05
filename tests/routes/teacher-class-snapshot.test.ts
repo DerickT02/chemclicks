@@ -65,6 +65,25 @@ describe("incremental class snapshots", () => {
     expect(result.attempts?.students[0].overallStatus).toBe("taking_quiz");
     expect(result.attempts?.students[1]).toBe(summary.students[1]);
   });
+  it("keeps the database's order for existing rows and places only new or renamed students", () => {
+    // The database sorted "de Silva" before "Davis"; a browser comparator would not.
+    const deSilva = { ...alice, id: "de-silva", first_name: "Ana", last_name: "de Silva" };
+    const davis = { ...alice, id: "davis", first_name: "Dan", last_name: "Davis" };
+    const before: TeacherClassSnapshot = { ...initial, roster: { pending: [deSilva, davis], active: [] },
+      progress: { ...initial.progress!, students: [lessonStudent(deSilva), lessonStudent(davis)] } };
+    const updated = mergeClassSnapshot(before, { ...emptyDelta,
+      roster: { pending: [{ ...davis, student_id: "D2" }], active: [] },
+      progress: { ...initial.progress!, students: [{ ...lessonStudent(davis), overallPercent: 50 }] },
+    });
+    expect(updated.roster?.pending.map(row => row.id)).toEqual(["de-silva", "davis"]);
+    expect(updated.progress?.students.map(row => row.studentId)).toEqual(["de-silva", "davis"]);
+    const renamed = mergeClassSnapshot(updated, { ...emptyDelta, revision: "3",
+      roster: { pending: [{ ...deSilva, last_name: "Zane" }], active: [] },
+      progress: { ...initial.progress!, students: [{ ...lessonStudent(deSilva), lastName: "Zane" }] },
+    });
+    expect(renamed.roster?.pending.map(row => row.id)).toEqual(["davis", "de-silva"]);
+    expect(renamed.progress?.students.map(row => row.studentId)).toEqual(["davis", "de-silva"]);
+  });
   it("keeps cursor precision and does not add a cursor to an unversioned SSR seed", () => {
     expect(classSnapshotCursor(null)).toBeUndefined();
     expect(classSnapshotCursor({ ...initial, revision: null })).toBeUndefined();
