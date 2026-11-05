@@ -10,7 +10,7 @@ const LABS = [
   },
   {
     slug: "bohr-models/stability",
-    icon: "âš›ï¸",
+    icon: "⚖️",
     title: "Bohr Model Stability",
     description: "Adjust protons and electrons to compare noble-gas electron counts, neutral charge, and ionic charge.",
     status: "available" as const,
