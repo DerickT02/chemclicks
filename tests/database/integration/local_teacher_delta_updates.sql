@@ -124,4 +124,42 @@ DO $$ BEGIN
     OR EXISTS (SELECT 1 FROM private.teacher_changed_students WHERE class_id = '10000000-0000-4000-8000-000000000002')
     THEN RAISE EXCEPTION 'Class cascade left tracking rows'; END IF;
 END $$;
-SELECT 'PASS: combined full/delta/idle reads, student-only calculations, missed notifications, tombstones, transfers, assignment/catalog resets, future cursors and grants' AS result;
+-- Live reads use the shared assignment state: a pass on a split Bohr quiz key
+-- completes the lesson, and live and full reports agree row for row.
+DO $$
+DECLARE
+  teacher uuid := '00000000-0000-4000-8000-000000000001';
+  class uuid := '10000000-0000-4000-8000-000000000001';
+  intro uuid := '30000000-0000-4000-8000-000000000003';
+  student uuid := '40000000-0000-4000-8000-000000000009';
+  updates jsonb; lesson jsonb; live jsonb; legacy jsonb;
+BEGIN
+  INSERT INTO public.activities(id, title, type, order_index) VALUES ('20000000-0000-4000-8000-000000000003', 'Bohr intro', 'bohr_model_intro', 1);
+  INSERT INTO public.class_activities(id, class_id, activity_id) VALUES (intro, class, '20000000-0000-4000-8000-000000000003');
+  INSERT INTO public.students(id, class_id, first_name, last_name, student_id, verified) VALUES (student, class, 'Split', 'Bohr', 'SPLIT', true);
+  INSERT INTO public.student_progress(id, student_id, class_activity_id, status, started_at, completed_at, exploration_started_at)
+  -- Exploration is unfinished, so only the quiz pass can complete the lesson.
+  VALUES ('50000000-0000-4000-8000-000000000009', student, intro, 'in_progress', now() - interval '9 minutes', NULL, now() - interval '9 minutes');
+  INSERT INTO public.student_attempts(id, progress_id, attempt_number, status, quiz_key, score, question_total, percentage, passed, started_at, completed_at) VALUES
+  ('60000000-0000-4000-8000-000000000009', '50000000-0000-4000-8000-000000000009', 1, 'completed', 'bohr_model_intro', 9, 10, 90, true, now() - interval '4 minutes', now());
+
+  updates := public.teacher_class_updates(teacher, class);
+  SELECT l INTO lesson FROM jsonb_array_elements(updates#>'{progress,students}') st, jsonb_array_elements(st->'lessons') l
+    WHERE st->>'studentId' = student::text AND l->>'assignmentId' = intro::text;
+  IF lesson->>'status' <> 'completed' OR lesson->>'stage' <> 'completed' OR lesson->>'passingQuizAttemptNumber' <> '1'
+    THEN RAISE EXCEPTION 'Live progress ignored a split Bohr quiz pass: %', lesson; END IF;
+  IF updates#>'{progress,students}' <> public.teacher_class_lesson_progress(teacher, class)->'students'
+    THEN RAISE EXCEPTION 'Live and full class progress disagree'; END IF;
+
+  live := public.teacher_class_updates(teacher, class, NULL, intro)->'attempts';
+  legacy := public.teacher_activity_attempt_summary(teacher, class, intro);
+  IF (SELECT x->>'progressStage' FROM jsonb_array_elements(live->'students') x WHERE x->>'studentId' = student::text) <> 'completed'
+    THEN RAISE EXCEPTION 'Live attempts ignored a split Bohr quiz pass'; END IF;
+  IF jsonb_array_length(legacy#>'{students,0,attempts}') + jsonb_array_length(legacy#>'{students,1,attempts}') = 0
+    THEN RAISE EXCEPTION 'Full summary lost histories'; END IF;
+  IF (SELECT jsonb_agg(x - 'attempts' ORDER BY n) FROM jsonb_array_elements(live->'students') WITH ORDINALITY e(x, n))
+    <> (SELECT jsonb_agg(x - 'attempts' ORDER BY n) FROM jsonb_array_elements(legacy->'students') WITH ORDINALITY e(x, n))
+    OR live - 'students' <> legacy - 'students'
+    THEN RAISE EXCEPTION 'Live and full attempt summaries disagree'; END IF;
+END $$;
+SELECT 'PASS: combined full/delta/idle reads, student-only calculations, missed notifications, tombstones, transfers, assignment/catalog resets, future cursors, grants, and shared-state agreement' AS result;

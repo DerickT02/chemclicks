@@ -37,10 +37,16 @@
   class transfers use tombstones. Assignment/catalog changes or invalid future
   cursors require a full replacement snapshot. Timing is unchanged: no new
   toggle or 15-second refresh interval is introduced.
-- Attempt overview reads return counts/grades/stages but skip history JSON
-  aggregation. Histories load for one student only while expanded, and stop
-  fetching on collapse. The legacy full-history RPC is unchanged.
-- Four explicit GET endpoints (`updates`, `progress`, `roster`, `attempt-history`) own their
+- The class dashboard (roster and each activity card's stage counts) and each
+  activity's student progress page read from the same combined `updates`
+  endpoint. Activity pages render a lightweight overview: counts, grades and
+  stages without history JSON. Histories load for one student only while
+  expanded, and stop fetching on collapse.
+- Every report applies the shared assignment state from
+  `20261104000200_shared_assignment_progress_state.sql`. The full and live
+  reports share one private row builder per view, so stages, completion and
+  grades cannot drift between the page load and later live updates.
+- Two explicit GET endpoints (`updates`, `attempt-history`) own their
   authentication and mutable cookie refresh. The proxy skips its duplicate checks
   only for those endpoints; pages/actions retain the existing proxy guards.
 
@@ -96,8 +102,10 @@ failures). Manual refresh is still available.
 **These migrations are prepared in source control, not automatically applied to a
 shared project. Confirm the target project and audit its deployed schema first.**
 No additional environment variables or service-role browser keys are needed.
+They require `20261104000200_shared_assignment_progress_state.sql` (from `dev`)
+to be applied first, and are numbered to run after it.
 
-1. `supabase/migrations/20261027000000_teacher_class_broadcasts.sql`
+1. `supabase/migrations/20261105000000_teacher_class_broadcasts.sql`
    - Adds six AFTER triggers on students, progress, attempts, measurement quiz
      sessions, assignments, and classes, plus narrowly scoped private functions.
    - Adds receive-only policies on `realtime.messages`. Only verified,
@@ -109,39 +117,45 @@ No additional environment variables or service-role browser keys are needed.
      policies/settings in the target project, including the Realtime public
      access setting. The migration does not change global Realtime settings.
    - It does not enable raw-table Postgres Changes or alter existing table RLS.
-2. `supabase/migrations/20261027010000_teacher_live_attempt_summary.sql`
-   - Adds the service-role-only `teacher_activity_live_summary` RPC, preserving
-     existing grade/timer rules and independently checking active class ownership,
-     assignment membership, archive state, and optional student membership.
+2. `supabase/migrations/20261105010000_teacher_live_attempt_summary.sql`
+   - Adds `private.teacher_attempt_rows`, built on `assignment_progress_state`,
+     and the service-role-only `teacher_activity_live_summary` RPC. The live RPC
+     independently checks active class ownership, assignment membership, archive
+     state, and optional student membership.
    - The default omits attempt-history JSON. Expanded histories explicitly request
-     one student's rows. The existing `teacher_activity_attempt_summary` remains
-     compatible with older clients.
+     one student's rows. `teacher_activity_attempt_summary` is redefined to call
+     the same helper with histories; its output and checks are unchanged.
 
-3. `supabase/migrations/20261027020000_budget_teacher_notifications.sql`
+3. `supabase/migrations/20261105020000_budget_teacher_notifications.sql`
    - Replaces the trigger function with transaction-local hint deduplication.
      Bulk approvals and related progress/attempt writes in one transaction share
      one hint per scope. The state resets at commit and rolls back with a
      savepoint, so later changes are not accidentally suppressed.
    - No table RLS or authorization policies are changed.
 
-4. `supabase/migrations/20261027030000_teacher_student_revisions.sql`
+4. `supabase/migrations/20261105030000_teacher_student_revisions.sql`
    - Adds two RLS-protected, non-browser-accessible private tracking tables, a
      revision index, and one additional catalog-update trigger. Existing trigger
      paths record latest changed student IDs, retaining deletion tombstones.
    - A per-class counter row lock orders committed revisions; transaction-local
      caches avoid repeated counter/journal writes for the same scope. Full resets
      prune older tracking entries. Broadcast content and authorization are unchanged.
-5. `supabase/migrations/20261027040000_teacher_incremental_reads.sql`
-   - Adds the service-role-only `teacher_class_updates` RPC and private filtered
-     aggregation helpers. One MVCC snapshot covers revision, membership and data;
+5. `supabase/migrations/20261105040000_teacher_incremental_reads.sql`
+   - Adds the service-role-only `teacher_class_updates` RPC and the private
+     lesson-row helper. One MVCC snapshot covers revision, membership and data;
      the RPC independently checks active class ownership and assignment access.
-   - Preserves existing lesson grades and attempt grades/timers. The original
-     live-summary RPC becomes a compatible wrapper around the filtered helper.
+   - `teacher_class_lesson_progress` is redefined to call the same lesson-row
+     helper; its output and ownership check are unchanged.
 
 Apply all five approved migrations **before** deploying the new frontend. The
 `updates` endpoint requires the new revision tables/RPC; fallback polling is not
 a substitute for those migrations. Realtime itself may be unavailable and data
 will still recover through the same combined delta endpoint on fallback.
+
+These files were renumbered from earlier `20261027…` drafts so they run after
+`dev`'s progress-state migration. A database that already applied the drafts
+must not re-run them as-is (the tables, triggers and policies already exist);
+reconcile its migration history first.
 
 Broadcast permissions are cached by Realtime until a JWT refresh/rejoin. A revoked
 listener may briefly continue receiving non-sensitive invalidation hints, but
@@ -164,6 +178,7 @@ A local-only SQL fixture builds a minimal empty schema and **stubs**
 `realtime.send` to record hints. It checks actual SQL execution, RLS (including
 pre-existing broad policies), old/new class routing, no-op suppression, report
 counts/grades/history ordering, combined/delta/idle reads, missed notifications,
+agreement between live and full reports (including split Bohr quiz keys),
 transfers/deletions, assignment/catalog resets, and RPC grants. It is not a certified application
 baseline or a hosted Realtime delivery test. It is excluded from `npm test`.
 

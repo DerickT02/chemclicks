@@ -31,11 +31,13 @@ CREATE FUNCTION realtime.send(payload jsonb, event text, topic text, private boo
 RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
   INSERT INTO realtime.messages(payload, topic, private) VALUES(payload, topic, private)
 $$;
-\ir ../../../supabase/migrations/20261027000000_teacher_class_broadcasts.sql
-\ir ../../../supabase/migrations/20261027010000_teacher_live_attempt_summary.sql
-\ir ../../../supabase/migrations/20261027020000_budget_teacher_notifications.sql
-\ir ../../../supabase/migrations/20261027030000_teacher_student_revisions.sql
-\ir ../../../supabase/migrations/20261027040000_teacher_incremental_reads.sql
+-- The live reads build on the shared assignment state from dev.
+\ir ../../../supabase/migrations/20261104000200_shared_assignment_progress_state.sql
+\ir ../../../supabase/migrations/20261105000000_teacher_class_broadcasts.sql
+\ir ../../../supabase/migrations/20261105010000_teacher_live_attempt_summary.sql
+\ir ../../../supabase/migrations/20261105020000_budget_teacher_notifications.sql
+\ir ../../../supabase/migrations/20261105030000_teacher_student_revisions.sql
+\ir ../../../supabase/migrations/20261105040000_teacher_incremental_reads.sql
 
 INSERT INTO auth.users VALUES
 ('00000000-0000-4000-8000-000000000001', now(), false),

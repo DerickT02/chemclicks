@@ -1,10 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 const read = (name: string) => readFileSync(new URL(`../../supabase/migrations/${name}.sql`, import.meta.url), "utf8").replace(/\s+/g, " ").toLowerCase();
-const revisions = read("20261027030000_teacher_student_revisions");
-const reads = read("20261027040000_teacher_incremental_reads");
-const oldAttempts = read("20261027010000_teacher_live_attempt_summary");
-const oldLessons = read("20261012050000_exclude_archived_assignments");
+const revisions = read("20261105030000_teacher_student_revisions");
+const reads = read("20261105040000_teacher_incremental_reads");
+const shared = read("20261104000200_shared_assignment_progress_state");
 const slice = (text: string, start: string, end: string) => {
   const index = text.indexOf(start);
   expect(index).toBeGreaterThanOrEqual(0);
@@ -50,8 +49,12 @@ describe("incremental teacher data migrations", () => {
     expect(reads).toContain("p_after > coalesce(v.revision, 0)");
     expect(reads).toContain("p_after < coalesce(v.reset_revision, 0)");
   });
-  it("preserves existing attempt grades/timers and lesson completion rules", () => {
-    expect(slice(reads, "'overallstatus', case", "'attempts', history.attempts")).toBe(slice(oldAttempts, "'overallstatus', case", "'attempts', history.attempts"));
-    expect(slice(reads, "case when a.type::text in ('bohr_model_intro'", "end as status")).toBe(slice(oldLessons, "case when a.type::text in ('bohr_model_intro'", "end as status"));
+  it("builds lesson rows from the shared assignment state and delegates the full class view", () => {
+    expect(reads).toContain("cross join lateral public.assignment_progress_state(p.id, a.type::text) st");
+    expect(reads).not.toContain("quiz_key = (case");
+    expect(slice(reads, "'assignmentid', lr.assignment_id", "where ca.class_id"))
+      .toBe(slice(shared, "'assignmentid', lr.assignment_id", "where ca.class_id"));
+    expect(reads).toContain("'students', private.teacher_lesson_progress_rows(c.id, null)");
+    expect(reads).toContain("private.teacher_attempt_rows(p_teacher_id, scoped.id, p_assignment_id, false, scoped.student_ids, true)");
   });
 });
