@@ -49,22 +49,25 @@ $$;
 DO $$
 DECLARE
   teacher uuid; c uuid;
-  covalent_activity uuid; bohr_intro_activity uuid; bohr_stability_activity uuid;
+  covalent_activity uuid; diagram_activity uuid; bohr_intro_activity uuid; bohr_stability_activity uuid;
   ruler_tenths_activity uuid; ruler_hundredths_activity uuid;
-  covalent uuid; bohr_intro uuid; bohr_stability uuid; ruler_tenths uuid; ruler_hundredths uuid;
-  walker uuid; concurrent uuid; quiz_first uuid;
-  progress uuid; pass_time timestamptz := now() - interval '10 minutes';
+  covalent uuid; diagram uuid; bohr_intro uuid; bohr_stability uuid; ruler_tenths uuid; ruler_hundredths uuid;
+  walker uuid; diagram_student uuid; concurrent uuid; quiz_first uuid;
+  progress uuid; batch_state record;
+  exploration_time timestamptz := now() - interval '50 minutes';
+  pass_time timestamptz := now() - interval '10 minutes';
   legacy_pass_time timestamptz := now() - interval '45 minutes';
   l jsonb; r jsonb;
 BEGIN
   SELECT t.id INTO teacher FROM public.teachers t JOIN auth.users u ON u.id = t.id
     WHERE u.email_confirmed_at IS NOT NULL AND NOT COALESCE(u.is_anonymous, false) LIMIT 1;
   SELECT id INTO covalent_activity FROM public.activities WHERE type = 'lewis_structures_covalent' LIMIT 1;
+  SELECT id INTO diagram_activity FROM public.activities WHERE type = 'lewis_diagram' LIMIT 1;
   SELECT id INTO bohr_intro_activity FROM public.activities WHERE type = 'bohr_model_intro' LIMIT 1;
   SELECT id INTO bohr_stability_activity FROM public.activities WHERE type = 'bohr_model_stability' LIMIT 1;
   SELECT id INTO ruler_tenths_activity FROM public.activities WHERE type = 'measurement_ruler_tenths' LIMIT 1;
   SELECT id INTO ruler_hundredths_activity FROM public.activities WHERE type = 'measurement_ruler_hundredths' LIMIT 1;
-  IF teacher IS NULL OR covalent_activity IS NULL OR bohr_intro_activity IS NULL OR bohr_stability_activity IS NULL
+  IF teacher IS NULL OR covalent_activity IS NULL OR diagram_activity IS NULL OR bohr_intro_activity IS NULL OR bohr_stability_activity IS NULL
      OR ruler_tenths_activity IS NULL OR ruler_hundredths_activity IS NULL THEN
     RAISE EXCEPTION 'Verified teacher and covalent/Bohr intro/Bohr stability/ruler tenths/ruler hundredths activities required';
   END IF;
@@ -72,6 +75,7 @@ BEGIN
   INSERT INTO public.classes(teacher_id, name, section, class_code) VALUES
     (teacher, 'Stage test', 'Test', upper(substr(md5(random()::text), 1, 6))) RETURNING id INTO c;
   INSERT INTO public.class_activities(class_id, activity_id) VALUES (c, covalent_activity) RETURNING id INTO covalent;
+  INSERT INTO public.class_activities(class_id, activity_id) VALUES (c, diagram_activity) RETURNING id INTO diagram;
   INSERT INTO public.class_activities(class_id, activity_id) VALUES (c, bohr_intro_activity) RETURNING id INTO bohr_intro;
   INSERT INTO public.class_activities(class_id, activity_id) VALUES (c, bohr_stability_activity) RETURNING id INTO bohr_stability;
   INSERT INTO public.class_activities(class_id, activity_id) VALUES (c, ruler_tenths_activity) RETURNING id INTO ruler_tenths;
@@ -79,6 +83,8 @@ BEGIN
 
   INSERT INTO public.students(class_id, first_name, last_name, student_id, verified)
     VALUES (c, 'Walker', 'Test', gen_random_uuid()::text, true) RETURNING id INTO walker;
+  INSERT INTO public.students(class_id, first_name, last_name, student_id, verified)
+    VALUES (c, 'Diagram', 'Test', gen_random_uuid()::text, true) RETURNING id INTO diagram_student;
   INSERT INTO public.students(class_id, first_name, last_name, student_id, verified)
     VALUES (c, 'Concurrent', 'Test', gen_random_uuid()::text, true) RETURNING id INTO concurrent;
   INSERT INTO public.students(class_id, first_name, last_name, student_id, verified)
@@ -93,7 +99,9 @@ BEGIN
     RETURNING id INTO progress;
   PERFORM pg_temp.expect_stage(teacher, c, walker, covalent, 'exploring', 'exploration started');
 
-  UPDATE public.student_progress SET status = 'completed', completed_at = now() - interval '50 minutes'
+  UPDATE public.student_progress
+    SET status = 'completed', completed_at = exploration_time,
+        exploration_completed = true, exploration_completed_at = exploration_time
     WHERE id = progress;
   PERFORM pg_temp.expect_stage(teacher, c, walker, covalent, 'explored', 'exploration finished');
 
@@ -132,27 +140,66 @@ BEGIN
   IF (l->>'failedQuizAttemptCount')::int <> 2 OR (r->>'failedQuizAttemptCount')::int <> 2 THEN
     RAISE EXCEPTION 'Failed attempts before the pass miscounted';
   END IF;
+  IF r->>'explorationStatus' <> 'completed' THEN
+    RAISE EXCEPTION 'Completed exploration marker missing from teacher report: %', r;
+  END IF;
   IF (l->>'completedAt')::timestamptz <> pass_time OR (r->>'completedAt')::timestamptz <> pass_time THEN
     RAISE EXCEPTION 'Lewis completion time should be the later half (the pass), got % / %', l->>'completedAt', r->>'completedAt';
   END IF;
   IF (l->>'timeToFirstQuizSeconds')::bigint <> 1200 THEN RAISE EXCEPTION 'Retries rewrote the exploration interval'; END IF;
 
+  -- Later retries and practice attempts cannot erase the first completion pass.
+  INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
+    VALUES (progress, 4, 'lewis_covalent', 12, 3, 25.00, false, 'completed', now() - interval '2 minutes', now() - interval '1 minute');
+  PERFORM pg_temp.expect_stage(teacher, c, walker, covalent, 'completed', 'failed retry after pass');
+  l := pg_temp.lesson(teacher, c, walker, covalent);
+  IF (l->>'passingQuizAttemptNumber')::int <> 3
+     OR (l->>'passingQuizScore')::int <> 11
+     OR (l->>'failedQuizAttemptCount')::int <> 2
+     OR (l->>'completedAt')::timestamptz <> pass_time THEN
+    RAISE EXCEPTION 'Later retry changed the first passing completion evidence: %', l;
+  END IF;
+
+  -- A no-quiz Lewis diagram completes on the durable exploration marker alone.
+  INSERT INTO public.student_progress(
+    student_id, class_activity_id, status, completed_at,
+    exploration_completed, exploration_completed_at
+  ) VALUES (diagram_student, diagram, 'completed', exploration_time, true, exploration_time);
+  PERFORM pg_temp.expect_stage(teacher, c, diagram_student, diagram, 'completed', 'Lewis diagram exploration completed');
+  l := pg_temp.lesson(teacher, c, diagram_student, diagram);
+  IF (l->>'completedAt')::timestamptz <> exploration_time THEN
+    RAISE EXCEPTION 'No-quiz completion timestamp should come from exploration: %', l;
+  END IF;
+
   -- Two concurrent Bohr assignments and two ruler precisions stay independent.
-  INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at, quiz_started_at)
-    VALUES (concurrent, bohr_intro, 'in_progress', now() - interval '5 minutes', now() - interval '1 minute')
+  INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at, completed_at, quiz_started_at)
+    VALUES (concurrent, bohr_intro, 'completed', now() - interval '5 minutes', now() - interval '2 minutes', now() - interval '1 minute')
     RETURNING id INTO progress;
   PERFORM pg_temp.expect_stage(teacher, c, concurrent, bohr_intro, 'quiz_in_progress', 'Bohr intro quiz started');
   PERFORM pg_temp.expect_stage(teacher, c, concurrent, bohr_stability, 'not_started', 'Bohr stability untouched');
   INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
     VALUES (progress, 1, 'bohr_models', 12, 11, 91.67, true, 'completed', now() - interval '1 minute', now());
-  PERFORM pg_temp.expect_stage(teacher, c, concurrent, bohr_intro, 'completed', 'Bohr intro passed');
+  PERFORM pg_temp.expect_stage(teacher, c, concurrent, bohr_intro, 'exploring', 'Bohr quiz passed before exploration');
   PERFORM pg_temp.expect_stage(teacher, c, concurrent, bohr_stability, 'not_started', 'Bohr intro pass must not complete stability');
+  r := pg_temp.report_row(teacher, c, concurrent, bohr_intro);
+  IF r->>'explorationStatus' <> 'not_started' THEN
+    RAISE EXCEPTION 'A quiz-only Bohr pass was reported as exploration completion';
+  END IF;
 
-  INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at)
-    VALUES (concurrent, ruler_tenths, 'in_progress', now() - interval '5 minutes') RETURNING id INTO progress;
+  INSERT INTO public.student_progress(
+    student_id, class_activity_id, status, started_at,
+    exploration_completed, exploration_completed_at
+  ) VALUES (
+    concurrent, ruler_tenths, 'in_progress', now() - interval '5 minutes', true, exploration_time
+  ) RETURNING id INTO progress;
   INSERT INTO public.measurement_quiz_sessions(progress_id, mode, attempt_number) VALUES (progress, 'ruler_tenths', 1);
-  INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at, completed_at)
-    VALUES (concurrent, ruler_hundredths, 'completed', now() - interval '5 minutes', now() - interval '4 minutes')
+  INSERT INTO public.student_progress(
+    student_id, class_activity_id, status, started_at, completed_at,
+    exploration_completed, exploration_completed_at
+  ) VALUES (
+    concurrent, ruler_hundredths, 'completed', now() - interval '5 minutes', exploration_time,
+    true, exploration_time
+  )
     RETURNING id INTO progress;
   PERFORM pg_temp.expect_stage(teacher, c, concurrent, ruler_tenths, 'quiz_in_progress', 'open ruler tenths session');
   -- A finished exploration alone is not completion: the quiz still has to pass.
@@ -162,12 +209,26 @@ BEGIN
   PERFORM pg_temp.expect_stage(teacher, c, concurrent, ruler_hundredths, 'completed', 'ruler hundredths quiz passed');
   PERFORM pg_temp.expect_stage(teacher, c, concurrent, ruler_tenths, 'quiz_in_progress', 'hundredths pass must not complete tenths');
 
-  -- Passing the quiz completes the lesson even if exploration was not marked finished.
+  -- Passing the quiz alone keeps the assignment unfinished until exploration.
   INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at)
     VALUES (quiz_first, covalent, 'in_progress', now() - interval '5 minutes') RETURNING id INTO progress;
   INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
     VALUES (progress, 1, 'lewis_covalent', 12, 12, 100.00, true, 'completed', now() - interval '2 minutes', now());
-  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, covalent, 'completed', 'Lewis quiz passed, exploration unfinished');
+  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, covalent, 'exploring', 'Lewis quiz passed, exploration unfinished');
+  r := pg_temp.report_row(teacher, c, quiz_first, covalent);
+  IF r->>'explorationStatus' <> 'not_started' OR (r->>'completedAt') IS NOT NULL THEN
+    RAISE EXCEPTION 'Quiz-only Lewis pass reported completion: %', r;
+  END IF;
+
+  UPDATE public.student_progress
+  SET status = 'completed', completed_at = now() - interval '1 hour',
+      exploration_completed = true, exploration_completed_at = now() - interval '1 hour'
+  WHERE id = progress;
+  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, covalent, 'completed', 'exploration finished after the quiz pass');
+  r := pg_temp.report_row(teacher, c, quiz_first, covalent);
+  IF (r->>'completedAt')::timestamptz <> (r->>'passingQuizCompletedAt')::timestamptz THEN
+    RAISE EXCEPTION 'Completion timestamp should be the later of exploration and pass: %', r;
+  END IF;
 
   -- Bohr numbering restarts under the split key. A legacy attempt numbered 8
   -- must not outrank a newer split attempt numbered 1 when finding the latest
@@ -244,6 +305,17 @@ BEGIN
 
   SET LOCAL ROLE service_role;
   PERFORM public.assignment_progress_state(NULL, 'bohr_model_intro');
+  SELECT * INTO batch_state
+  FROM public.student_assignment_progress_states(quiz_first, c, ARRAY[covalent]::uuid[]);
+  IF batch_state.status <> 'completed' OR NOT batch_state.exploration_completed
+     OR batch_state.passing_attempt_number <> 1 THEN
+    RAISE EXCEPTION 'Batch student state did not return the completed conjunction: %', batch_state;
+  END IF;
+  BEGIN
+    PERFORM public.student_assignment_progress_states(quiz_first, c, ARRAY[gen_random_uuid()]::uuid[]);
+    RAISE EXCEPTION 'Batch student state accepted an unassigned ID';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
   RESET ROLE;
 
   SET LOCAL ROLE anon;
@@ -252,6 +324,11 @@ BEGIN
 
   SET LOCAL ROLE authenticated;
   BEGIN PERFORM public.assignment_progress_state(NULL, 'bohr_model_intro'); RAISE EXCEPTION 'Browser helper call allowed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    PERFORM public.student_assignment_progress_states(quiz_first, c, ARRAY[covalent]::uuid[]);
+    RAISE EXCEPTION 'Browser batch state call allowed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
   RESET ROLE;
 END $$;
 SELECT 'PASS: stages, mixed legacy/split history, chronological passing results, assignment isolation, view agreement, ownership and grants' AS result;

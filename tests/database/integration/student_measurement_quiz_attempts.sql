@@ -9,7 +9,7 @@ DECLARE
   v_assignment uuid;
   v_progress uuid;
   v_mode text;
-  v_modes text[] := ARRAY['ruler_tenths', 'ruler_hundredths', 'cylinder_tenths'];
+  v_modes text[] := ARRAY['ruler_tenths', 'ruler_hundredths', 'cylinder_whole', 'cylinder_tenths'];
   v_start jsonb;
   v_question jsonb;
   v_receipt jsonb;
@@ -19,6 +19,7 @@ DECLARE
   v_number integer;
   v_answer text;
   v_index integer;
+  v_assignment_status text;
 BEGIN
   SELECT t.id INTO v_teacher FROM public.teachers t
     JOIN auth.users u ON u.id = t.id
@@ -58,10 +59,10 @@ BEGIN
       v_index := (v_question->>'question_index')::integer;
       IF v_index = 0 THEN
         -- A valid but wrong first answer must remain the scored answer.
-        v_answer := CASE WHEN v_mode = 'ruler_hundredths' THEN '0.00' ELSE '0.0' END;
+        v_answer := CASE v_mode WHEN 'ruler_hundredths' THEN '0.00' WHEN 'cylinder_whole' THEN '0' ELSE '0.0' END;
       ELSE
         v_answer := to_char((v_question->>'reading')::numeric,
-          CASE WHEN v_mode = 'ruler_hundredths' THEN 'FM999999990.00' ELSE 'FM999999990.0' END);
+          CASE v_mode WHEN 'ruler_hundredths' THEN 'FM999999990.00' WHEN 'cylinder_whole' THEN 'FM999999990' ELSE 'FM999999990.0' END);
       END IF;
       v_receipt := public.student_measurement_quiz_record_answer(
         v_student, v_class, v_assignment, v_attempt_id, v_index, v_answer
@@ -71,7 +72,7 @@ BEGIN
       END IF;
       IF v_index = 0 THEN
         v_answer := to_char((v_question->>'reading')::numeric,
-          CASE WHEN v_mode = 'ruler_hundredths' THEN 'FM999999990.00' ELSE 'FM999999990.0' END);
+          CASE v_mode WHEN 'ruler_hundredths' THEN 'FM999999990.00' WHEN 'cylinder_whole' THEN 'FM999999990' ELSE 'FM999999990.0' END);
         v_receipt := public.student_measurement_quiz_record_answer(
           v_student, v_class, v_assignment, v_attempt_id, v_index, v_answer
         );
@@ -88,8 +89,18 @@ BEGIN
     IF v_attempt.attempt_number <> 1 OR v_attempt.question_total <> 5
        OR v_attempt.score <> 4 OR v_attempt.passed IS NOT TRUE
        OR v_attempt.instrument <> (CASE WHEN v_mode LIKE 'ruler_%' THEN 'ruler' ELSE 'cylinder' END)
-       OR v_attempt.precision_mode <> (CASE WHEN v_mode = 'ruler_hundredths' THEN 'hundredths' ELSE 'tenths' END) THEN
+       OR v_attempt.precision_mode <> (CASE v_mode WHEN 'ruler_hundredths' THEN 'hundredths' WHEN 'cylinder_whole' THEN 'whole' ELSE 'tenths' END) THEN
       RAISE EXCEPTION 'Completed result metadata or score is wrong for %', v_mode;
+    END IF;
+    SELECT state.status INTO v_assignment_status
+    FROM public.assignment_progress_state(v_attempt.progress_id, CASE v_mode
+      WHEN 'ruler_tenths' THEN 'measurement_ruler_tenths'
+      WHEN 'ruler_hundredths' THEN 'measurement_ruler_hundredths'
+      WHEN 'cylinder_whole' THEN 'measurement_graduated_cylinder_whole'
+      ELSE 'measurement_graduated_cylinder'
+    END) state;
+    IF v_assignment_status <> 'in_progress' THEN
+      RAISE EXCEPTION 'Quiz-only measurement pass completed % before exploration', v_mode;
     END IF;
 
     SELECT * INTO v_replayed FROM public.student_measurement_quiz_complete(
@@ -118,6 +129,21 @@ BEGIN
     );
     IF (v_start->>'attempt_number')::integer <> 2 THEN
       RAISE EXCEPTION 'Retry did not create the next attempt for %', v_mode;
+    END IF;
+    IF v_mode = 'ruler_tenths' AND NOT EXISTS (
+      SELECT 1 FROM public.student_progress
+      WHERE id = v_progress
+        AND exploration_completed
+        AND exploration_completed_at IS NOT NULL
+    ) THEN
+      RAISE EXCEPTION 'Measurement quiz start did not durably finish the open exploration';
+    END IF;
+    IF v_mode = 'ruler_tenths' THEN
+      SELECT state.status INTO v_assignment_status
+      FROM public.assignment_progress_state(v_attempt.progress_id, 'measurement_ruler_tenths') state;
+      IF v_assignment_status <> 'completed' THEN
+        RAISE EXCEPTION 'Measurement pass plus exploration did not complete the shared assignment state';
+      END IF;
     END IF;
     v_attempt_id := (v_start->>'attempt_id')::uuid;
     SELECT * INTO v_attempt FROM public.student_measurement_quiz_complete(

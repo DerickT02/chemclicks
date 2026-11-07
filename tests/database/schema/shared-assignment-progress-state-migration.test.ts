@@ -1,22 +1,24 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const migration = readFileSync(
-  fileURLToPath(
-    new URL(
-      "../../../supabase/migrations/20261104000200_shared_assignment_progress_state.sql",
-      import.meta.url,
-    ),
-  ),
-  "utf8",
-)
+const migrationDirectory = fileURLToPath(
+  new URL("../../../supabase/migrations/", import.meta.url),
+);
+const migration = readdirSync(migrationDirectory)
+  .filter((file) => file.endsWith(".sql"))
+  .sort()
+  .map((file) => readFileSync(join(migrationDirectory, file), "utf8"))
+  .join("\n")
   .replace(/--[^\n]*/g, "")
   .replace(/\s+/g, " ")
   .toLowerCase();
 
 function functionBody(name: string): string {
-  const start = migration.indexOf(`create or replace function public.${name}(`);
+  const matcher = new RegExp(`(?:create or replace function|create function) public\\.${name}\\(`, "g");
+  const starts = [...migration.matchAll(matcher)];
+  const start = starts.at(-1)?.index ?? -1;
   if (start < 0) return "";
   return migration.slice(start, migration.indexOf("$$;", start));
 }
@@ -29,6 +31,7 @@ describe("shared assignment progress state migration", () => {
   it("locks every function to the service role", () => {
     for (const signature of [
       "assignment_progress_state(uuid, text)",
+      "student_assignment_progress_states(uuid, uuid, uuid[])",
       "teacher_class_lesson_progress(uuid, uuid)",
       "teacher_activity_attempt_summary(uuid, uuid, uuid)",
     ]) {
@@ -37,12 +40,31 @@ describe("shared assignment progress state migration", () => {
     }
   });
 
-  it("completes an activity with a quiz only when that quiz is passed", () => {
-    expect(helper).toContain("when cardinality(v_quiz_keys) = 0 then v_progress_status");
-    expect(helper).toContain("when passing_attempt_number is not null then 'completed'");
-    // A finished exploration alone never completes a quizzed activity.
-    expect(helper).not.toMatch(/v_progress_status = 'completed' (or|and)/);
-    expect(helper.match(/then 'completed'/g)).toHaveLength(2);
+  it("completes a quiz-backed activity only after exploration and its matching quiz pass", () => {
+    expect(helper).toContain("when v_exploration_completed and (cardinality(v_quiz_keys) = 0 or passing_attempt_number is not null) then 'completed'");
+    expect(helper).not.toMatch(/when passing_attempt_number is not null then 'completed'/);
+    expect(helper).toContain("v_progress.exploration_completed");
+    expect(helper).toContain("v_progress.exploration_completed_at");
+    expect(helper).toContain("when v_exploration_completed then 'explored'");
+  });
+
+  it("backfills reliable exploration evidence without treating an ambiguous Bohr quiz pass as exploration", () => {
+    expect(migration).toContain("add column exploration_completed boolean not null default false");
+    expect(migration).toContain("add column exploration_completed_at timestamptz");
+    expect(migration).toContain("sa.quiz_key is null and sa.status = 'completed'");
+    expect(migration).toContain("a.type::text not in ('bohr_model_intro', 'bohr_model_stability')");
+    expect(migration).toContain("not exists ( select 1 from public.student_attempts quiz");
+    expect(migration).toContain("quiz.quiz_key = any (array['bohr_models', 'bohr_model_intro', 'bohr_model_stability'])");
+  });
+
+  it("sets the durable exploration marker whenever an exploration attempt is completed", () => {
+    const trigger = functionBody("mark_assignment_exploration_complete");
+    expect(migration).toContain("create trigger student_attempts_mark_exploration_complete");
+    expect(trigger).toContain("new.quiz_key is null");
+    expect(trigger).toContain("new.status = 'completed'");
+    expect(trigger).toContain("exploration_completed_at = coalesce(p.exploration_completed_at, new.completed_at)");
+    expect(migration).toContain("drop trigger if exists student_attempts_sync_bohr_progress");
+    expect(migration).toContain("drop function if exists public.sync_bohr_progress_after_quiz()");
   });
 
   it("grades each activity by its own quiz, keeping the split Bohr keys", () => {
@@ -63,8 +85,8 @@ describe("shared assignment progress state migration", () => {
   it("steps through 0, 33, 66 and 100 percent stages", () => {
     expect(helper).toContain("when status = 'completed' then 'completed'");
     expect(helper).toContain("when v_quiz_open then 'quiz_in_progress'");
-    expect(helper).toContain("when v_has_latest then 'needs_retry'");
-    expect(helper).toContain("when v_progress_status = 'completed' then 'explored'");
+    expect(helper).toContain("when v_has_latest and passing_attempt_number is null then 'needs_retry'");
+    expect(helper).toContain("when v_exploration_completed then 'explored'");
     expect(helper).toContain("when status <> 'not_started' then 'exploring'");
     expect(helper).not.toContain("quiz_passed");
   });
@@ -77,12 +99,23 @@ describe("shared assignment progress state migration", () => {
 
   it("counts failed attempts only up to the first pass", () => {
     expect(helper).toContain("sa.attempt_number < coalesce(passing_attempt_number, 2147483647)");
-    expect(helper).toMatch(/sa\.passed order by sa\.attempt_number asc limit 1/);
+    expect(helper).toMatch(/sa\.passed order by sa\.attempt_number asc, sa\.created_at asc limit 1/);
   });
 
   it("dates completion by the passing attempt, or by the exploration when there is no quiz", () => {
     expect(helper).toContain("when status <> 'completed' then null");
-    expect(helper).toContain("when cardinality(v_quiz_keys) = 0 then v_progress.completed_at else passing_completed_at");
+    expect(helper).toContain("when cardinality(v_quiz_keys) = 0 then v_progress.exploration_completed_at");
+    expect(helper).toContain("greatest(v_progress.exploration_completed_at, passing_completed_at)");
+    expect(helper).toContain("passing_quiz_key");
+  });
+
+  it("provides an ownership-checked, service-only batch state read", () => {
+    const batch = functionBody("student_assignment_progress_states");
+    expect(batch).toContain("security invoker");
+    expect(batch).toContain("s.id = p_student_id");
+    expect(batch).toContain("ca.class_id = p_class_id");
+    expect(batch).toContain("ca.archived_at is null");
+    expect(batch).toContain("assignment_progress_state(p.id, a.type::text)");
   });
 
   it("feeds both teacher views from the shared state", () => {
@@ -90,6 +123,7 @@ describe("shared assignment progress state migration", () => {
     expect(summary).toContain("cross join lateral public.assignment_progress_state(p.id, a.type::text) st");
     expect(lessons).toContain("'stage', lr.stage");
     expect(summary).toContain("'progressstage', st.stage");
+    expect(summary).toContain("'explorationstatus', case when st.exploration_completed then 'completed'");
   });
 
   it("reports one exploration duration: the saved exploration-to-first-quiz interval", () => {
