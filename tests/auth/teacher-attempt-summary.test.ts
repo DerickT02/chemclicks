@@ -43,6 +43,23 @@ describe('teacher attempt summary server boundary', () => {
     await expect(getTeacherActivityAttemptSummary(classId, assignmentId, { live: true, studentId: 'invalid' })).rejects.toThrow('Invalid')
     expect(mock.rpc).toHaveBeenCalledTimes(2)
   })
+  it('falls back to the full report when the live RPC is not migrated, keeping only the requested student', async () => {
+    const studentId = '33333333-3333-4333-8333-333333333333'
+    const row = (id: string) => ({ studentId: id, overallStatus: 'exploring', attempts: [] })
+    mock.rpc
+      .mockResolvedValueOnce({ data: null, error: { code: 'PGRST202', message: 'missing' } })
+      .mockResolvedValueOnce({ data: { students: [row(studentId), row('other')] }, error: null })
+    const result = await getTeacherActivityAttemptSummary(classId, assignmentId, { live: true, studentId })
+    expect(mock.rpc).toHaveBeenLastCalledWith('teacher_activity_attempt_summary', {
+      p_teacher_id: 'session-teacher', p_class_id: classId, p_assignment_id: assignmentId,
+    })
+    expect(result.students.map(student => student.studentId)).toEqual([studentId])
+  })
+  it('does not fall back on other live RPC errors', async () => {
+    mock.rpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'private details' } })
+    await expect(getTeacherActivityAttemptSummary(classId, assignmentId, { live: true })).rejects.toThrow('denied')
+    expect(mock.rpc).toHaveBeenCalledTimes(1)
+  })
   it.each([
     ['not_started', 'not_started'],
     ['exploring', 'exploring'],

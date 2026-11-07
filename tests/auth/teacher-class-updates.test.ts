@@ -3,6 +3,14 @@ vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({ teacher: vi.fn(), rpc: vi.fn() }));
 vi.mock("@/lib/server/teacher", () => ({ requireTeacherId: mocks.teacher }));
 vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({ rpc: mocks.rpc }) }));
+const fallback = vi.hoisted(() => ({ roster: vi.fn(), progress: vi.fn(), attempts: vi.fn() }));
+vi.mock("@/lib/server/student-roster", () => ({ getOwnedStudentRoster: fallback.roster }));
+vi.mock("@/lib/server/teacher-lesson-progress", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/server/teacher-lesson-progress")>(), getTeacherClassLessonProgress: fallback.progress,
+}));
+vi.mock("@/lib/server/teacher-attempts", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/server/teacher-attempts")>(), getTeacherActivityAttemptSummary: fallback.attempts,
+}));
 import { getTeacherClassUpdates, isClassUpdateCursor } from "@/lib/server/teacher-class-updates";
 import { GET } from "@/app/admin/classes/[classId]/updates/route";
 
@@ -77,6 +85,20 @@ describe("combined teacher class updates", () => {
     const student = result.attempts?.students[0];
     expect(student?.progress.stage).toBe("quiz_in_progress");
     expect(student?.attempts.map(row => row.id)).toEqual(["newer", "older"]);
+  });
+  it("falls back to full, cursorless snapshots when the incremental RPC is not migrated", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "missing" } });
+    const roster = { pending: [], active: [] };
+    const progress = { classId, className: "Period 1", students: [] };
+    const attempts = { classId, assignmentId, students: [] };
+    fallback.roster.mockResolvedValue(roster);
+    fallback.progress.mockResolvedValue(progress);
+    fallback.attempts.mockResolvedValue(attempts);
+    expect(await getTeacherClassUpdates(classId, { after: "7", assignmentId })).toEqual({
+      classId, revision: null, reset: true, removedStudentIds: [], roster, progress, attempts,
+    });
+    expect(fallback.attempts).toHaveBeenCalledWith(classId, assignmentId, { live: true });
+    expect((await getTeacherClassUpdates(classId)).attempts).toBeNull();
   });
   it.each([{ data: null, error: null }, { data: null, error: { message: "private database details" } }])("fails closed when ownership or database reads fail (%j)", async result => {
     mocks.rpc.mockResolvedValue(result);
