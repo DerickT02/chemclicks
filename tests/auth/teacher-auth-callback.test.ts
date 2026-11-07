@@ -121,8 +121,10 @@ describe("teacher auth callback GET", () => {
       ["invalid relative value", "not-a-valid-route", "/"],
       ["absolute external URL", "https://evil.example.com", "/"],
       ["protocol-relative URL", "//evil.example.com", "/"],
-      ["encoded protocol-relative path", "/%2F%2Fevil.example.com", "/"],
-      ["encoded backslashes", "/%5C%5Cevil.example.com", "/"],
+      ["backslash path", "/\\evil.example.com", "/"],
+      ["tab-separated protocol-relative path", "/\t/evil.example.com", "/"],
+      ["encoded protocol-relative path", "/%2F%2Fevil.example.com", "/%2F%2Fevil.example.com"],
+      ["encoded backslashes", "/%5C%5Cevil.example.com", "/%5C%5Cevil.example.com"],
       ["javascript scheme", "javascript:alert(1)", "/"],
     ])("resolves %s safely (%s)", async (_label, redirectTo, expectedPath) => {
       const query = redirectTo

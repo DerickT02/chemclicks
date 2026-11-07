@@ -1,30 +1,6 @@
+import { resolveSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-
-/** Same-origin relative path only; rejects open redirects and encoded bypass attempts. */
-export function resolveSafeRedirectPath(redirectTo: string | null, origin: string): string {
-  if (!redirectTo?.startsWith("/") || redirectTo.startsWith("//")) {
-    return "/";
-  }
-
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(redirectTo);
-  } catch {
-    return "/";
-  }
-
-  if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\")) {
-    return "/";
-  }
-
-  const resolved = new URL(decoded, origin);
-  if (resolved.origin !== origin) {
-    return "/";
-  }
-
-  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
-}
 
 /**
  * PKCE / email-confirm / OAuth redirect target. Exchanges `?code=` for a session cookie.
