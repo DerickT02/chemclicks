@@ -163,6 +163,8 @@ DECLARE
   v_progress_status text;
   v_exploration_completed boolean := false;
   v_quiz_keys text[];
+  v_passing_id uuid;
+  v_passing_created_at timestamptz;
   v_has_latest boolean := false;
   v_latest_completed_at timestamptz;
   v_quiz_open boolean := false;
@@ -192,15 +194,16 @@ BEGIN
   END;
 
   SELECT sa.attempt_number, sa.score, sa.question_total, sa.percentage,
-         sa.quiz_key, sa.completed_at
+         sa.quiz_key, sa.completed_at, sa.created_at, sa.id
     INTO passing_attempt_number, passing_score, passing_total,
-         passing_percentage, passing_quiz_key, passing_completed_at
+         passing_percentage, passing_quiz_key, passing_completed_at,
+         v_passing_created_at, v_passing_id
   FROM public.student_attempts sa
   WHERE sa.progress_id = v_progress.id
     AND sa.quiz_key = ANY (v_quiz_keys)
     AND sa.status = 'completed'
     AND sa.passed
-  ORDER BY sa.attempt_number ASC, sa.created_at ASC
+  ORDER BY sa.completed_at ASC NULLS LAST, sa.created_at ASC, sa.id ASC
   LIMIT 1;
 
   SELECT count(*)::integer INTO failed_quiz_attempt_count
@@ -209,14 +212,16 @@ BEGIN
     AND sa.quiz_key = ANY (v_quiz_keys)
     AND sa.status = 'completed'
     AND NOT sa.passed
-    AND sa.attempt_number < COALESCE(passing_attempt_number, 2147483647);
+    AND (v_passing_id IS NULL
+      OR (sa.completed_at, sa.created_at, sa.id)
+         < (passing_completed_at, v_passing_created_at, v_passing_id));
 
   SELECT sa.completed_at INTO v_latest_completed_at
   FROM public.student_attempts sa
   WHERE sa.progress_id = v_progress.id
     AND sa.quiz_key = ANY (v_quiz_keys)
     AND sa.status = 'completed'
-  ORDER BY sa.attempt_number DESC, sa.created_at DESC
+  ORDER BY sa.completed_at DESC NULLS LAST, sa.created_at DESC, sa.id DESC
   LIMIT 1;
   v_has_latest := FOUND;
 
@@ -428,7 +433,7 @@ BEGIN
             'questionTotal', sa.question_total,
             'percentage', sa.percentage,
             'passed', sa.passed
-          ) ORDER BY sa.attempt_number DESC, sa.created_at DESC), '[]'::jsonb) AS attempts
+          ) ORDER BY sa.started_at DESC NULLS LAST, sa.created_at DESC, sa.id DESC), '[]'::jsonb) AS attempts
         FROM public.student_attempts sa WHERE sa.progress_id = p.id
       ) history
       WHERE s.class_id = c.id
