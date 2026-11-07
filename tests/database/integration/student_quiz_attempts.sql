@@ -120,7 +120,7 @@ BEGIN
     RAISE EXCEPTION 'Passing quiz and exploration did not complete the shared assignment state';
   END IF;
 
-  PERFORM public.student_quiz_start(
+  PERFORM public.student_quiz_retry_start(
     student, classroom, assignment, 'bohr_models'
   );
 

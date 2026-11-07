@@ -11,6 +11,58 @@ COMMENT ON COLUMN public.student_progress.exploration_completed IS
 COMMENT ON COLUMN public.student_progress.exploration_completed_at IS
   'First known server timestamp when the assignment exploration was completed.';
 
+-- Preserve idempotent retries through later quiz starts. The legacy submit
+-- RPC has no start timestamp parameter, so use the saved attempt's timestamp
+-- when the same submission key is replayed after a retry has begun. The
+-- canonical timer-aware RPC still performs all assignment and access checks.
+CREATE OR REPLACE FUNCTION public.student_quiz_submit(
+  p_student_id uuid,
+  p_class_id uuid,
+  p_assignment_id uuid,
+  p_quiz_key text,
+  p_submission_key text,
+  p_answers jsonb
+) RETURNS SETOF public.student_attempts
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+DECLARE
+  v_progress_id uuid;
+  v_quiz_started_at timestamptz;
+  v_existing_started_at timestamptz;
+BEGIN
+  SELECT p.id, p.quiz_started_at
+    INTO v_progress_id, v_quiz_started_at
+  FROM public.student_progress p
+  WHERE p.student_id = p_student_id
+    AND p.class_activity_id = p_assignment_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_quiz_started_at IS NULL THEN
+    RAISE EXCEPTION 'Quiz has not been started' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT sa.started_at INTO v_existing_started_at
+  FROM public.student_attempts sa
+  WHERE sa.progress_id = v_progress_id
+    AND sa.quiz_key = p_quiz_key
+    AND sa.submission_key = p_submission_key;
+
+  IF FOUND THEN
+    v_quiz_started_at := v_existing_started_at;
+  END IF;
+
+  RETURN QUERY
+  SELECT * FROM public.student_quiz_submit(
+    p_student_id,
+    p_class_id,
+    p_assignment_id,
+    p_quiz_key,
+    v_quiz_started_at,
+    p_submission_key,
+    p_answers
+  );
+END;
+$$;
+
 -- Completed exploration attempts are authoritative. Legacy progress rows are
 -- also reliable except for Bohr rows that may have been marked complete by
 -- the old quiz-pass trigger without any completed exploration attempt.
