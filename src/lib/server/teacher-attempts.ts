@@ -1,14 +1,16 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/server/database'
 import { requireTeacherId } from '@/lib/server/teacher'
+import type { AssignmentStage } from '@/lib/assignments/stages'
+import { normalizeAssignmentProgress, type AssignmentProgressFacts } from '@/lib/assignments/progress'
 
-export type TeacherActivityAttemptSummary = {
+type AttemptSummaryResponse = {
   classId: string
   className: string
   assignmentId: string
   activityId: string
   activityTitle: string
-  students: {
+  students: ({
     studentId: string
     firstName: string
     lastName: string
@@ -19,19 +21,11 @@ export type TeacherActivityAttemptSummary = {
     completedCount: number
     inProgressCount: number
     overallStatus: 'not_started' | 'exploring' | 'taking_quiz' | 'needs_retry' | 'completed'
-    explorationStatus: 'not_started' | 'in_progress' | 'completed'
-    explorationDurationSeconds: number | null
-    passingQuizAttemptNumber: number | null
-    passingQuizScore: number | null
-    passingQuizTotal: number | null
-    passingQuizPercentage: number | null
-    passingQuizCompletedAt: string | null
-    failedQuizAttemptCount: number
-    stage?: 'Not started' | 'Exploring' | 'Taking quiz' | 'Needs retry' | 'Completed'
-    explorationStartedAt?: string | null
-    firstQuizStartedAt?: string | null
+    // Shared stage from assignment_progress_state (20261104000200); absent on
+    // databases without that migration.
+    progressStage?: AssignmentStage
+    passingQuizCompletedAt?: string | null
     quizStartedAt?: string | null
-    timeToFirstQuizSeconds?: number | null
     attempts: {
       id: string
       attemptNumber: number
@@ -47,7 +41,31 @@ export type TeacherActivityAttemptSummary = {
       percentage?: number | null
       passed?: boolean | null
     }[]
-  }[]
+  } & Partial<Omit<AssignmentProgressFacts, 'stage'>>)[]
+}
+
+type Student = AttemptSummaryResponse['students'][number]
+type Attempt = Student['attempts'][number]
+
+// An attempt without a readable start time sorts last, matching the report's
+// NULLS LAST ordering, instead of making the comparison inconsistent.
+function newestStartFirst(a: Attempt, b: Attempt): number {
+  const aMs = Date.parse(a.startedAt)
+  const bMs = Date.parse(b.startedAt)
+  if (Number.isNaN(aMs) || Number.isNaN(bMs)) return Number(Number.isNaN(aMs)) - Number(Number.isNaN(bMs))
+  return bMs - aMs
+}
+
+export type TeacherActivityAttemptSummary = Omit<AttemptSummaryResponse, 'students'> & {
+  students: (Pick<Student,
+    'studentId' | 'firstName' | 'lastName' | 'verified' | 'attemptCount'
+    | 'completedCount' | 'inProgressCount' | 'attempts'
+  > & {
+    explorationAttemptCount: number
+    quizAttemptCount: number
+    quizStartedAt: string | null
+    progress: AssignmentProgressFacts
+  })[]
 }
 
 // Includes the entire enrolled roster, even students awaiting verification or progress.
@@ -72,5 +90,33 @@ export async function getTeacherActivityAttemptSummary(
     p_assignment_id: assignmentId,
   })
   if (error || !data) throw new Error('Activity summary access denied or unavailable.')
-  return data as TeacherActivityAttemptSummary
+  const response = data as AttemptSummaryResponse
+  return {
+    ...response,
+    students: response.students.map(student => ({
+      studentId: student.studentId,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      verified: student.verified,
+      attemptCount: student.attemptCount,
+      completedCount: student.completedCount,
+      inProgressCount: student.inProgressCount,
+      // Attempt numbers restart for each quiz key (and for exploration).
+      attempts: [...student.attempts].sort(newestStartFirst),
+      explorationAttemptCount: student.explorationAttemptCount
+        ?? student.attempts.filter(attempt => attempt.kind === 'exploration'
+          || (attempt.kind === undefined && attempt.quizKey == null)).length,
+      quizAttemptCount: student.quizAttemptCount
+        ?? student.attempts.filter(attempt => attempt.kind === 'quiz'
+          || (attempt.kind === undefined && attempt.quizKey != null)).length,
+      quizStartedAt: student.quizStartedAt ?? null,
+      progress: normalizeAssignmentProgress({
+        ...student,
+        stage: student.progressStage,
+        // Older RPCs expose the passing timestamp under a different key.
+        completedAt: student.completedAt === undefined
+          ? student.passingQuizCompletedAt : student.completedAt,
+      }, student.overallStatus),
+    })),
+  }
 }

@@ -6,8 +6,7 @@ import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
 import { getStudentAssignmentSchedules } from "@/lib/db/student-assignments";
 import { getAssignmentAttempts } from "@/lib/server/student-assignments";
 import { scheduleStatus } from "@/lib/assignments/schedule";
-import { getAssignmentGate } from "@/lib/assignments/prerequisites";
-import LockedSection from "@/components/assignments/LockedSection";
+import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,22 +19,15 @@ export default async function AssignmentHistoryPage({ params }: { params: Promis
   if (!assignment) notFound();
   // eslint-disable-next-line react-hooks/purity -- Request-time Server Component availability check.
   const status = scheduleStatus(assignment, Date.now());
-  // Closed work stays reviewable; an open section stays behind its prerequisites.
-  const gate = status === "Open" ? await getAssignmentGate(assignmentId) : null;
-  if (gate?.status === "unauthenticated") redirect("/login/student");
-  if (gate?.status === "error") throw new Error(gate.message);
-  if (gate?.status === "locked") return (
-    <main className="min-h-screen-below-nav bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <h1 className="text-3xl font-semibold">{assignment.activity.title} — saved history</h1>
-        <LockedSection blocker={gate.blocker} />
-      </div>
-    </main>
-  );
+  // Open and closed work stays reviewable.
   const readable = status === "Open" || status === "Closed";
   const allAttempts = readable ? await getAssignmentAttempts(assignmentId) : [];
   const attempts = allAttempts.filter(attempt => !attempt.quiz_key);
-  const bohrQuizAttempts = allAttempts.filter(attempt => attempt.quiz_key === "bohr_models");
+  const bohrQuizAttempts = allAttempts.filter(attempt =>
+    attempt.quiz_key === BOHR_QUIZ_KEY
+      || attempt.quiz_key === BOHR_INTRO_QUIZ_KEY
+      || attempt.quiz_key === BOHR_STABILITY_QUIZ_KEY,
+  );
   const completed = attempts.some(attempt => attempt.status === "completed");
 
   return (
@@ -48,7 +40,10 @@ export default async function AssignmentHistoryPage({ params }: { params: Promis
           <p className="font-medium">{completed ? "Exploration completion saved." : "No exploration completion has been saved."}</p>
           <AttemptHistory attempts={attempts} />
           {assignment.activity.type === "bohr_model_intro" || assignment.activity.type === "bohr_model_stability" ? (
-            <QuizAttemptHistory title="Bohr quiz" attempts={bohrQuizAttempts} />
+            <QuizAttemptHistory
+              title={assignment.activity.type === "bohr_model_stability" ? "Bohr Model Stability quiz" : "Bohr Model Introduction quiz"}
+              attempts={bohrQuizAttempts}
+            />
           ) : null}
           {status === "Open" && <Link href={`/student/assignments/${assignment.id}`} className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-semibold">Back to activity</Link>}
         </> : <p role="status">Saved history is unavailable until the activity opens with a valid schedule. Return to assignments or ask your teacher.</p>}

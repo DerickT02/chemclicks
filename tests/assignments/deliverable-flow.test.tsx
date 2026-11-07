@@ -31,7 +31,6 @@ vi.mock("@/lib/server/student-assignments", async (importOriginal) => ({
 }));
 vi.mock("@/lib/auth/student-session", () => ({ getStudentSession: mocks.session }));
 vi.mock("@/lib/assignments/prerequisites", () => ({
-  assertAssignmentUnlocked: async () => {},
   getAssignmentGate: async () => ({ status: "open", entry: { complete: false }, next: null }),
 }));
 vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({

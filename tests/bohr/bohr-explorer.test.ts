@@ -10,6 +10,7 @@ import {
   describeNobleGasStability,
   describeProtonElectronDifference,
   evaluateNobleGasRule,
+  isPlausibleIonicCharge,
   isNobleGasStableElectronCount,
   MAX_ELECTRON_COUNT,
   MAX_PROTON_COUNT,
@@ -68,6 +69,17 @@ describe("NGS and NCS indicators", () => {
   it("marks equal protons and electrons as NCS met", () => {
     expect(describeNeutralChargeStability(11, 11).label).toBe("NCS: met");
     expect(describeNeutralChargeStability(11, 10).label).toBe("NCS: not met");
+  });
+
+  it("does not treat an extreme charge mismatch as noble-gas stability", () => {
+    expect(describeNobleGasStability(10, 11).met).toBe(true);
+    expect(describeNobleGasStability(18, 1)).toMatchObject({
+      met: false,
+      label: "NGS: not met",
+    });
+    expect(describeNobleGasStability(18, 1).explanation).toContain("charge magnitude above 4");
+    expect(isPlausibleIonicCharge(4)).toBe(true);
+    expect(isPlausibleIonicCharge(-5)).toBe(false);
   });
 });
 

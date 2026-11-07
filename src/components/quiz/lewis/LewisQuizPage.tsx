@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AssignmentAccess from "@/components/assignments/AssignmentAccess";
-import LockedSection from "@/components/assignments/LockedSection";
 import LewisQuiz from "@/components/quiz/lewis/LewisQuiz";
 import { getLewisQuizAccess } from "@/lib/assignments/lewis-quiz-access";
 import { LEWIS_QUIZZES, type LewisQuizKind } from "@/lib/assignments/lewis-quizzes";
@@ -22,6 +21,8 @@ export default async function LewisQuizPage({ kind, assignmentId }: Props) {
   // Access comes from the student's own class assignment, checked per request.
   const access = await getLewisQuizAccess(kind, assignmentId);
   if (access.status === "unauthenticated") redirect("/login/student");
+  // No lesson for this quiz is assigned: there is nothing to take here.
+  if (access.status === "locked") redirect("/student");
 
   // Client sessions cannot read these rows; load them only after access passes.
   let questionsResult: QuizQuestionsResult = { data: null, error: null };
@@ -44,8 +45,6 @@ export default async function LewisQuizPage({ kind, assignmentId }: Props) {
           <p role="alert" className="text-sm text-destructive">
             {access.message}
           </p>
-        ) : access.status === "blocked" ? (
-          <LockedSection blocker={access.blocker} />
         ) : access.status !== "available" ? (
           <div
             role="status"
@@ -54,17 +53,14 @@ export default async function LewisQuizPage({ kind, assignmentId }: Props) {
             <p className="font-semibold text-foreground">
               {access.status === "scheduled" ? "This quiz is not open yet."
                 : access.status === "closed" ? "This quiz is closed."
-                : access.status === "missing" ? "This assignment is unavailable."
-                : "This quiz is locked."}
+                : "This assignment is unavailable."}
             </p>
             <p className="text-muted-foreground">
               {access.status === "scheduled"
                 ? `Your ${lessonTitle} lesson is scheduled. Return when the assignment opens.`
                 : access.status === "closed"
                 ? `Your ${lessonTitle} lesson is no longer open. Further quiz answers are unavailable; quizzes you already finished remain saved.`
-                : access.status === "missing"
-                ? `This ${lessonTitle} assignment is missing or you no longer have access to it.`
-                : `Your teacher must assign the ${lessonTitle} lesson to your class before you can take this quiz.`}
+                : `This ${lessonTitle} assignment is missing or you no longer have access to it.`}
             </p>
             <Link href="/student" className="text-accent underline">
               Back to assignments

@@ -1,10 +1,12 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/server/database'
 import { requireTeacherId } from '@/lib/server/teacher'
+import { normalizeAssignmentProgress, type AssignmentProgressFacts } from '@/lib/assignments/progress'
+import type { AssignmentStage } from '@/lib/assignments/stages'
 
-export type LessonStatus = 'not_started' | 'in_progress' | 'completed'
+type LessonStatus = 'not_started' | 'in_progress' | 'completed'
 
-export type TeacherClassLessonProgress = {
+type LessonProgressResponse = {
   classId: string
   className: string
   students: {
@@ -13,13 +15,28 @@ export type TeacherClassLessonProgress = {
     lastName: string
     verified: boolean
     overallPercent: number
-    lessons: {
+    // stage and the timing/result facts are absent until the stage
+    // migration (20261104000200) reaches the database.
+    lessons: ({
       assignmentId: string
       activityId: string
       activityTitle: string
       status: LessonStatus
-    }[]
+      stage?: AssignmentStage
+      quizStartedAt?: string | null
+    } & Partial<Omit<AssignmentProgressFacts, 'stage'>>)[]
   }[]
+}
+
+type Student = LessonProgressResponse['students'][number]
+type Lesson = Student['lessons'][number]
+
+export type TeacherClassLessonProgress = Omit<LessonProgressResponse, 'students'> & {
+  students: (Omit<Student, 'lessons'> & {
+    lessons: (Pick<Lesson, 'assignmentId' | 'activityId' | 'activityTitle'> & {
+      progress: AssignmentProgressFacts
+    })[]
+  })[]
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
@@ -41,5 +58,17 @@ export async function getTeacherClassLessonProgress(
   if (error || !data) {
     throw new Error('Class progress access denied or unavailable.')
   }
-  return data as TeacherClassLessonProgress
+  const response = data as LessonProgressResponse
+  return {
+    ...response,
+    students: response.students.map(student => ({
+      ...student,
+      lessons: student.lessons.map(lesson => ({
+        assignmentId: lesson.assignmentId,
+        activityId: lesson.activityId,
+        activityTitle: lesson.activityTitle,
+        progress: normalizeAssignmentProgress(lesson, lesson.status),
+      })),
+    })),
+  }
 }

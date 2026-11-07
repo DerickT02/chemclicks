@@ -2,10 +2,17 @@ import Link from "next/link";
 
 const LABS = [
   {
-    slug: "bohr-models",
+    slug: "bohr-models/intro",
     icon: "⚛️",
-    title: "Bohr Models",
+    title: "Bohr Model Introduction",
     description: "Learn about electron shells by exploring interactive atomic models for elements 1–20.",
+    status: "available" as const,
+  },
+  {
+    slug: "bohr-models/stability",
+    icon: "⚛️",
+    title: "Bohr Model Stability",
+    description: "Adjust protons and electrons to compare noble-gas electron counts, neutral charge, and ionic charge.",
     status: "available" as const,
   },
   {
