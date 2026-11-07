@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  fileURLToPath(new URL("../../supabase/migrations/20261026043835_jira_232_live_compatibility.sql", import.meta.url)),
+  fileURLToPath(new URL("../../supabase/migrations/20261026045317_jira_232_live_compatibility.sql", import.meta.url)),
   "utf8",
 ).replace(/\s+/g, " ").toLowerCase();
 

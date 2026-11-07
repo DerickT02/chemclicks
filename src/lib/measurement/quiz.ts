@@ -78,6 +78,7 @@ export type ResultsState = {
   attemptId?: string;
   attemptNumber?: number;
   passed?: boolean;
+  assignmentCompleted?: boolean | null;
   score: number;
   total: number;
 };
@@ -105,7 +106,7 @@ export type QuizAction =
   | { type: "edit-answer"; answer: string }
   | { type: "submit" }
   | { type: "server-submit"; result: AnswerResult; counted: boolean; firstTryCorrect: boolean | null }
-  | { type: "server-complete"; attemptId: string; attemptNumber: number; score: number; total: number; passed: boolean }
+  | { type: "server-complete"; attemptId: string; attemptNumber: number; score: number; total: number; passed: boolean; assignmentCompleted?: boolean | null }
   | { type: "next" }
   | { type: "choose-instrument" };
 
@@ -169,6 +170,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       attemptId: action.attemptId,
       attemptNumber: action.attemptNumber,
       passed: action.passed,
+      assignmentCompleted: action.assignmentCompleted,
       score: action.score,
       total: action.total,
     };

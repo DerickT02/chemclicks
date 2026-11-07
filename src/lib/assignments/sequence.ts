@@ -4,26 +4,21 @@ import { scheduleStatus, type ScheduleStatus } from "@/lib/assignments/schedule"
 import type { ActivityType } from "@/lib/db/activities";
 import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from "@/lib/db/quiz-questions";
 import type { StudentAssignment } from "@/lib/db/student-assignments";
-import type { ProgressStatus } from "@/lib/db/student_progress";
 import { measurementQuizModeForActivity } from "@/lib/measurement/modes";
+import type { StudentAssignmentProgressState } from "@/lib/server/student-assignment-progress";
 
 /** The student's own saved state for one assignment. */
-export type SectionRecord = {
-  progress: ProgressStatus | null;
-  passedQuizKeys: ReadonlySet<string>;
-};
+export type SectionRecord = Pick<
+  StudentAssignmentProgressState,
+  "status" | "stage" | "explorationCompleted" | "passingQuizKey"
+>;
 
 export type SequenceEntry = {
   assignment: StudentAssignment;
   schedule: ScheduleStatus;
   complete: boolean;
+  state: SectionRecord | null;
 };
-
-const NO_QUIZZES: ReadonlySet<string> = new Set();
-
-function isBohrLesson(type: ActivityType): boolean {
-  return type === "bohr_model_intro" || type === "bohr_model_stability";
-}
 
 /** The quiz_key a lesson's quiz attempts are saved under, or null when it has none. */
 export function sectionQuizKey(type: ActivityType): string | null {
@@ -35,21 +30,21 @@ export function sectionQuizKey(type: ActivityType): string | null {
   return mode ? `measurement_${mode.key}` : null;
 }
 
+/** All keys accepted by the shared database policy for a lesson. */
+export function sectionQuizKeys(type: ActivityType): ReadonlySet<string> {
+  const key = sectionQuizKey(type);
+  if (type === "bohr_model_intro" || type === "bohr_model_stability") {
+    return new Set([BOHR_QUIZ_KEY, ...(key ? [key] : [])]);
+  }
+  return new Set(key ? [key] : []);
+}
+
 /**
- * A section with a quiz is complete once that quiz is passed; one without a
- * quiz is complete once its exploration is finished. Same rule as the
- * teacher views (public.assignment_progress_state).
+ * Completion is resolved by the database's shared assignment state helper;
+ * sequence consumers do not recreate its exploration/quiz conjunction.
  */
-export function isSectionComplete(
-  type: ActivityType,
-  progress: ProgressStatus | null,
-  passedQuizKeys: ReadonlySet<string>,
-): boolean {
-  const quizKey = sectionQuizKey(type);
-  if (!quizKey) return progress === "completed";
-  // Bohr passes saved under the legacy shared key still count for either lesson.
-  if (isBohrLesson(type) && passedQuizKeys.has(BOHR_QUIZ_KEY)) return true;
-  return passedQuizKeys.has(quizKey);
+export function isSectionComplete(state: SectionRecord | null | undefined): boolean {
+  return state?.status === "completed";
 }
 
 /**
@@ -70,11 +65,8 @@ export function resolveSequence(
       return {
         assignment,
         schedule: scheduleStatus(assignment, now),
-        complete: isSectionComplete(
-          assignment.activity.type,
-          record?.progress ?? null,
-          record?.passedQuizKeys ?? NO_QUIZZES,
-        ),
+        complete: isSectionComplete(record),
+        state: record ?? null,
       };
     });
 }

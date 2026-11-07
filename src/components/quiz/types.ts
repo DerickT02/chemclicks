@@ -18,6 +18,8 @@ export type QuizCompleteResult = {
   total: number;
   percent: number;
   passed: boolean;
+  /** Whether exploration and the quiz together completed the assignment. */
+  assignmentCompleted?: boolean | null;
   attemptId?: string;
   attemptNumber?: number;
   nextDestination?: string | null;

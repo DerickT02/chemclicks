@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ActivityType } from "@/lib/db/activities";
 import type { StudentAssignment } from "@/lib/db/student-assignments";
-import type { ProgressStatus } from "@/lib/db/student_progress";
+import type { AssignmentStage } from "@/lib/assignments/stages";
 import {
   assignmentPath,
   isSectionComplete,
@@ -14,8 +14,6 @@ import {
 const NOW = Date.parse("2026-10-23T12:00:00Z");
 const HOUR = 60 * 60 * 1000;
 const iso = (offset: number) => new Date(NOW + offset).toISOString();
-const none = new Set<string>();
-
 function section(
   id: string,
   type: string,
@@ -30,8 +28,12 @@ function section(
   };
 }
 
-const record = (progress: ProgressStatus | null, ...keys: string[]): SectionRecord =>
-  ({ progress, passedQuizKeys: new Set(keys) });
+const record = (
+  status: "not_started" | "in_progress" | "completed",
+  stage: AssignmentStage,
+  explorationCompleted: boolean,
+  passingQuizKey: string | null,
+): SectionRecord => ({ status, stage, explorationCompleted, passingQuizKey });
 const ids = (entries: { assignment: { id: string } }[]) => entries.map((entry) => entry.assignment.id);
 const assignmentIds = (assignments: StudentAssignment[]) => assignments.map((assignment) => assignment.id);
 
@@ -52,39 +54,17 @@ describe("sectionQuizKey", () => {
 });
 
 describe("isSectionComplete", () => {
-  it.each([
-    ["bohr_model_intro", "bohr_models"],
-    ["bohr_model_stability", "bohr_models"],
-    ["lewis_structures_covalent", "lewis_covalent"],
-    ["lewis_structures_ionic", "lewis_ionic"],
-    ["measurement_ruler_tenths", "measurement_ruler_tenths"],
-    ["measurement_ruler_hundredths", "measurement_ruler_hundredths"],
-    ["measurement_graduated_cylinder_whole", "measurement_cylinder_whole"],
-    ["measurement_graduated_cylinder", "measurement_cylinder_tenths"],
-  ] as const)("%s is complete only once its own quiz is passed", (type, own) => {
-    expect(isSectionComplete(type, "completed", new Set([own]))).toBe(true);
-    expect(isSectionComplete(type, "in_progress", new Set([own]))).toBe(true);
-    expect(isSectionComplete(type, null, new Set([own]))).toBe(true);
-    // A finished exploration alone, or another quiz's pass, is not completion.
-    expect(isSectionComplete(type, "completed", none)).toBe(false);
-    expect(isSectionComplete(type, "completed", new Set(["some_other_quiz"]))).toBe(false);
-    expect(isSectionComplete(type, null, none)).toBe(false);
+  it("uses the database's conjunction result instead of recomputing pass/progress policy", () => {
+    expect(isSectionComplete(record("completed", "completed", true, "lewis_covalent"))).toBe(true);
+    expect(isSectionComplete(record("in_progress", "exploring", false, "lewis_covalent"))).toBe(false);
+    expect(isSectionComplete(record("in_progress", "explored", true, null))).toBe(false);
+    expect(isSectionComplete(record("in_progress", "needs_retry", true, null))).toBe(false);
+    expect(isSectionComplete(record("in_progress", "exploring", false, null))).toBe(false);
   });
 
-  it.each([
-    ["bohr_model_intro", "bohr_model_intro", "bohr_model_stability"],
-    ["bohr_model_stability", "bohr_model_stability", "bohr_model_intro"],
-  ] as const)("%s completes on its own split quiz or the legacy shared one, not the other lesson's", (type, own, other) => {
-    expect(isSectionComplete(type, null, new Set([own]))).toBe(true);
-    expect(isSectionComplete(type, null, new Set(["bohr_models"]))).toBe(true);
-    expect(isSectionComplete(type, "completed", new Set([other]))).toBe(false);
-  });
-
-  it("completes the Lewis dot diagram, which has no quiz, once its exploration is finished", () => {
-    expect(isSectionComplete("lewis_diagram", "completed", none)).toBe(true);
-    expect(isSectionComplete("lewis_diagram", "in_progress", none)).toBe(false);
-    expect(isSectionComplete("lewis_diagram", "not_started", none)).toBe(false);
-    expect(isSectionComplete("lewis_diagram", null, none)).toBe(false);
+  it("uses the canonical status for no-quiz activities too", () => {
+    expect(isSectionComplete(record("completed", "completed", true, null))).toBe(true);
+    expect(isSectionComplete(record("in_progress", "explored", true, null))).toBe(false);
   });
 });
 
@@ -107,7 +87,7 @@ describe("resolveSequence", () => {
     ], new Map(), NOW);
 
     expect(entries.map((entry) => Object.keys(entry).sort())).toEqual(
-      entries.map(() => ["assignment", "complete", "schedule"]),
+      entries.map(() => ["assignment", "complete", "schedule", "state"]),
     );
     expect(entries.map((entry) => entry.schedule)).toEqual(["Open", "Scheduled", "Open"]);
   });
@@ -139,7 +119,7 @@ describe("resolveSequence", () => {
   it("ignores records for other assignments", () => {
     const entries = resolveSequence(
       [section("a", "lewis_diagram", 1), section("b", "lewis_diagram", 2)],
-      new Map([["someone-else", record("completed")]]),
+      new Map([["someone-else", record("completed", "completed", true, null)]]),
       NOW,
     );
     expect(entries.map((entry) => entry.complete)).toEqual([false, false]);
@@ -153,21 +133,27 @@ describe("nextSection", () => {
       section("b", "bohr_model_stability", 2),
       section("c", "lewis_diagram", 3, { opens_at: iso(HOUR) }),
       section("d", "lewis_structures_covalent", 4),
-    ], new Map([["a", record(null, "bohr_models")], ["b", record(null, "bohr_models")]]), NOW);
+    ], new Map([
+      ["a", record("completed", "completed", true, "bohr_models")],
+      ["b", record("completed", "completed", true, "bohr_models")],
+    ]), NOW);
 
     // c has not opened, so d is next even though c is unfinished.
     expect(nextSection(entries, "a")?.assignment.id).toBe("d");
   });
 
-  it("returns the next open, unfinished section", () => {
+  it("returns the first open unfinished section from canonical state", () => {
     const entries = resolveSequence([
       section("a", "bohr_model_intro", 1),
       section("b", "bohr_model_stability", 2),
       section("c", "lewis_diagram", 3, { closes_at: iso(-HOUR) }),
       section("d", "lewis_structures_covalent", 4),
-    ], new Map([["a", record("completed", "bohr_models")], ["b", record(null, "bohr_models")]]), NOW);
+    ], new Map([
+      ["a", record("completed", "completed", true, "bohr_models")],
+      ["b", record("in_progress", "exploring", false, null)],
+    ]), NOW);
 
-    expect(nextSection(entries, "a")?.assignment.id).toBe("d");
+    expect(nextSection(entries, "a")?.assignment.id).toBe("b");
     expect(nextSection(entries, "d")).toBeNull();
     expect(nextSection(entries, "unknown")).toBeNull();
   });
@@ -186,14 +172,14 @@ describe("the Bohr → Lewis → Measurement journey", () => {
   ];
   // What finishing each section saves, in order.
   const finish: [string, SectionRecord][] = [
-    ["bohr-intro", record("in_progress", "bohr_models")],
-    ["bohr-stability", record("completed", "bohr_models")],
-    ["lewis-diagram", record("completed")],
-    ["lewis-covalent", record("completed", "lewis_covalent")],
-    ["lewis-ionic", record("completed", "lewis_ionic")],
-    ["ruler-tenths", record("completed", "measurement_ruler_tenths")],
-    ["ruler-hundredths", record("completed", "measurement_ruler_hundredths")],
-    ["cylinder", record("completed", "measurement_cylinder_tenths")],
+    ["bohr-intro", record("completed", "completed", true, "bohr_models")],
+    ["bohr-stability", record("completed", "completed", true, "bohr_models")],
+    ["lewis-diagram", record("completed", "completed", true, null)],
+    ["lewis-covalent", record("completed", "completed", true, "lewis_covalent")],
+    ["lewis-ionic", record("completed", "completed", true, "lewis_ionic")],
+    ["ruler-tenths", record("completed", "completed", true, "measurement_ruler_tenths")],
+    ["ruler-hundredths", record("completed", "completed", true, "measurement_ruler_hundredths")],
+    ["cylinder", record("completed", "completed", true, "measurement_cylinder_tenths")],
   ];
 
   it("continues to the next section after each one is finished", () => {
@@ -211,7 +197,7 @@ describe("the Bohr → Lewis → Measurement journey", () => {
   });
 
   it("lets a later section be finished before an earlier one", () => {
-    const records = new Map<string, SectionRecord>([["cylinder", record("completed", "measurement_cylinder_tenths")]]);
+    const records = new Map<string, SectionRecord>([["cylinder", record("completed", "completed", true, "measurement_cylinder_tenths")]]);
     const entries = resolveSequence(journey, records, NOW);
     expect(entries.filter((entry) => entry.complete).map((entry) => entry.assignment.id)).toEqual(["cylinder"]);
     expect(nextSection(entries, "bohr-intro")?.assignment.id).toBe("bohr-stability");

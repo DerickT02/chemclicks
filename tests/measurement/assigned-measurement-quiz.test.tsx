@@ -84,6 +84,41 @@ describe("assigned measurement quiz", () => {
     expect(screen.getByText("Attempt 1")).toBeTruthy();
   });
 
+  it("shows a pass-only result without offering continuation", async () => {
+    const user = userEvent.setup();
+    actions.complete.mockResolvedValue({
+      attemptId: "attempt-1",
+      attemptNumber: 1,
+      score: 5,
+      total: 5,
+      passed: true,
+      assignmentCompleted: false,
+      nextDestination: null,
+    });
+    actions.record.mockResolvedValue({
+      counted: true,
+      firstTryCorrect: true,
+      result: { status: "correct", message: "Correct reading." },
+    });
+    render(<MeasurementQuiz assignmentId="assignment-1" mode="ruler_tenths" />);
+
+    await user.click(screen.getByRole("button", { name: "Start quiz" }));
+    await screen.findByRole("heading", { name: "Ruler question 1 of 5" });
+    for (let index = 0; index < readings.length; index += 1) {
+      const input = screen.getByLabelText("Your reading, in centimeters");
+      await user.type(input, readings[index].toFixed(1));
+      await user.click(screen.getByRole("button", { name: "Check answer" }));
+      await screen.findByText("Correct reading.");
+      await user.click(screen.getByRole("button", {
+        name: index === readings.length - 1 ? "See results" : "Next question",
+      }));
+    }
+
+    expect(await screen.findByRole("heading", { name: "Ruler results: 5 of 5 correct" })).toBeTruthy();
+    expect(screen.getByText("Quiz passed — exploration still needed.")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Continue to next section" })).toBeNull();
+  });
+
   it("keeps focus on the answer while it saves, then locks an incorrect result", async () => {
     const user = userEvent.setup();
     let finishSaving: (receipt: unknown) => void = () => {};
