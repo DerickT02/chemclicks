@@ -15,7 +15,7 @@ import {
 
 export type QuizProgression = {
   passed: boolean;
-  assignmentCompleted: boolean;
+  assignmentCompleted: boolean | null;
   nextDestination: string | null;
 };
 
@@ -102,18 +102,18 @@ export async function getQuizProgression(
 ): Promise<QuizProgression> {
   const sequence = await getAssignmentSequence();
   if (sequence.status !== "ok") {
-    return { passed: false, assignmentCompleted: false, nextDestination: null };
+    return { passed: false, assignmentCompleted: null, nextDestination: null };
   }
   const entry = sequence.entries.find((candidate) => candidate.assignment.id === assignmentId);
-  if (!entry) return { passed: false, assignmentCompleted: false, nextDestination: null };
+  if (!entry) return { passed: false, assignmentCompleted: null, nextDestination: null };
 
   const allowedKeys = sectionQuizKeys(entry.assignment.activity.type);
   const passed = allowedKeys.has(quizKey)
     && entry.state?.passingQuizKey !== null
     && entry.state?.passingQuizKey !== undefined
     && allowedKeys.has(entry.state.passingQuizKey);
-  const assignmentCompleted = entry.state?.status === "completed";
-  const next = entry.schedule === "Open" && passed && assignmentCompleted
+  const assignmentCompleted = entry.state ? entry.state.status === "completed" : null;
+  const next = entry.schedule === "Open" && passed && assignmentCompleted === true
     ? nextSection(sequence.entries, assignmentId)
     : null;
   return {

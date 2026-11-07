@@ -164,6 +164,11 @@ export default function QuizShell({
             ? `Passed — you needed ${passingThresholdPercent}% or higher.`
             : `Not passed — you need at least ${passingThresholdPercent}% to pass.`}
         </p>
+        {result.passed && result.assignmentCompleted === false && (
+          <p className="mt-3 text-base font-medium text-foreground" role="status">
+            Quiz passed — exploration still needed.
+          </p>
+        )}
         <div className="mt-8 flex flex-wrap gap-4">
           <button
             type="button"
@@ -186,7 +191,7 @@ export default function QuizShell({
           >
             Back to assignments
           </Link>
-          {result.passed && result.attemptId && !result.nextDestination && (
+          {result.passed && result.assignmentCompleted === true && result.attemptId && !result.nextDestination && (
             <p className="text-sm text-muted-foreground">
               Your passing result is saved. No next assigned section is
               currently available.

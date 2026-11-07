@@ -1,7 +1,7 @@
 -- Transactional fixtures: no retained test data.
 -- Walks one student through every assignment stage, then checks retries,
--- concurrent assignments, that only a passed quiz completes quizzed work, and
--- ownership. Also covers mixed legacy/split Bohr histories after
+-- concurrent assignments, that quizzed work needs exploration and a passing
+-- quiz to complete, ownership, and mixed legacy/split Bohr histories after
 -- 20261104000300_fix_bohr_quiz_access_and_progress_history.sql.
 -- Run only on a disposable test database; these fixtures write and roll back.
 -- At every step the class progress view and the detailed results must agree.

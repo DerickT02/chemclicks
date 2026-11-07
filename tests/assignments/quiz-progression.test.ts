@@ -115,4 +115,14 @@ describe("quiz progression from shared assignment state", () => {
       nextDestination: `/student/assignments/${nextId}`,
     });
   });
+
+  it("does not claim the exploration is unfinished when shared state cannot be read", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: "private" } });
+
+    await expect(getQuizProgression(assignmentId, "lewis_covalent")).resolves.toEqual({
+      passed: false,
+      assignmentCompleted: null,
+      nextDestination: null,
+    });
+  });
 });
