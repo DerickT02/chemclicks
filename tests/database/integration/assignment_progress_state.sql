@@ -57,6 +57,8 @@ DECLARE
   exploration_time timestamptz := now() - interval '50 minutes';
   pass_time timestamptz := now() - interval '10 minutes';
   legacy_pass_time timestamptz := now() - interval '45 minutes';
+  exploration_started_after_pass timestamptz := now() - interval '6 minutes';
+  exploration_after_pass timestamptz := now() - interval '5 minutes';
   l jsonb; r jsonb;
 BEGIN
   SELECT t.id INTO teacher FROM public.teachers t JOIN auth.users u ON u.id = t.id
@@ -210,10 +212,14 @@ BEGIN
   PERFORM pg_temp.expect_stage(teacher, c, concurrent, ruler_tenths, 'quiz_in_progress', 'hundredths pass must not complete tenths');
 
   -- Passing the quiz alone keeps the assignment unfinished until exploration.
-  INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at)
-    VALUES (quiz_first, covalent, 'in_progress', now() - interval '5 minutes') RETURNING id INTO progress;
+  INSERT INTO public.student_progress(
+    student_id, class_activity_id, status, started_at, quiz_started_at, first_quiz_started_at
+  ) VALUES (
+    quiz_first, covalent, 'in_progress', now() - interval '20 minutes',
+    now() - interval '20 minutes', now() - interval '20 minutes'
+  ) RETURNING id INTO progress;
   INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
-    VALUES (progress, 1, 'lewis_covalent', 12, 12, 100.00, true, 'completed', now() - interval '2 minutes', now());
+    VALUES (progress, 1, 'lewis_covalent', 12, 12, 100.00, true, 'completed', now() - interval '20 minutes', pass_time);
   PERFORM pg_temp.expect_stage(teacher, c, quiz_first, covalent, 'exploring', 'Lewis quiz passed, exploration unfinished');
   r := pg_temp.report_row(teacher, c, quiz_first, covalent);
   IF r->>'explorationStatus' <> 'not_started' OR (r->>'completedAt') IS NOT NULL THEN
@@ -221,13 +227,25 @@ BEGIN
   END IF;
 
   UPDATE public.student_progress
-  SET status = 'completed', completed_at = now() - interval '1 hour',
-      exploration_completed = true, exploration_completed_at = now() - interval '1 hour'
+  SET status = 'completed', completed_at = exploration_after_pass,
+      exploration_started_at = exploration_started_after_pass,
+      exploration_completed = true, exploration_completed_at = exploration_after_pass
   WHERE id = progress;
   PERFORM pg_temp.expect_stage(teacher, c, quiz_first, covalent, 'completed', 'exploration finished after the quiz pass');
   r := pg_temp.report_row(teacher, c, quiz_first, covalent);
-  IF (r->>'completedAt')::timestamptz <> (r->>'passingQuizCompletedAt')::timestamptz THEN
-    RAISE EXCEPTION 'Completion timestamp should be the later of exploration and pass: %', r;
+  l := pg_temp.lesson(teacher, c, quiz_first, covalent);
+  IF (r->>'completedAt')::timestamptz IS DISTINCT FROM exploration_after_pass
+     OR (l->>'completedAt')::timestamptz IS DISTINCT FROM exploration_after_pass
+     OR (r->>'passingQuizCompletedAt')::timestamptz IS DISTINCT FROM pass_time THEN
+    RAISE EXCEPTION 'Completion timestamp should be the later exploration time, not the earlier pass: % / %', l, r;
+  END IF;
+
+  UPDATE public.student_progress SET exploration_completed_at = NULL WHERE id = progress;
+  l := pg_temp.lesson(teacher, c, quiz_first, covalent);
+  r := pg_temp.report_row(teacher, c, quiz_first, covalent);
+  IF l->>'status' IS DISTINCT FROM 'completed' OR r->>'overallStatus' IS DISTINCT FROM 'completed'
+     OR (l->>'completedAt') IS NOT NULL OR (r->>'completedAt') IS NOT NULL THEN
+    RAISE EXCEPTION 'A missing completion timestamp endpoint should keep completedAt unknown: % / %', l, r;
   END IF;
 
   -- Bohr numbering restarts under the split key. A legacy attempt numbered 8
