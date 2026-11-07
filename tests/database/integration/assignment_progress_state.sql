@@ -251,9 +251,22 @@ BEGIN
   -- Bohr numbering restarts under the split key. A legacy attempt numbered 8
   -- must not outrank a newer split attempt numbered 1 when finding the latest
   -- result, and failures numbered 7/8 still precede a split pass numbered 2.
-  INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at, quiz_started_at)
-    VALUES (quiz_first, bohr_intro, 'in_progress', now() - interval '90 minutes', now() - interval '35 minutes')
+  INSERT INTO public.student_progress(
+    student_id, class_activity_id, status, started_at, exploration_started_at, quiz_started_at
+  ) VALUES (
+    quiz_first, bohr_intro, 'in_progress', now() - interval '90 minutes',
+    now() - interval '90 minutes', now() - interval '35 minutes'
+  )
     RETURNING id INTO progress;
+  INSERT INTO public.student_attempts(progress_id, attempt_number, status, started_at, completed_at)
+    VALUES (progress, 1, 'completed', now() - interval '85 minutes', exploration_time);
+  IF NOT EXISTS (
+    SELECT 1 FROM public.student_progress
+    WHERE id = progress AND exploration_completed
+      AND exploration_completed_at = exploration_time
+  ) THEN
+    RAISE EXCEPTION 'Completed Bohr exploration did not save its durable marker';
+  END IF;
   INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
     VALUES
       (progress, 7, 'bohr_models', 12, 6, 50.00, false, 'completed', now() - interval '80 minutes', now() - interval '70 minutes'),
