@@ -40,6 +40,7 @@ BEGIN
     SELECT id INTO v_activity FROM public.activities WHERE type::text = CASE v_mode
       WHEN 'ruler_tenths' THEN 'measurement_ruler_tenths'
       WHEN 'ruler_hundredths' THEN 'measurement_ruler_hundredths'
+      WHEN 'cylinder_whole' THEN 'measurement_graduated_cylinder_whole'
       ELSE 'measurement_graduated_cylinder'
     END LIMIT 1;
     IF v_activity IS NULL THEN RAISE EXCEPTION 'Missing activity for %', v_mode; END IF;
