@@ -6,7 +6,7 @@ import RefreshAssignments from '@/components/assignments/RefreshAssignments'
 import { ASSIGNMENT_STAGES, type AssignmentStage } from '@/lib/assignments/stages'
 import { getTeacherClassActivities } from '@/lib/server/teacher-activities'
 import { getTeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
-import { StudentProgressRoster, studentStage } from './StudentProgressRoster'
+import { StudentProgressRoster } from './StudentProgressRoster'
 
 type Props = { params: Promise<{ classId: string; assignmentId: string }> }
 
@@ -36,7 +36,7 @@ export default async function ActivityProgressPage({ params }: Props) {
   if (!assignment) notFound()
   const summary = await getTeacherActivityAttemptSummary(classId, assignmentId)
 
-  const stages = summary.students.map(studentStage)
+  const stages = summary.students.map(student => student.progress.stage)
   const counts = STAGE_ORDER
     .map(stage => ({ stage, count: stages.filter(item => item === stage).length }))
     .filter(item => item.count > 0)

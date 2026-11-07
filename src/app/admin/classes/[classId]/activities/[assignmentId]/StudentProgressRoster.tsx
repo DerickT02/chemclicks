@@ -4,7 +4,6 @@ import { AssignmentProgressDetails } from '@/components/assignments/AssignmentPr
 import { StageBar } from '@/components/assignments/StageBar'
 import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
 import { LEWIS_QUIZZES } from '@/lib/assignments/lewis-quizzes'
-import type { AssignmentStage } from '@/lib/assignments/stages'
 import { BOHR_INTRO_QUIZ_KEY, BOHR_QUIZ_KEY, BOHR_STABILITY_QUIZ_KEY } from '@/lib/db/quiz-questions'
 import { measurementAttemptLabel } from '@/lib/measurement/modes'
 
@@ -17,21 +16,6 @@ const QUIZ_TITLES: Record<string, string> = {
   [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
 }
 
-type Student = TeacherActivityAttemptSummary['students'][number]
-
-// Used when the database has not been migrated to return progressStage yet.
-const STAGE_FROM_STATUS: Record<Student['overallStatus'], AssignmentStage> = {
-  not_started: 'not_started',
-  exploring: 'exploring',
-  taking_quiz: 'quiz_in_progress',
-  needs_retry: 'needs_retry',
-  completed: 'completed',
-}
-
-export function studentStage(student: Student): AssignmentStage {
-  return student.progressStage ?? STAGE_FROM_STATUS[student.overallStatus]
-}
-
 /** Every enrolled student's progress on one activity, with their attempt history. */
 export function StudentProgressRoster({ summary }: { summary: TeacherActivityAttemptSummary }) {
   return (
@@ -39,57 +23,38 @@ export function StudentProgressRoster({ summary }: { summary: TeacherActivityAtt
       {summary.students.length === 0 ? <p>No students enrolled in this class yet.</p> : (
         <ul className="divide-y divide-border">
           {summary.students.map(student => {
-            const stageKey = studentStage(student)
+            const { progress } = student
             const name = `${student.firstName} ${student.lastName}`
             return (
             <li key={student.studentId} className="py-4 first:pt-0 last:pb-0">
               <StageBar
-                stage={stageKey}
+                stage={progress.stage}
                 label={`${name}, ${summary.activityTitle}`}
                 title={<h3 className="text-base font-semibold">{name}</h3>}
               />
               <AssignmentProgressDetails
                 className="mt-2 space-y-1 text-sm text-muted-foreground"
-                facts={{
-                  stage: stageKey,
-                  explorationStartedAt: student.explorationStartedAt ?? null,
-                  firstQuizStartedAt: student.firstQuizStartedAt ?? null,
-                  timeToFirstQuizSeconds: student.timeToFirstQuizSeconds ?? null,
-                  passingQuizAttemptNumber: student.passingQuizAttemptNumber,
-                  passingQuizScore: student.passingQuizScore,
-                  passingQuizTotal: student.passingQuizTotal,
-                  passingQuizPercentage: student.passingQuizPercentage,
-                  failedQuizAttemptCount: student.failedQuizAttemptCount,
-                  completedAt: student.completedAt ?? null,
-                }}
+                facts={progress}
               />
               <dl className="mt-1 space-y-1 text-sm text-muted-foreground">
-                {student.firstQuizStartedAt && (
+                {progress.firstQuizStartedAt && (
                   <div className="flex flex-wrap gap-x-2">
                     <dt className="font-medium text-foreground/80">First quiz started:</dt>
-                    <dd><LocalizedTimestamp value={student.firstQuizStartedAt} /></dd>
+                    <dd><LocalizedTimestamp value={progress.firstQuizStartedAt} /></dd>
                   </div>
                 )}
-                {student.quizStartedAt && student.quizStartedAt !== student.firstQuizStartedAt && (
+                {student.quizStartedAt && student.quizStartedAt !== progress.firstQuizStartedAt && (
                   <div className="flex flex-wrap gap-x-2">
                     <dt className="font-medium text-foreground/80">Latest quiz started:</dt>
                     <dd><LocalizedTimestamp value={student.quizStartedAt} /></dd>
                   </div>
                 )}
               </dl>
-              {(() => {
-                const explorationCount = student.explorationAttemptCount
-                  ?? student.attempts.filter((attempt) => attempt.kind === 'exploration' || (attempt.kind === undefined && attempt.quizKey == null)).length
-                const quizCount = student.quizAttemptCount
-                  ?? student.attempts.filter((attempt) => attempt.kind === 'quiz' || (attempt.kind === undefined && attempt.quizKey != null)).length
-                return (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {student.attemptCount} {student.attemptCount === 1 ? 'attempt' : 'attempts'} · {explorationCount} exploration {explorationCount === 1 ? 'attempt' : 'attempts'} · {quizCount} quiz {quizCount === 1 ? 'attempt' : 'attempts'} · {student.completedCount} completed · {student.inProgressCount} in progress
-                  </p>
-                )
-              })()}
+              <p className="mt-1 text-sm text-muted-foreground">
+                {student.attemptCount} {student.attemptCount === 1 ? 'attempt' : 'attempts'} · {student.explorationAttemptCount} exploration {student.explorationAttemptCount === 1 ? 'attempt' : 'attempts'} · {student.quizAttemptCount} quiz {student.quizAttemptCount === 1 ? 'attempt' : 'attempts'} · {student.completedCount} completed · {student.inProgressCount} in progress
+              </p>
               {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">
-                {stageKey === 'quiz_in_progress' ? 'Quiz started; no result submitted yet.' : 'No attempts yet.'}
+                {progress.stage === 'quiz_in_progress' ? 'Quiz started; no result submitted yet.' : 'No attempts yet.'}
               </p> : (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm underline">View attempt history for {student.firstName} {student.lastName}</summary>

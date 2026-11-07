@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { progressFacts } from "../testing/progress";
 
 const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), teacher: vi.fn(), roster: vi.fn() }));
 vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
@@ -111,8 +112,8 @@ const fiveAssignments = Array.from({ length: 5 }, (_, index) => ({ ...assignment
 const lessonStudent = {
   studentId: student.id, firstName: student.first_name, lastName: student.last_name, verified: true, overallPercent: 20,
   lessons: [
-    { assignmentId: "assignment-0", activityId: "activity-0", activityTitle: "Lewis Diagrams", status: "completed" },
-    { assignmentId: "assignment-1", activityId: "activity-1", activityTitle: "Graduated Cylinder", status: "not_started" },
+    { assignmentId: "assignment-0", activityId: "activity-0", activityTitle: "Lewis Diagrams", progress: progressFacts({ stage: "completed" }) },
+    { assignmentId: "assignment-1", activityId: "activity-1", activityTitle: "Graduated Cylinder", progress: progressFacts() },
   ],
 };
 function populateClass() {

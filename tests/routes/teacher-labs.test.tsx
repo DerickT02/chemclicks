@@ -30,6 +30,16 @@ describe("teacher labs", () => {
     }
   });
 
+  it("renders the atom icon without corrupted encoding in both lab indexes", () => {
+    for (const Page of [TeacherLabsPage, StudentLabsPage]) {
+      const container = document.createElement("div");
+      container.innerHTML = renderToStaticMarkup(<Page />);
+      const card = container.querySelector('a[href$="/bohr-models/stability"]');
+      expect(card?.textContent).toContain("⚛️");
+      expect(card?.textContent).not.toContain("âš");
+    }
+  });
+
   it("leaves the student index linking to the student lab routes", () => {
     const links = hrefs(renderToStaticMarkup(<StudentLabsPage />));
     expect(links).toEqual([
