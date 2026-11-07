@@ -1,3 +1,4 @@
+import { resolveSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -11,19 +12,22 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const origin = requestUrl.origin;
   const redirectTo = requestUrl.searchParams.get("redirect_to");
+  const safePath = resolveSafeRedirectPath(redirectTo, origin);
+  const authCodeError = `${origin}/auth/auth-code-error`;
 
-  const safePath =
-    redirectTo?.startsWith("/") && !redirectTo.startsWith("//")
-      ? redirectTo
-      : "/";
+  if (!code) {
+    return NextResponse.redirect(authCodeError);
+  }
 
-  if (code) {
+  try {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       return NextResponse.redirect(`${origin}${safePath}`);
     }
+  } catch {
+    // Network/client failures must not send the user to a protected post-auth destination.
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+  return NextResponse.redirect(authCodeError);
 }

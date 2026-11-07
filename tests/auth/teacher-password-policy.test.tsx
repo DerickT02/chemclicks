@@ -5,6 +5,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AuthSessionMissingError, AuthWeakPasswordError } from "@supabase/supabase-js";
 import { TEACHER_PASSWORD_MIN_LENGTH } from "@/lib/auth/validate-teacher-signup";
+import { GENERIC_RETRY_MESSAGE } from "@/lib/errors/user-facing-errors";
 
 // SCRUM-55: the teacher password policy as enforced today by the signup and
 // reset forms (validateTeacherPassword), and how Auth rejections surface.
@@ -189,7 +190,50 @@ describe("teacher password reset policy", () => {
     mocks.updateUser.mockResolvedValue({ data: { user: null }, error: new AuthSessionMissingError() });
     await submitReset(VALID_PASSWORD);
     expect(await screen.findByRole("alert")).toHaveTextContent("Your reset link is invalid or has expired.");
+    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
     expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it("recovers from thrown password update failures without claiming success", async () => {
+    mocks.updateUser.mockRejectedValue(new Error("network failure"));
+    await submitReset(VALID_PASSWORD);
+    expect(await screen.findByRole("alert")).toHaveTextContent(GENERIC_RETRY_MESSAGE);
+    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+    expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it.each([
+    ["reports an error", () => mocks.signOut.mockResolvedValueOnce({ error: new Error("sign-out failure") })],
+    ["throws", () => mocks.signOut.mockRejectedValueOnce(new Error("sign-out failure"))],
+  ])("falls back to a local sign-out when the global sign-out %s", async (_label, failGlobalSignOut) => {
+    failGlobalSignOut();
+    await submitReset(VALID_PASSWORD);
+    await vi.waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/login/teacher?password=reset"));
+    expect(mocks.signOut).toHaveBeenNthCalledWith(1);
+    expect(mocks.signOut).toHaveBeenNthCalledWith(2, { scope: "local" });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it("says the password was updated, without offering a retry, when every sign-out attempt fails", async () => {
+    mocks.signOut.mockRejectedValue(new Error("sign-out failure"));
+    await submitReset(VALID_PASSWORD);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your password was updated");
+    expect(screen.getByRole("alert")).not.toHaveTextContent(GENERIC_RETRY_MESSAGE);
+    expect(screen.getByRole("button", { name: "Password updated" })).toBeDisabled();
+    expect(screen.getByLabelText("New password")).toHaveValue("");
+    expect(mocks.updateUser).toHaveBeenCalledTimes(1);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it("keeps the submit button disabled while navigating to sign-in after a successful reset", async () => {
+    await submitReset(VALID_PASSWORD);
+    await vi.waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/login/teacher?password=reset"));
+    expect(screen.getByRole("button", { name: "Password updated" })).toBeDisabled();
   });
 });
