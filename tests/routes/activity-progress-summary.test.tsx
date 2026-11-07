@@ -4,12 +4,13 @@ import { ActivityProgressSummary } from '@/app/admin/ActivityProgressSummary'
 import { StageBar } from '@/components/assignments/StageBar'
 import type { AssignmentStage } from '@/lib/assignments/stages'
 import type { TeacherClassLessonProgress } from '@/lib/server/teacher-lesson-progress'
+import { progressFacts } from '../testing/progress'
 
 type Student = TeacherClassLessonProgress['students'][number]
 type Lesson = Student['lessons'][number]
 
-const lesson = (assignmentId: string, stage?: AssignmentStage, status: Lesson['status'] = 'in_progress'): Lesson =>
-  ({ assignmentId, activityId: `activity-${assignmentId}`, activityTitle: assignmentId, status, stage })
+const lesson = (assignmentId: string, stage: AssignmentStage): Lesson =>
+  ({ assignmentId, activityId: `activity-${assignmentId}`, activityTitle: assignmentId, progress: progressFacts({ stage }) })
 const student = (id: string, lessons: Lesson[]): Student =>
   ({ studentId: id, firstName: id, lastName: 'Student', verified: true, overallPercent: 0, lessons })
 
@@ -20,32 +21,24 @@ const render = (students: Student[] | null, assignmentId = 'bohr') => renderToSt
 describe('ActivityProgressSummary', () => {
   it('counts only this activity, furthest stage first, and skips empty stages', () => {
     const html = render([
-      student('a', [lesson('bohr', 'completed', 'completed'), lesson('lewis', 'not_started', 'not_started')]),
-      student('b', [lesson('bohr', 'quiz_in_progress'), lesson('lewis', 'completed', 'completed')]),
-      student('c', [lesson('bohr', 'explored'), lesson('lewis', 'completed', 'completed')]),
+      student('a', [lesson('bohr', 'completed'), lesson('lewis', 'not_started')]),
+      student('b', [lesson('bohr', 'quiz_in_progress'), lesson('lewis', 'completed')]),
+      student('c', [lesson('bohr', 'explored'), lesson('lewis', 'completed')]),
       student('d', [lesson('bohr', 'exploring')]),
-      student('e', [lesson('bohr', 'not_started', 'not_started')]),
+      student('e', [lesson('bohr', 'not_started')]),
     ])
     expect(html).toContain('5 students · 1 completed · 1 taking the quiz · 2 exploring · 1 not started')
     expect(html).not.toContain('needs retry')
   })
 
   it('links to the activity page, naming the activity for screen readers', () => {
-    const html = render([student('a', [lesson('bohr', 'completed', 'completed')])])
+    const html = render([student('a', [lesson('bohr', 'completed')])])
     expect(html).toContain('href="/admin/classes/class-1/activities/bohr"')
     expect(html).toContain('Student progress<span class="sr-only">: Bohr Model Intro</span>')
   })
 
   it('treats a student without a row for this activity as not started', () => {
     expect(render([student('a', [])])).toContain('1 student · 1 not started')
-  })
-
-  it('falls back to the saved status on a database without stages', () => {
-    const html = render([
-      student('a', [lesson('bohr', undefined, 'completed')]),
-      student('b', [lesson('bohr', undefined, 'in_progress')]),
-    ])
-    expect(html).toContain('2 students · 1 completed · 1 exploring')
   })
 
   it('distinguishes an empty class from progress that could not be loaded, keeping the link', () => {

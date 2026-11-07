@@ -1,20 +1,7 @@
 import type { ReactNode } from "react";
 import LocalizedTimestamp from "@/components/datetime/LocalizedTimestamp";
-import { formatDuration, hasReachedQuiz, type AssignmentStage } from "@/lib/assignments/stages";
-
-/** Saved timing and result facts for one student's assignment. */
-export type AssignmentProgressFacts = {
-  stage: AssignmentStage;
-  explorationStartedAt: string | null;
-  firstQuizStartedAt: string | null;
-  timeToFirstQuizSeconds: number | null;
-  passingQuizAttemptNumber: number | null;
-  passingQuizScore: number | null;
-  passingQuizTotal: number | null;
-  passingQuizPercentage: number | null;
-  failedQuizAttemptCount: number;
-  completedAt: string | null;
-};
+import type { AssignmentProgressFacts } from "@/lib/assignments/progress";
+import { formatDuration, hasReachedQuiz } from "@/lib/assignments/stages";
 
 type Props = { facts: AssignmentProgressFacts; className?: string };
 
