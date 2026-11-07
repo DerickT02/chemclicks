@@ -4,15 +4,16 @@ import { useCallback, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 /** Dashboard updates are explicit or on focus; active exercises enforce their own deadlines. */
-export default function RefreshAssignments({ label = "Refresh assignments" }: { label?: string }) {
+export default function RefreshAssignments({ label = "Refresh assignments", refreshOnFocus = true }: { label?: string; refreshOnFocus?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const refresh = useCallback(() => startTransition(() => router.refresh()), [router]);
 
   useEffect(() => {
+    if (!refreshOnFocus) return;
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
-  }, [refresh]);
+  }, [refresh, refreshOnFocus]);
 
   return (
     <button type="button" onClick={refresh} disabled={pending} aria-busy={pending}

@@ -6,7 +6,7 @@ import type { AssignmentStage } from '@/lib/assignments/stages'
 
 type LessonStatus = 'not_started' | 'in_progress' | 'completed'
 
-type LessonProgressResponse = {
+export type LessonProgressResponse = {
   classId: string
   className: string
   students: {
@@ -58,7 +58,11 @@ export async function getTeacherClassLessonProgress(
   if (error || !data) {
     throw new Error('Class progress access denied or unavailable.')
   }
-  const response = data as LessonProgressResponse
+  return normalizeTeacherClassLessonProgress(data as LessonProgressResponse)
+}
+
+/** Shared with the live class updates, which read the same rows through another RPC. */
+export function normalizeTeacherClassLessonProgress(response: LessonProgressResponse): TeacherClassLessonProgress {
   return {
     ...response,
     students: response.students.map(student => ({

@@ -4,7 +4,7 @@ import { requireTeacherId } from '@/lib/server/teacher'
 import type { AssignmentStage } from '@/lib/assignments/stages'
 import { normalizeAssignmentProgress, type AssignmentProgressFacts } from '@/lib/assignments/progress'
 
-type AttemptSummaryResponse = {
+export type AttemptSummaryResponse = {
   classId: string
   className: string
   assignmentId: string
@@ -47,6 +47,9 @@ type AttemptSummaryResponse = {
 type Student = AttemptSummaryResponse['students'][number]
 type Attempt = Student['attempts'][number]
 
+/** PostgREST's code for an RPC the database does not define (an unapplied migration). */
+export const MISSING_FUNCTION = 'PGRST202'
+
 // An attempt without a readable start time sorts last, matching the report's
 // NULLS LAST ordering, instead of making the comparison inconsistent.
 function newestStartFirst(a: Attempt, b: Attempt): number {
@@ -73,10 +76,11 @@ export type TeacherActivityAttemptSummary = Omit<AttemptSummaryResponse, 'studen
 export async function getTeacherActivityAttemptSummary(
   classId: string,
   assignmentId: string,
+  options: { live?: boolean; studentId?: string } = {},
 ): Promise<TeacherActivityAttemptSummary> {
   const teacherId = await requireTeacherId()
   const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
-  if (!uuid.test(classId) || !uuid.test(assignmentId)) {
+  if (!uuid.test(classId) || !uuid.test(assignmentId) || (options.studentId !== undefined && !uuid.test(options.studentId))) {
     throw new Error('Invalid class or assignment.')
   }
   const client = createServiceClient()
@@ -84,13 +88,26 @@ export async function getTeacherActivityAttemptSummary(
     .select('id').eq('id', classId).eq('teacher_id', teacherId)
     .eq('is_active', true).maybeSingle()
   if (classError || !classroom) throw new Error('Class access denied or unavailable.')
-  const { data, error } = await client.rpc('teacher_activity_attempt_summary', {
-    p_teacher_id: teacherId,
-    p_class_id: classId,
-    p_assignment_id: assignmentId,
-  })
+  const args = { p_teacher_id: teacherId, p_class_id: classId, p_assignment_id: assignmentId }
+  if (options.live) {
+    const { data, error } = await client.rpc('teacher_activity_live_summary', {
+      ...args, p_include_attempts: options.studentId !== undefined, p_student_id: options.studentId ?? null,
+    })
+    if (error?.code !== MISSING_FUNCTION) {
+      if (error || !data) throw new Error('Activity summary access denied or unavailable.')
+      return normalizeTeacherActivityAttemptSummary(data as AttemptSummaryResponse)
+    }
+    // Databases without 20261105010000 only have the full report.
+  }
+  const { data, error } = await client.rpc('teacher_activity_attempt_summary', args)
   if (error || !data) throw new Error('Activity summary access denied or unavailable.')
-  const response = data as AttemptSummaryResponse
+  const summary = normalizeTeacherActivityAttemptSummary(data as AttemptSummaryResponse)
+  return options.studentId === undefined ? summary
+    : { ...summary, students: summary.students.filter(student => student.studentId === options.studentId) }
+}
+
+/** Shared with the live class updates, which read the same rows through another RPC. */
+export function normalizeTeacherActivityAttemptSummary(response: AttemptSummaryResponse): TeacherActivityAttemptSummary {
   return {
     ...response,
     students: response.students.map(student => ({

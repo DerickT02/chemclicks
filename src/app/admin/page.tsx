@@ -14,8 +14,9 @@ import { listActiveClassesForTeacher } from "@/lib/db/classes";
 import { createServiceClient } from "@/lib/server/database";
 import { requireTeacherId } from "@/lib/server/teacher";
 import { getTeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
-import { ActivityProgressSummary } from "@/app/admin/ActivityProgressSummary";
-import StudentRoster from "@/app/admin/classes/StudentRoster";
+import { LiveActivityProgressSummary, LiveProgressStatus } from "@/app/admin/LiveActivityProgress";
+import { LiveClassroomProvider } from "@/app/admin/LiveClassroomProvider";
+import LiveStudentRoster from "@/app/admin/classes/LiveStudentRoster";
 import { getOwnedStudentRoster } from "@/lib/server/student-roster";
 
 
@@ -91,8 +92,6 @@ export default async function AdminPage({
   );
   const catalogLoadFailed = Boolean(catalogResult.error) || catalogResult.data === null;
   const assignmentsLoadFailed = Boolean(assignmentsResult.error) || assignmentsResult.data === null;
-  const lessonProgressLoadFailed = Boolean(lessonProgressResult.error);
-  const lessonProgressStudents = lessonProgressLoadFailed ? null : lessonProgressResult.data?.students ?? [];
   // Request-time status snapshot; dashboard refreshes update it.
   // eslint-disable-next-line react-hooks/purity -- This server-only clock read is not a client render-time side effect.
   const scheduleRenderedAt = Date.now();
@@ -179,7 +178,12 @@ export default async function AdminPage({
                 </p>
               </div>
             ) : (
-              <>
+              <LiveClassroomProvider
+                key={selectedClass.id}
+                classId={selectedClass.id}
+                initialRoster={rosterResult.data}
+                initialProgress={lessonProgressResult.data}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-semibold text-foreground">{selectedClass.name}</h2>
@@ -196,26 +200,11 @@ export default async function AdminPage({
                   {selectedClass.student_count} {selectedClass.student_count === 1 ? "student" : "students"} enrolled
                 </p>
                 <div className="mt-4"><CopyClassCode key={selectedClass.id} code={selectedClass.class_code} /></div>
-                {rosterResult.error || !rosterResult.data ? (
-                  <section aria-label="Students & approvals" className="mt-7 space-y-3">
-                    <h3 className="text-lg font-semibold">Students & approvals</h3>
-                    <p role="alert" className="text-sm text-destructive">Student roster could not be loaded. Please try again.</p>
-                    <RefreshAssignments label="Retry student roster" />
-                  </section>
-                ) : (
-                  <StudentRoster key={selectedClass.id} classId={selectedClass.id} roster={rosterResult.data} />
-                )}
+                <LiveStudentRoster key={selectedClass.id} classId={selectedClass.id} />
                 <section className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
-                  {lessonProgressLoadFailed && (
-                    <div className="space-y-3">
-                      <p role="alert" className="text-sm text-destructive">
-                        Student progress could not be loaded. Please try again.
-                      </p>
-                      <RefreshAssignments label="Retry student progress" />
-                    </div>
-                  )}
+                  <LiveProgressStatus />
 
                   {catalogLoadFailed && (
                     <p role="alert" className="text-sm text-destructive">
@@ -289,11 +278,10 @@ export default async function AdminPage({
                                     assignment={assignment}
                                     renderedAt={scheduleRenderedAt}
                                   />
-                                  <ActivityProgressSummary
+                                  <LiveActivityProgressSummary
                                     classId={selectedClass.id}
                                     assignmentId={assignment.id}
                                     activityTitle={activity?.title ?? "Assigned activity"}
-                                    students={lessonProgressStudents}
                                   />
                                 </div>
                                 <div className="shrink-0">
@@ -311,8 +299,8 @@ export default async function AdminPage({
                         })
                       )}
                 </section>
-                <div className="mt-5"><RefreshAssignments label="Refresh classroom" /></div>
-              </>
+                <div className="mt-5"><RefreshAssignments label="Refresh classroom" refreshOnFocus={false} /></div>
+              </LiveClassroomProvider>
             )}
           </section>
         </div>
