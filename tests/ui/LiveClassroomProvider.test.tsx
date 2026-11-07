@@ -11,13 +11,14 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }
 import { LiveClassroomProvider } from "@/app/admin/LiveClassroomProvider";
 import LiveStudentRoster from "@/app/admin/classes/LiveStudentRoster";
 import { LiveActivityProgressSummary, LiveProgressStatus } from "@/app/admin/LiveActivityProgress";
+import { progressFacts } from "../testing/progress";
 
 const alice = { id: "alice", first_name: "Alice", last_name: "Student", student_id: "A", verified: false };
 const bob = { ...alice, id: "bob", first_name: "Bob", student_id: "B" };
 const progressStudent = (student: typeof alice) => ({ studentId: student.id, firstName: student.first_name, lastName: student.last_name,
   verified: student.verified, overallPercent: 0,
   lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models",
-    status: "not_started" as const, stage: "not_started" as const }],
+    progress: progressFacts({ stage: "not_started" }) }],
 });
 const baseline: TeacherClassSnapshot = { classId: "class", revision: "1", reset: true, removedStudentIds: [], attempts: null,
   roster: { pending: [alice, bob], active: [] }, progress: { classId: "class", className: "Chemistry", students: [progressStudent(alice), progressStudent(bob)] },
@@ -65,7 +66,7 @@ describe("one shared classroom data stream", () => {
     fetchMock.mockResolvedValue(reply({ ...baseline, revision: "2", reset: false,
       roster: { pending: [], active: [{ ...alice, verified: true }] },
       progress: { ...baseline.progress!, students: [{ ...progressStudent(alice), verified: true, overallPercent: 100,
-        lessons: [{ ...progressStudent(alice).lessons[0], status: "completed", stage: "completed" }] }] },
+        lessons: [{ ...progressStudent(alice).lessons[0], progress: progressFacts({ stage: "completed" }) }] }] },
     }));
     act(() => { mocks.subscribe.mock.calls[0][1]({ kind: "progress", assignmentId: "assignment" }); });
     await tick(5_000);

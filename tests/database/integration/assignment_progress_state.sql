@@ -1,7 +1,9 @@
 -- Transactional fixtures: no retained test data.
 -- Walks one student through every assignment stage, then checks retries,
 -- concurrent assignments, that only a passed quiz completes quizzed work, and
--- ownership.
+-- ownership. Also covers mixed legacy/split Bohr histories after
+-- 20261104000300_fix_bohr_quiz_access_and_progress_history.sql.
+-- Run only on a disposable test database; these fixtures write and roll back.
 -- At every step the class progress view and the detailed results must agree.
 BEGIN;
 
@@ -52,6 +54,7 @@ DECLARE
   covalent uuid; bohr_intro uuid; bohr_stability uuid; ruler_tenths uuid; ruler_hundredths uuid;
   walker uuid; concurrent uuid; quiz_first uuid;
   progress uuid; pass_time timestamptz := now() - interval '10 minutes';
+  legacy_pass_time timestamptz := now() - interval '45 minutes';
   l jsonb; r jsonb;
 BEGIN
   SELECT t.id INTO teacher FROM public.teachers t JOIN auth.users u ON u.id = t.id
@@ -166,6 +169,75 @@ BEGIN
     VALUES (progress, 1, 'lewis_covalent', 12, 12, 100.00, true, 'completed', now() - interval '2 minutes', now());
   PERFORM pg_temp.expect_stage(teacher, c, quiz_first, covalent, 'completed', 'Lewis quiz passed, exploration unfinished');
 
+  -- Bohr numbering restarts under the split key. A legacy attempt numbered 8
+  -- must not outrank a newer split attempt numbered 1 when finding the latest
+  -- result, and failures numbered 7/8 still precede a split pass numbered 2.
+  INSERT INTO public.student_progress(student_id, class_activity_id, status, started_at, quiz_started_at)
+    VALUES (quiz_first, bohr_intro, 'in_progress', now() - interval '90 minutes', now() - interval '35 minutes')
+    RETURNING id INTO progress;
+  INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
+    VALUES
+      (progress, 7, 'bohr_models', 12, 6, 50.00, false, 'completed', now() - interval '80 minutes', now() - interval '70 minutes'),
+      (progress, 8, 'bohr_models', 12, 6, 50.00, false, 'completed', now() - interval '65 minutes', now() - interval '60 minutes'),
+      (progress, 1, 'bohr_model_intro', 12, 6, 50.00, false, 'completed', now() - interval '35 minutes', now() - interval '30 minutes');
+  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, bohr_intro, 'needs_retry', 'new split failure after higher-numbered legacy failures');
+  l := pg_temp.lesson(teacher, c, quiz_first, bohr_intro);
+  r := pg_temp.report_row(teacher, c, quiz_first, bohr_intro);
+  IF (l->>'failedQuizAttemptCount')::int IS DISTINCT FROM 3
+     OR (r->>'failedQuizAttemptCount')::int IS DISTINCT FROM 3 THEN
+    RAISE EXCEPTION 'All mixed-key failures must count before a pass';
+  END IF;
+  IF r->'attempts'->0->>'quizKey' IS DISTINCT FROM 'bohr_model_intro'
+     OR (r->'attempts'->0->>'attemptNumber')::int IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'History must be newest first across per-key number sequences';
+  END IF;
+
+  UPDATE public.student_progress SET quiz_started_at = now() - interval '25 minutes' WHERE id = progress;
+  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, bohr_intro, 'quiz_in_progress', 'mixed-key retry actually open');
+  pass_time := now() - interval '15 minutes';
+  INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
+    VALUES (progress, 2, 'bohr_model_intro', 12, 11, 91.67, true, 'completed', now() - interval '25 minutes', pass_time);
+  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, bohr_intro, 'completed', 'mixed-key retry passed');
+  l := pg_temp.lesson(teacher, c, quiz_first, bohr_intro);
+  r := pg_temp.report_row(teacher, c, quiz_first, bohr_intro);
+  IF (l->>'failedQuizAttemptCount')::int IS DISTINCT FROM 3
+     OR (r->>'failedQuizAttemptCount')::int IS DISTINCT FROM 3
+     OR (l->>'passingQuizAttemptNumber')::int IS DISTINCT FROM 2
+     OR (l->>'completedAt')::timestamptz IS DISTINCT FROM pass_time THEN
+    RAISE EXCEPTION 'Legacy failures must precede split pass 2 regardless of their larger attempt numbers';
+  END IF;
+
+  -- Later failures/passes must not replace the first pass or inflate its
+  -- failed-attempt count. A backfilled, earlier legacy pass takes precedence
+  -- by its actual completion time, not its larger per-key attempt number.
+  INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
+    VALUES
+      (progress, 3, 'bohr_model_intro', 12, 6, 50.00, false, 'completed', now() - interval '12 minutes', now() - interval '10 minutes'),
+      (progress, 4, 'bohr_model_intro', 12, 12, 100.00, true, 'completed', now() - interval '8 minutes', now() - interval '5 minutes');
+  l := pg_temp.lesson(teacher, c, quiz_first, bohr_intro);
+  IF (l->>'passingQuizAttemptNumber')::int IS DISTINCT FROM 2
+     OR (l->>'failedQuizAttemptCount')::int IS DISTINCT FROM 3
+     OR (l->>'completedAt')::timestamptz IS DISTINCT FROM pass_time THEN
+    RAISE EXCEPTION 'Attempts after the first pass changed the passing summary';
+  END IF;
+
+  INSERT INTO public.student_attempts(progress_id, attempt_number, quiz_key, question_total, score, percentage, passed, status, started_at, completed_at)
+    VALUES (progress, 9, 'bohr_models', 12, 10, 83.33, true, 'completed', now() - interval '50 minutes', legacy_pass_time);
+  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, bohr_intro, 'completed', 'earlier legacy pass discovered');
+  l := pg_temp.lesson(teacher, c, quiz_first, bohr_intro);
+  r := pg_temp.report_row(teacher, c, quiz_first, bohr_intro);
+  IF (l->>'passingQuizAttemptNumber')::int IS DISTINCT FROM 9
+     OR (r->>'passingQuizAttemptNumber')::int IS DISTINCT FROM 9
+     OR (l->>'passingQuizScore')::int IS DISTINCT FROM 10
+     OR (l->>'failedQuizAttemptCount')::int IS DISTINCT FROM 2
+     OR (r->>'failedQuizAttemptCount')::int IS DISTINCT FROM 2
+     OR (l->>'completedAt')::timestamptz IS DISTINCT FROM legacy_pass_time
+     OR (r->>'completedAt')::timestamptz IS DISTINCT FROM legacy_pass_time THEN
+    RAISE EXCEPTION 'The earliest chronological pass and failures before it must agree in both views';
+  END IF;
+  PERFORM pg_temp.expect_stage(teacher, c, quiz_first, bohr_stability, 'not_started', 'mixed intro history must not complete stability');
+  PERFORM pg_temp.expect_stage(teacher, c, walker, bohr_intro, 'not_started', 'mixed history must not complete another student');
+
   -- Another teacher is refused both views.
   BEGIN PERFORM public.teacher_class_lesson_progress(gen_random_uuid(), c); RAISE EXCEPTION 'Foreign teacher read class progress'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM public.teacher_activity_attempt_summary(gen_random_uuid(), c, covalent); RAISE EXCEPTION 'Foreign teacher read detailed results'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
@@ -182,5 +254,5 @@ BEGIN
   BEGIN PERFORM public.assignment_progress_state(NULL, 'bohr_model_intro'); RAISE EXCEPTION 'Browser helper call allowed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
 END $$;
-SELECT 'PASS: stage sequence, retries then pass, concurrent assignments, view agreement, ownership and grants' AS result;
+SELECT 'PASS: stages, mixed legacy/split history, chronological passing results, assignment isolation, view agreement, ownership and grants' AS result;
 ROLLBACK;

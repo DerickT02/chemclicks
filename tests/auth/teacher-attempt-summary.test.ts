@@ -4,6 +4,7 @@ const mock = vi.hoisted(() => ({ teacher: vi.fn(), rpc: vi.fn(), from: vi.fn(), 
 vi.mock('@/lib/server/teacher', () => ({ requireTeacherId: mock.teacher }))
 vi.mock('@/lib/server/database', () => ({ createServiceClient: () => ({ rpc: mock.rpc, from: mock.from }) }))
 import { getTeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
+import { progressFacts } from '../testing/progress'
 const classId = '11111111-1111-4111-8111-111111111111'
 const assignmentId = '22222222-2222-4222-8222-222222222222'
 beforeEach(() => {
@@ -41,6 +42,70 @@ describe('teacher attempt summary server boundary', () => {
     })
     await expect(getTeacherActivityAttemptSummary(classId, assignmentId, { live: true, studentId: 'invalid' })).rejects.toThrow('Invalid')
     expect(mock.rpc).toHaveBeenCalledTimes(2)
+  })
+  it.each([
+    ['not_started', 'not_started'],
+    ['exploring', 'exploring'],
+    ['taking_quiz', 'quiz_in_progress'],
+    ['needs_retry', 'needs_retry'],
+    ['completed', 'completed'],
+  ] as const)('normalizes legacy report status %s at the boundary', async (overallStatus, stage) => {
+    mock.rpc.mockResolvedValue({ data: { classId, assignmentId, students: [{
+      studentId: 'student', firstName: 'Alex', lastName: 'Student', verified: true,
+      attemptCount: 0, completedCount: 0, inProgressCount: 0, overallStatus,
+      explorationDurationSeconds: 900, attempts: [],
+    }] }, error: null })
+    const result = await getTeacherActivityAttemptSummary(classId, assignmentId)
+    expect(result.students[0]).toEqual({
+      studentId: 'student', firstName: 'Alex', lastName: 'Student', verified: true,
+      attemptCount: 0, completedCount: 0, inProgressCount: 0, attempts: [],
+      explorationAttemptCount: 0, quizAttemptCount: 0, quizStartedAt: null,
+      // The old explorationDurationSeconds included quiz time; never use it as the interval.
+      progress: progressFacts({ stage }),
+    })
+  })
+  it('normalizes modern facts, preserving explicit null completion and zero counts', async () => {
+    const facts = progressFacts({ stage: 'explored', timeToFirstQuizSeconds: 0, completedAt: null })
+    mock.rpc.mockResolvedValue({ data: { students: [{
+      ...facts, stage: 'Exploring', progressStage: 'explored', overallStatus: 'completed',
+      passingQuizCompletedAt: '2026-09-23T12:05:00Z',
+      explorationAttemptCount: 0, quizAttemptCount: 0, attempts: [{ quizKey: 'bohr_models' }],
+    }] }, error: null })
+    const result = await getTeacherActivityAttemptSummary(classId, assignmentId)
+    expect(result.students[0].progress).toEqual(facts)
+    expect(result.students[0].quizAttemptCount).toBe(0)
+  })
+  it('orders history by start time across quiz keys without mutating the RPC response', async () => {
+    const attempts = Object.freeze([
+      { id: 'legacy', attemptNumber: 8, quizKey: 'bohr_models', startedAt: '2026-09-23T12:00:00Z' },
+      { id: 'split', attemptNumber: 1, quizKey: 'bohr_model_intro', startedAt: '2026-09-24T12:00:00Z' },
+      { id: 'exploration', attemptNumber: 9, quizKey: null, startedAt: '2026-09-22T12:00:00Z' },
+    ])
+    mock.rpc.mockResolvedValue({ data: { students: [{ overallStatus: 'needs_retry', attempts }] }, error: null })
+    const result = await getTeacherActivityAttemptSummary(classId, assignmentId)
+    expect(result.students[0].attempts.map(attempt => attempt.id)).toEqual(['split', 'legacy', 'exploration'])
+    expect(attempts.map(attempt => attempt.id)).toEqual(['legacy', 'split', 'exploration'])
+  })
+  it('preserves the legacy passing timestamp and derives missing attempt counts once', async () => {
+    const completedAt = '2026-09-23T12:05:00Z'
+    mock.rpc.mockResolvedValue({ data: { students: [{
+      overallStatus: 'completed', passingQuizCompletedAt: completedAt,
+      attempts: [{ kind: 'exploration' }, { quizKey: null }, { kind: 'quiz' }, { quizKey: 'bohr_models' }],
+    }] }, error: null })
+    const result = await getTeacherActivityAttemptSummary(classId, assignmentId)
+    expect(result.students[0].progress.completedAt).toBe(completedAt)
+    expect(result.students[0].explorationAttemptCount).toBe(2)
+    expect(result.students[0].quizAttemptCount).toBe(2)
+  })
+  it('lists attempts without a readable start time last', async () => {
+    mock.rpc.mockResolvedValue({ data: { students: [{ overallStatus: 'needs_retry', attempts: [
+      { id: 'unknown', startedAt: null },
+      { id: 'older', startedAt: '2026-09-22T12:00:00Z' },
+      { id: 'invalid', startedAt: 'not a date' },
+      { id: 'newer', startedAt: '2026-09-24T12:00:00Z' },
+    ] }] }, error: null })
+    const result = await getTeacherActivityAttemptSummary(classId, assignmentId)
+    expect(result.students[0].attempts.map(attempt => attempt.id)).toEqual(['newer', 'older', 'unknown', 'invalid'])
   })
   it.each([{ data: null, error: null }, { data: { id: classId }, error: { message: 'private details' } }])('blocks foreign, disabled or unavailable class reports before the RPC (%j)', async result => {
     mock.maybeSingle.mockResolvedValue(result)

@@ -59,6 +59,25 @@ describe("combined teacher class updates", () => {
     expect(await response.text()).not.toContain("private session details");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
+  it("normalizes changed progress and attempt rows like the direct reads", async () => {
+    const lesson = { assignmentId, activityId: "activity", activityTitle: "Bohr Models", status: "in_progress" };
+    const attempt = (id: string, startedAt: string) => ({ id, attemptNumber: 1, status: "completed", startedAt, completedAt: null });
+    mocks.rpc.mockResolvedValue({ data: {
+      ...data,
+      progress: { classId, className: "Period 1", students: [{ studentId: "s", firstName: "A", lastName: "B", lessons: [lesson] }] },
+      attempts: { classId, className: "Period 1", assignmentId, activityId: "activity", activityTitle: "Bohr Models", students: [{
+        studentId: "s", firstName: "A", lastName: "B", verified: true, attemptCount: 2, completedCount: 2, inProgressCount: 0,
+        overallStatus: "taking_quiz", attempts: [attempt("older", "2026-09-22T12:00:00Z"), attempt("newer", "2026-09-24T12:00:00Z")],
+      }] },
+    }, error: null });
+    const result = await getTeacherClassUpdates(classId, { assignmentId });
+    expect(result.progress?.students[0].lessons[0]).toEqual({
+      assignmentId, activityId: "activity", activityTitle: "Bohr Models", progress: expect.objectContaining({ stage: "exploring" }),
+    });
+    const student = result.attempts?.students[0];
+    expect(student?.progress.stage).toBe("quiz_in_progress");
+    expect(student?.attempts.map(row => row.id)).toEqual(["newer", "older"]);
+  });
   it.each([{ data: null, error: null }, { data: null, error: { message: "private database details" } }])("fails closed when ownership or database reads fail (%j)", async result => {
     mocks.rpc.mockResolvedValue(result);
     const response = await request();

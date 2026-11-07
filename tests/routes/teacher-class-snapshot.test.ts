@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { TeacherActivityAttemptSummary } from "@/lib/server/teacher-attempts";
 import { classSnapshotCursor, mergeClassSnapshot, type TeacherClassSnapshot } from "@/lib/teacher-class-snapshot";
+import { progressFacts } from "../testing/progress";
 
 const alice = { id: "alice", first_name: "Alice", last_name: "Student", student_id: "A", verified: false };
 const bob = { ...alice, id: "bob", first_name: "Bob", student_id: "B" };
 const lessonStudent = (row: typeof alice) => ({ studentId: row.id, firstName: row.first_name, lastName: row.last_name,
   verified: row.verified, overallPercent: 0,
-  lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models", status: "not_started" as const }],
+  lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models", progress: progressFacts({ stage: "not_started" }) }],
 });
 const initial: TeacherClassSnapshot = { classId: "class", revision: "1", reset: true, removedStudentIds: [], attempts: null,
   roster: { pending: [alice, bob], active: [] }, progress: { classId: "class", className: "Chemistry", students: [lessonStudent(alice), lessonStudent(bob)] },
@@ -20,7 +21,7 @@ describe("incremental class snapshots", () => {
     const result = mergeClassSnapshot(initial, { ...emptyDelta,
       roster: { pending: [], active: [{ ...alice, verified: true }] },
       progress: { ...initial.progress!, students: [{ ...lessonStudent(alice), verified: true, overallPercent: 100,
-        lessons: [{ ...lessonStudent(alice).lessons[0], status: "completed" }] }] },
+        lessons: [{ ...lessonStudent(alice).lessons[0], progress: progressFacts({ stage: "completed" }) }] }] },
     });
     expect(result.roster?.pending.map(row => row.id)).toEqual(["bob"]);
     expect(result.roster?.active.map(row => row.id)).toEqual(["alice"]);
@@ -49,20 +50,18 @@ describe("incremental class snapshots", () => {
   it("merges incremental attempt overviews without discarding other students", () => {
     const student = (id: string): TeacherActivityAttemptSummary["students"][number] => ({
       studentId: id, firstName: id, lastName: "Student", verified: true, attemptCount: 0,
-      completedCount: 0, inProgressCount: 0, overallStatus: "not_started", explorationStatus: "not_started",
-      explorationDurationSeconds: null, passingQuizAttemptNumber: null, passingQuizScore: null,
-      passingQuizTotal: null, passingQuizPercentage: null, passingQuizCompletedAt: null,
-      failedQuizAttemptCount: 0, attempts: [],
+      completedCount: 0, inProgressCount: 0, explorationAttemptCount: 0, quizAttemptCount: 0,
+      quizStartedAt: null, progress: progressFacts({ stage: "not_started" }), attempts: [],
     });
     const summary: TeacherActivityAttemptSummary = { classId: "class", className: "Chemistry", assignmentId: "assignment",
       activityId: "activity", activityTitle: "Bohr Models", students: [student("alice"), student("bob")],
     };
     const before = { ...initial, roster: null, progress: null, attempts: summary };
     const result = mergeClassSnapshot(before, { ...emptyDelta, roster: null, progress: null,
-      attempts: { ...summary, students: [{ ...student("alice"), overallStatus: "taking_quiz" }] },
+      attempts: { ...summary, students: [{ ...student("alice"), progress: progressFacts({ stage: "quiz_in_progress" }) }] },
     });
     expect(result.attempts?.students).toHaveLength(2);
-    expect(result.attempts?.students[0].overallStatus).toBe("taking_quiz");
+    expect(result.attempts?.students[0].progress.stage).toBe("quiz_in_progress");
     expect(result.attempts?.students[1]).toBe(summary.students[1]);
   });
   it("keeps the database's order for existing rows and places only new or renamed students", () => {

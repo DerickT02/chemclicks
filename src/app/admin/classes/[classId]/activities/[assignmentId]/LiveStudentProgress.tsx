@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { StudentProgressRoster, studentStage } from "@/app/admin/classes/[classId]/activities/[assignmentId]/StudentProgressRoster";
+import { StudentProgressRoster } from "@/app/admin/classes/[classId]/activities/[assignmentId]/StudentProgressRoster";
 import RefreshAssignments from "@/components/assignments/RefreshAssignments";
 import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherProgress";
 import { ASSIGNMENT_STAGES, type AssignmentStage } from "@/lib/assignments/stages";
@@ -27,7 +27,7 @@ export function LiveStudentProgress({ initialSummary }: { initialSummary: Teache
   );
   const summary = data?.attempts ?? initialSummary;
 
-  const stages = summary.students.map(studentStage);
+  const stages = summary.students.map(student => student.progress.stage);
   const counts = STAGE_ORDER
     .map(stage => ({ stage, count: stages.filter(item => item === stage).length }))
     .filter(item => item.count > 0);

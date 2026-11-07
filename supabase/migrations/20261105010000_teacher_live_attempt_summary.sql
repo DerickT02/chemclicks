@@ -84,7 +84,9 @@ BEGIN
             'questionTotal', sa.question_total,
             'percentage', sa.percentage,
             'passed', sa.passed
-          ) ORDER BY sa.attempt_number DESC, sa.created_at DESC)
+          -- Newest start first across exploration and quizzes, whose attempt
+          -- numbers are independent sequences (20261104000300).
+          ) ORDER BY sa.started_at DESC NULLS LAST, sa.created_at DESC, sa.id DESC)
           FILTER (WHERE p_include_attempts), '[]'::jsonb) AS attempts
         FROM public.student_attempts sa WHERE sa.progress_id = p.id
       ) history
@@ -109,8 +111,8 @@ REVOKE ALL ON FUNCTION private.teacher_attempt_rows(uuid, uuid, uuid, boolean, u
 GRANT EXECUTE ON FUNCTION private.teacher_attempt_rows(uuid, uuid, uuid, boolean, uuid[], boolean)
   TO service_role;
 
--- Same output, ownership check and (absent) active/archive filter as
--- 20261104000200; only the definition moved.
+-- Same output, ownership check, history order and (absent) active/archive
+-- filter as 20261104000300; only the definition moved.
 CREATE OR REPLACE FUNCTION public.teacher_activity_attempt_summary(
   p_teacher_id uuid, p_class_id uuid, p_assignment_id uuid
 ) RETURNS jsonb

@@ -12,6 +12,7 @@ import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherP
 import { LiveActivityProgressSummary, LiveProgressStatus } from "@/app/admin/LiveActivityProgress";
 import { LiveClassroomProvider } from "@/app/admin/LiveClassroomProvider";
 import { LiveStudentProgress } from "@/app/admin/classes/[classId]/activities/[assignmentId]/LiveStudentProgress";
+import { progressFacts } from "../testing/progress";
 
 const fetchMock = vi.fn();
 const seed = { value: "initial" };
@@ -234,7 +235,7 @@ describe("event-driven teacher progress", () => {
 const progress: TeacherClassLessonProgress = {
   classId: "class", className: "Chemistry", students: [{
     studentId: "student", firstName: "Mina", lastName: "Chen", verified: true, overallPercent: 0,
-    lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models", status: "not_started", stage: "not_started" }],
+    lessons: [{ assignmentId: "assignment", activityId: "activity", activityTitle: "Bohr Models", progress: progressFacts({ stage: "not_started" }) }],
   }],
 };
 let revision = 0;
@@ -254,7 +255,7 @@ describe("teacher live views", () => {
     render(classView(progress));
     expect(screen.getByText("1 student · 1 not started")).toBeTruthy();
     fetchMock.mockResolvedValue(reply(snapshot({ ...progress, students: [{ ...progress.students[0], overallPercent: 100,
-      lessons: [{ ...progress.students[0].lessons[0], status: "completed", stage: "completed" }],
+      lessons: [{ ...progress.students[0].lessons[0], progress: progressFacts({ stage: "completed" }) }],
     }] })));
     await change({ kind: "progress" });
     expect(screen.getByText("1 student · 1 completed")).toBeTruthy();
@@ -280,10 +281,8 @@ describe("teacher live views", () => {
   it("fetches history only while expanded and keeps it open across overview updates", async () => {
     const student: TeacherActivityAttemptSummary["students"][number] = {
       studentId: "student", firstName: "Mina", lastName: "Chen", verified: true,
-      attemptCount: 1, completedCount: 0, inProgressCount: 1, overallStatus: "exploring",
-      explorationStatus: "in_progress", explorationDurationSeconds: null, passingQuizAttemptNumber: null,
-      passingQuizScore: null, passingQuizTotal: null, passingQuizPercentage: null, passingQuizCompletedAt: null,
-      failedQuizAttemptCount: 0, attempts: [],
+      attemptCount: 1, completedCount: 0, inProgressCount: 1, explorationAttemptCount: 1, quizAttemptCount: 0,
+      quizStartedAt: null, progress: progressFacts({ stage: "exploring" }), attempts: [],
     };
     const summary: TeacherActivityAttemptSummary = { classId: "class", className: "Chemistry", assignmentId: "selected", activityId: "activity", activityTitle: "Bohr Models", students: [student] };
     render(<LiveStudentProgress initialSummary={summary} />);
