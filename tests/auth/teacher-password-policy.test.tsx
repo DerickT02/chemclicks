@@ -206,13 +206,34 @@ describe("teacher password reset policy", () => {
     expectPasswordNotExposed(VALID_PASSWORD);
   });
 
-  it("does not navigate to sign-in success when session cleanup fails after update", async () => {
+  it.each([
+    ["reports an error", () => mocks.signOut.mockResolvedValueOnce({ error: new Error("sign-out failure") })],
+    ["throws", () => mocks.signOut.mockRejectedValueOnce(new Error("sign-out failure"))],
+  ])("falls back to a local sign-out when the global sign-out %s", async (_label, failGlobalSignOut) => {
+    failGlobalSignOut();
+    await submitReset(VALID_PASSWORD);
+    await vi.waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/login/teacher?password=reset"));
+    expect(mocks.signOut).toHaveBeenNthCalledWith(1);
+    expect(mocks.signOut).toHaveBeenNthCalledWith(2, { scope: "local" });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it("says the password was updated, without offering a retry, when every sign-out attempt fails", async () => {
     mocks.signOut.mockRejectedValue(new Error("sign-out failure"));
     await submitReset(VALID_PASSWORD);
-    expect(await screen.findByRole("alert")).toHaveTextContent(GENERIC_RETRY_MESSAGE);
-    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
-    expect(mocks.updateUser).toHaveBeenCalledWith({ password: VALID_PASSWORD });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your password was updated");
+    expect(screen.getByRole("alert")).not.toHaveTextContent(GENERIC_RETRY_MESSAGE);
+    expect(screen.getByRole("button", { name: "Password updated" })).toBeDisabled();
+    expect(screen.getByLabelText("New password")).toHaveValue("");
+    expect(mocks.updateUser).toHaveBeenCalledTimes(1);
     expect(mocks.push).not.toHaveBeenCalled();
     expectPasswordNotExposed(VALID_PASSWORD);
+  });
+
+  it("keeps the submit button disabled while navigating to sign-in after a successful reset", async () => {
+    await submitReset(VALID_PASSWORD);
+    await vi.waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/login/teacher?password=reset"));
+    expect(screen.getByRole("button", { name: "Password updated" })).toBeDisabled();
   });
 });
