@@ -1,20 +1,21 @@
 import "server-only";
 
 import { getStudentAssignmentSchedules, type StudentAssignment } from "@/lib/db/student-assignments";
-import type { ProgressStatus } from "@/lib/db/student_progress";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudentSession } from "@/lib/auth/student-session";
 import { scheduleStatus } from "@/lib/assignments/schedule";
+import { readStudentAssignmentProgressStates } from "@/lib/server/student-assignment-progress";
 import {
   assignmentPath,
   nextSection,
   resolveSequence,
+  sectionQuizKeys,
   type SectionRecord,
   type SequenceEntry,
 } from "@/lib/assignments/sequence";
 
 export type QuizProgression = {
   passed: boolean;
+  assignmentCompleted: boolean;
   nextDestination: string | null;
 };
 
@@ -41,9 +42,6 @@ export type SectionAccess =
 
 const LOAD_ERROR = "Your assignments could not be loaded. Please try again.";
 
-type ProgressRow = { id: string; class_activity_id: string; status: ProgressStatus };
-type PassedAttemptRow = { progress_id: string; quiz_key: string };
-
 /**
  * The signed-in student's own sections in lesson order, each with its
  * completion state. Never accepts student or class IDs from callers.
@@ -57,37 +55,11 @@ export async function getAssignmentSequence(): Promise<AssignmentSequenceResult>
   const records = new Map<string, SectionRecord>();
   const ids = schedules.assignments.map((assignment) => assignment.id);
   if (ids.length > 0) {
-    const admin = createAdminClient();
-    const { data: progress, error: progressError } = await admin
-      .from("student_progress")
-      .select("id, class_activity_id, status")
-      .eq("student_id", session.studentId)
-      .in("class_activity_id", ids)
-      .returns<ProgressRow[]>();
-    if (progressError || !progress) return { status: "error", message: LOAD_ERROR };
-
-    const passed = new Map<string, Set<string>>();
-    if (progress.length > 0) {
-      const { data: attempts, error: attemptError } = await admin
-        .from("student_attempts")
-        .select("progress_id, quiz_key")
-        .in("progress_id", progress.map((row) => row.id))
-        .eq("passed", true)
-        .eq("status", "completed")
-        .not("quiz_key", "is", null)
-        .returns<PassedAttemptRow[]>();
-      if (attemptError || !attempts) return { status: "error", message: LOAD_ERROR };
-      for (const attempt of attempts) {
-        const keys = passed.get(attempt.progress_id) ?? new Set<string>();
-        keys.add(attempt.quiz_key);
-        passed.set(attempt.progress_id, keys);
-      }
-    }
-    for (const row of progress) {
-      records.set(row.class_activity_id, {
-        progress: row.status,
-        passedQuizKeys: passed.get(row.id) ?? new Set(),
-      });
+    try {
+      const states = await readStudentAssignmentProgressStates(session.studentId, session.classId, ids);
+      for (const [assignmentId, state] of states) records.set(assignmentId, state);
+    } catch {
+      return { status: "error", message: LOAD_ERROR };
     }
   }
 
@@ -121,44 +93,32 @@ export async function getSectionAccess(assignment: StudentAssignment): Promise<S
 }
 
 /**
- * Resolves the next section only after the authenticated student's own
- * persisted quiz attempt has passed. The destination is open and unfinished.
+ * Reads the first passing quiz from the shared assignment state. Continuation
+ * is available only when the assignment's full shared state is complete.
  */
 export async function getQuizProgression(
   assignmentId: string,
   quizKey: string,
 ): Promise<QuizProgression> {
-  const session = await getStudentSession();
-  if (!session) return { passed: false, nextDestination: null };
-
-  const admin = createAdminClient();
-  const { data: progress, error: progressError } = await admin
-    .from("student_progress")
-    .select("id")
-    .eq("student_id", session.studentId)
-    .eq("class_activity_id", assignmentId)
-    .maybeSingle();
-  if (progressError || !progress) {
-    return { passed: false, nextDestination: null };
+  const sequence = await getAssignmentSequence();
+  if (sequence.status !== "ok") {
+    return { passed: false, assignmentCompleted: false, nextDestination: null };
   }
+  const entry = sequence.entries.find((candidate) => candidate.assignment.id === assignmentId);
+  if (!entry) return { passed: false, assignmentCompleted: false, nextDestination: null };
 
-  const { data: passingAttempt, error: attemptError } = await admin
-    .from("student_attempts")
-    .select("id")
-    .eq("progress_id", progress.id)
-    .eq("quiz_key", quizKey)
-    .eq("passed", true)
-    .eq("status", "completed")
-    .limit(1)
-    .maybeSingle();
-  if (attemptError || !passingAttempt) {
-    return { passed: false, nextDestination: null };
-  }
-
-  const gate = await getAssignmentGate(assignmentId);
-  if (gate.status !== "open") return { passed: false, nextDestination: null };
+  const allowedKeys = sectionQuizKeys(entry.assignment.activity.type);
+  const passed = allowedKeys.has(quizKey)
+    && entry.state?.passingQuizKey !== null
+    && entry.state?.passingQuizKey !== undefined
+    && allowedKeys.has(entry.state.passingQuizKey);
+  const assignmentCompleted = entry.state?.status === "completed";
+  const next = entry.schedule === "Open" && passed && assignmentCompleted
+    ? nextSection(sequence.entries, assignmentId)
+    : null;
   return {
-    passed: true,
-    nextDestination: gate.next ? assignmentPath(gate.next.assignment) : null,
+    passed,
+    assignmentCompleted,
+    nextDestination: next ? assignmentPath(next.assignment) : null,
   };
 }

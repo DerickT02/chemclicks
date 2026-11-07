@@ -2,6 +2,7 @@ import "server-only";
 
 import { getStudentSession } from "@/lib/auth/student-session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { readStudentAssignmentProgressStates } from "@/lib/server/student-assignment-progress";
 import type { StudentAssignment } from "@/lib/db/student-assignments";
 import type { ProgressStatus } from "@/lib/db/student_progress";
 import type { QueueAssignment } from "@/lib/assignments/work-queue";
@@ -9,7 +10,6 @@ import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { scheduleStatus } from "@/lib/assignments/schedule";
 
 type AssignmentRow = StudentAssignment & { class_id: string };
-type ProgressRow = { id: string; class_activity_id: string; status: unknown };
 export type StudentWorkQueueResult =
   | { status: "unauthenticated" }
   | { status: "error"; message: string }
@@ -21,7 +21,7 @@ export type StudentWorkQueueResult =
     progressError: string | null;
   };
 
-const PROGRESS_ERROR = "Exploration progress could not be loaded. Refresh the page to try again.";
+const PROGRESS_ERROR = "Assignment progress could not be loaded. Refresh the page to try again.";
 const namePart = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const isProgressStatus = (value: unknown): value is ProgressStatus =>
   value === "not_started" || value === "in_progress" || value === "completed";
@@ -58,14 +58,22 @@ export async function getStudentWorkQueue(): Promise<StudentWorkQueueResult> {
     const trackedIds = assignments.filter(row => scheduleStatus(row, checkedAt) === "Open"
       && hasActivityContent(row.activity.type)).map(row => row.id);
     const states = new Map<string, ProgressStatus | null>();
+    const explorationCompleted = new Map<string, boolean>();
+    const passingQuizKey = new Map<string, string | null>();
+    const stages = new Map<string, string>();
     let progressError: string | null = null;
     if (trackedIds.length > 0) {
-      const { data: rows, error } = await client.from("student_progress")
-        .select("id, class_activity_id, status")
-        .eq("student_id", session.studentId).in("class_activity_id", trackedIds)
-        .returns<ProgressRow[]>();
-      if (error || !rows) progressError = PROGRESS_ERROR;
-      else for (const row of rows) states.set(row.class_activity_id, isProgressStatus(row.status) ? row.status : null);
+      try {
+        const rows = await readStudentAssignmentProgressStates(session.studentId, session.classId, trackedIds);
+        for (const [assignmentId, state] of rows) {
+          states.set(assignmentId, isProgressStatus(state.status) ? state.status : null);
+          explorationCompleted.set(assignmentId, state.explorationCompleted);
+          passingQuizKey.set(assignmentId, state.passingQuizKey);
+          stages.set(assignmentId, state.stage);
+        }
+      } catch {
+        progressError = PROGRESS_ERROR;
+      }
     }
     const tracked = new Set(trackedIds);
     return {
@@ -74,6 +82,9 @@ export async function getStudentWorkQueue(): Promise<StudentWorkQueueResult> {
         id: row.id, opens_at: row.opens_at, closes_at: row.closes_at,
         activity: { id: row.activity.id, title: row.activity.title, type: row.activity.type, order_index: row.activity.order_index },
         progress: progressError || !tracked.has(row.id) ? null : states.has(row.id) ? states.get(row.id) ?? null : "not_started",
+        explorationCompleted: progressError || !tracked.has(row.id) ? null : explorationCompleted.get(row.id) ?? false,
+        passingQuizKey: progressError || !tracked.has(row.id) ? null : passingQuizKey.get(row.id) ?? null,
+        stage: progressError || !tracked.has(row.id) ? null : stages.get(row.id) ?? null,
       })),
     };
   } catch {
