@@ -5,7 +5,11 @@ export default defineConfig({
   // Never load application .env files for unit/component tests.
   envDir: false,
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Next.js bundles server-only, so DOM suites that import server modules need a stand-in.
+      'server-only': fileURLToPath(new URL('./tests/stubs/server-only.ts', import.meta.url)),
+    },
   },
   test: {
     // Inert values, so no test can reach a real Supabase project.
