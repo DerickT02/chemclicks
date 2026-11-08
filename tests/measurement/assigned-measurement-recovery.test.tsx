@@ -35,7 +35,6 @@ vi.mock("@/lib/server/database", () => ({
   }),
 }));
 vi.mock("@/lib/assignments/prerequisites", () => ({
-  assertAssignmentUnlocked: async () => {},
   getQuizProgression: async () => ({ passed: false, nextDestination: null }),
 }));
 

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  assertUnlocked: vi.fn(),
   progression: vi.fn(),
   revalidatePath: vi.fn(),
   start: vi.fn(),
@@ -11,7 +10,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/assignments/prerequisites", () => ({
-  assertAssignmentUnlocked: mocks.assertUnlocked,
   getQuizProgression: mocks.progression,
 }));
 vi.mock("@/lib/server/student-measurement-quizzes", () => ({
@@ -31,17 +29,16 @@ const attemptId = "22222222-2222-2222-2222-222222222222";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.assertUnlocked.mockResolvedValue(undefined);
   mocks.progression.mockResolvedValue({ passed: true, nextDestination: "/student/assignments/next" });
 });
 
 describe("measurement quiz server actions", () => {
-  it("does not start a quiz on a locked assignment", async () => {
-    mocks.assertUnlocked.mockRejectedValue(new Error("Finish the earlier sections first."));
+  it("passes a failed start straight back to the student", async () => {
+    mocks.start.mockRejectedValue(new Error("The measurement quiz could not be started."));
 
     await expect(startMeasurementQuizAction(assignmentId, "cylinder_whole"))
-      .rejects.toThrow("Finish the earlier sections first.");
-    expect(mocks.start).not.toHaveBeenCalled();
+      .rejects.toThrow("could not be started");
+    expect(mocks.start).toHaveBeenCalledWith(assignmentId, "cylinder_whole");
   });
 
   it("passes a failed answer save straight back to the student", async () => {
