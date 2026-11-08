@@ -11,8 +11,9 @@
 -- diagram-based covalent molecule questions from SCRUM-131
 -- (20261021010000), which stay in the lewis_covalent pool.
 --
--- Apply after 20261104000200_shared_assignment_progress_state.sql. This file
--- is intentionally not applied by the application agent.
+-- Apply after 20261104000300_fix_bohr_quiz_access_and_progress_history.sql
+-- and the 20261105* teacher live-update migrations. This file is
+-- intentionally not applied by the application agent.
 
 BEGIN;
 
@@ -195,7 +196,8 @@ COMMENT ON FUNCTION public.assignment_progress_state(uuid, text) IS
   'Shared assignment status and stage. Quizzed lessons, including the Lewis dot diagram since SCRUM-234, complete once their own quiz is passed.';
 
 -- Like the other assignment-gated quizzes, the lewis_diagram pool (and its
--- answers) is read only by the server with the service-role client.
+-- answers) is read only by the server with the service-role client. The list
+-- keeps every pool hidden by 20261104000300, including the split Bohr pools.
 DROP POLICY IF EXISTS "chemclicks_quiz_questions_select_active" ON public.quiz_questions;
 CREATE POLICY "chemclicks_quiz_questions_select_active"
   ON public.quiz_questions
@@ -203,11 +205,14 @@ CREATE POLICY "chemclicks_quiz_questions_select_active"
   TO authenticated
   USING (
     is_active
-    AND quiz_key NOT IN ('bohr_models', 'lewis_bonding', 'lewis_covalent', 'lewis_ionic', 'lewis_diagram')
+    AND quiz_key NOT IN (
+      'bohr_models', 'bohr_model_intro', 'bohr_model_stability',
+      'lewis_bonding', 'lewis_covalent', 'lewis_ionic', 'lewis_diagram'
+    )
   );
 
 COMMENT ON POLICY "chemclicks_quiz_questions_select_active" ON public.quiz_questions IS
-  'Authenticated users may read active quiz questions except the assignment-gated Bohr and Lewis quizzes, which are loaded by the server after an assignment check. Question writes require a privileged server/admin client.';
+  'Authenticated users may read active questions except assignment-gated Bohr (legacy and split) and Lewis pools, including the Lewis dot diagram pool. Those questions are loaded by the server after an assignment check. Question writes require a privileged server/admin client.';
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;

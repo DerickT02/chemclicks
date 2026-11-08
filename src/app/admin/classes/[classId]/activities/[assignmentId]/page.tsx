@@ -2,21 +2,14 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
-import RefreshAssignments from '@/components/assignments/RefreshAssignments'
-import { ASSIGNMENT_STAGES, type AssignmentStage } from '@/lib/assignments/stages'
+import { LiveStudentProgress } from '@/app/admin/classes/[classId]/activities/[assignmentId]/LiveStudentProgress'
 import { getTeacherClassActivities } from '@/lib/server/teacher-activities'
 import { getTeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
-import { StudentProgressRoster, studentStage } from './StudentProgressRoster'
 
 type Props = { params: Promise<{ classId: string; assignmentId: string }> }
 
 // generateMetadata and the page share one ownership-checked read per request.
 const loadClassroom = cache(getTeacherClassActivities)
-
-// Furthest along first, matching the bar.
-const STAGE_ORDER: AssignmentStage[] = [
-  'completed', 'needs_retry', 'quiz_in_progress', 'explored', 'exploring', 'not_started',
-]
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { classId, assignmentId } = await params
@@ -34,13 +27,8 @@ export default async function ActivityProgressPage({ params }: Props) {
   const classroom = await loadClassroom(classId)
   const assignment = classroom.assignments.find(item => item.id === assignmentId)
   if (!assignment) notFound()
-  const summary = await getTeacherActivityAttemptSummary(classId, assignmentId)
-
-  const stages = summary.students.map(studentStage)
-  const counts = STAGE_ORDER
-    .map(stage => ({ stage, count: stages.filter(item => item === stage).length }))
-    .filter(item => item.count > 0)
-  const completed = stages.filter(stage => stage === 'completed').length
+  // The lightweight summary omits histories; each one is read when expanded.
+  const summary = await getTeacherActivityAttemptSummary(classId, assignmentId, { live: true })
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 text-foreground">
@@ -73,22 +61,7 @@ export default async function ActivityProgressPage({ params }: Props) {
         </nav>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground" role="status">
-          {summary.students.length === 0
-            ? 'No students enrolled yet.'
-            : <>
-              <span className="font-semibold text-foreground">{completed} of {summary.students.length}</span> completed
-              {counts.filter(item => item.stage !== 'completed')
-                .map(item => ` · ${item.count} ${ASSIGNMENT_STAGES[item.stage].label.toLowerCase()}`).join('')}
-            </>}
-        </p>
-        <RefreshAssignments label="Refresh progress" />
-      </div>
-
-      <div className="mt-4">
-        <StudentProgressRoster summary={summary} />
-      </div>
+      <LiveStudentProgress key={summary.assignmentId} initialSummary={summary} />
     </main>
   )
 }

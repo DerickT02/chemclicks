@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 import {
   MAX_ELECTRON_COUNT,
   MAX_PROTON_COUNT,
@@ -53,6 +53,7 @@ function BohrModelDiagram({
   stabilitySummary,
   activeShell,
   onShellClick,
+  stretchVertical = false,
 }: {
   shells: readonly number[];
   symbol: string;
@@ -62,9 +63,16 @@ function BohrModelDiagram({
   stabilitySummary: string;
   activeShell: number | null;
   onShellClick: (idx: number) => void;
+  stretchVertical?: boolean;
 }) {
   return (
-    <div className="relative my-auto aspect-square w-full shrink-0 select-none">
+    <div
+      className={`relative w-full shrink-0 select-none ${
+        stretchVertical
+          ? "min-h-[20rem] flex-1 md:min-h-[24rem]"
+          : "my-auto aspect-square"
+      }`}
+    >
       {/* Single keyframe shared by all orbiting groups */}
       <style>{`@keyframes bohr-orbit { to { transform: rotate(360deg); } }`}</style>
       <svg
@@ -255,6 +263,63 @@ function ParticleControl({ label, particle, value, min, max, onChange }: Particl
   );
 }
 
+type ElementStat = { label: string; value: ReactNode };
+
+function ElementSummaryCard({
+  symbol,
+  name,
+  atomicNumber,
+  stats,
+}: {
+  symbol: string;
+  name: string;
+  atomicNumber: number;
+  stats: readonly ElementStat[];
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="mb-3 flex items-baseline gap-2">
+        <span className="text-4xl font-bold text-foreground">{symbol}</span>
+        <div>
+          <p className="text-lg font-semibold text-foreground leading-tight">{name}</p>
+          <p className="text-xs text-muted-foreground">Atomic number: {atomicNumber}</p>
+        </div>
+      </div>
+      <div className="rounded-xl border border-border bg-muted/50 divide-y divide-border">
+        {stats.map((stat) => (
+          <div key={stat.label} className="flex items-center justify-between px-4 py-2.5 text-sm">
+            <span className="text-muted-foreground">{stat.label}</span>
+            {stat.value}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Diagram card. On small screens it is shown first so the diagram stays next to the controls that change it. */
+function BohrDiagramCard(props: ComponentProps<typeof BohrModelDiagram>) {
+  return (
+    <div className="flex flex-col rounded-2xl border border-border bg-card p-5 md:order-last">
+      <div className="mb-1 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">Bohr Diagram</h2>
+        <span className="text-xs text-muted-foreground">click a shell ring to highlight</span>
+      </div>
+      <BohrModelDiagram {...props} />
+      <div className="mt-auto flex items-center justify-center gap-4 pt-2">
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded-full bg-[#60a5fa]" />
+          <span className="text-xs text-muted-foreground">Electron (e⁻)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded-full bg-[#f87171]" />
+          <span className="text-xs text-muted-foreground">Nucleus</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const SHELL_CAPACITIES_MAP = SHELL_CAPACITIES;
 
 export type BohrLessonMode = "intro" | "stability";
@@ -295,12 +360,6 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
     setActiveShell(null);
   };
 
-  const handleResetNeutral = () => {
-    setProtonCount(selectedElement.atomicNumber);
-    setElectronCount(selectedElement.atomicNumber);
-    setActiveShell(null);
-  };
-
   const handleShellToggle = (idx: number) => {
     setActiveShell((prev) => (prev === idx ? null : idx));
   };
@@ -327,6 +386,24 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
     : isNeutral
       ? ionInfo.neutralNote
       : "Charge and shells still update as you explore. This configuration is not one of the common ions highlighted in class.";
+
+  const statValue = (value: ReactNode) => <span className="font-semibold text-foreground">{value}</span>;
+  const elementStats: ElementStat[] = [
+    { label: "Protons", value: statValue(protons) },
+    { label: "Valence electrons", value: statValue(valenceCount) },
+    { label: "Total electrons", value: statValue(totalElectrons) },
+    { label: "Occupied shells", value: statValue(shells.length) },
+  ];
+  const diagramProps = {
+    shells,
+    symbol: element.symbol,
+    atomicNumber: element.atomicNumber,
+    electronCount,
+    chargeDescription,
+    stabilitySummary: accessibilitySummary,
+    activeShell,
+    onShellClick: handleShellToggle,
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -427,7 +504,7 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
         <section className="rounded-2xl border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-foreground">Explore stability</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Adjust protons and electrons independently below. Compare noble-gas electron counts,
+            Adjust protons and electrons in Build an atom. Compare noble-gas electron counts,
             neutral charge, the resulting ionic charge, and common-ion examples. A noble-gas
             electron count alone does not prove that an ion is stable.
           </p>
@@ -435,148 +512,103 @@ export default function BohrModelViewer({ mode }: BohrModelViewerProps) {
       )}
 
       {/* ── Bohr Diagram + Info ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+      {showStabilityContent ? (
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+            <BohrDiagramCard {...diagramProps} stretchVertical />
 
-        {/* Diagram */}
-        <div className="flex flex-col rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-semibold text-foreground">Bohr Diagram</h2>
-            <span className="text-xs text-muted-foreground">click a shell ring to highlight</span>
-          </div>
-          <BohrModelDiagram
-            shells={shells}
-            symbol={element.symbol}
-            atomicNumber={element.atomicNumber}
-            electronCount={electronCount}
-            chargeDescription={chargeDescription}
-            stabilitySummary={accessibilitySummary}
-            activeShell={activeShell}
-            onShellClick={handleShellToggle}
-          />
-          <div className="mt-auto flex items-center justify-center gap-4 pt-2">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-[#60a5fa]" />
-              <span className="text-xs text-muted-foreground">Electron (e⁻)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-[#f87171]" />
-              <span className="text-xs text-muted-foreground">Nucleus</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Info panel */}
-        <div className="flex flex-col gap-4">
-          <div className="grow rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-foreground">{element.symbol}</span>
-                <div>
-                  <p className="text-lg font-semibold text-foreground leading-tight">{element.name}</p>
-                  <p className="text-xs text-muted-foreground">Atomic number: {element.atomicNumber}</p>
+            <div className="flex flex-col gap-4">
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h2 className="text-sm font-semibold text-foreground mb-4">Build an atom</h2>
+                <div className="flex flex-col gap-3">
+                  <ParticleControl
+                    label="Protons"
+                    particle="a proton"
+                    value={protonCount}
+                    min={MIN_PROTON_COUNT}
+                    max={MAX_PROTON_COUNT}
+                    onChange={handleProtonChange}
+                  />
+                  <ParticleControl
+                    label="Electrons"
+                    particle="an electron"
+                    value={electronCount}
+                    min={MIN_ELECTRON_COUNT}
+                    max={MAX_ELECTRON_COUNT}
+                    onChange={handleElectronChange}
+                  />
                 </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Use protons to change the element and electrons to model ions.
+                </p>
               </div>
-            </div>
 
-            {/* Stats */}
-            <div className="rounded-xl bg-muted/50 border border-border divide-y divide-border">
-              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Protons</span>
-                <span className="font-semibold text-foreground">{protons}</span>
+              <div className="rounded-xl border border-border bg-muted/40 p-4" role="status" aria-live="polite">
+                <h3 className="text-sm font-semibold text-foreground">{ionContextHeading}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{ionContextBody}</p>
               </div>
-              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Valence electrons</span>
-                <span className="font-semibold text-foreground">{valenceCount}</span>
-              </div>
-              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Total electrons</span>
-                <span className="font-semibold text-foreground">{totalElectrons}</span>
-              </div>
-              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Occupied shells</span>
-                <span className="font-semibold text-foreground">{shells.length}</span>
-              </div>
-              {showStabilityContent && <>
-              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Protons − electrons</span>
-                <span className="font-semibold text-foreground">{chargeDifference ?? "—"}</span>
-              </div>
-              <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">Ionic charge</span>
-                <output aria-label={`Ionic charge: ${chargeDescription}`} aria-live="polite" className="font-semibold text-foreground">
-                  {chargeDescription}
-                </output>
-              </div>
-              </>}
-            </div>
-            {showStabilityContent && <>
-            <div className="mt-3 rounded-xl border border-border bg-muted/50 p-4" aria-live="polite" aria-atomic="true">
-              <h3 className="text-sm font-semibold text-foreground">Charge and stability</h3>
-              <div className="mt-3 flex flex-col gap-2.5">
-                <StabilityInsight
-                  title="Noble-gas electron stability"
-                  met={nobleGasStability.met}
-                  {...nobleGasStabilityPanelText(electronCount, nobleGasStability)}
-                />
-                <StabilityInsight
-                  title="Neutral charge stability"
-                  met={neutralChargeStability.met}
-                  {...neutralChargeStabilityPanelText(protons, electronCount, neutralChargeStability)}
-                />
-                <StabilityInsight
-                  title="Charge from protons and electrons"
-                  headline={chargePanelText.headline}
-                  hint={chargePanelText.hint}
-                />
-                <StabilityInsight
-                  title="Outer-shell rule (duet/octet)"
-                  met={outerShellRuleMeetsStability}
-                  {...outerShellRulePanelText(electronCount, charge)}
-                />
-              </div>
-            </div>
-            <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4" role="status" aria-live="polite">
-              <h4 className="text-sm font-semibold text-foreground">{ionContextHeading}</h4>
-              <p className="mt-1 text-sm text-muted-foreground">{ionContextBody}</p>
-             </div>
-             </>}
-           </div>
 
-          {showStabilityContent && <div className="grow rounded-2xl border border-border bg-card p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">Build an atom</h2>
-            <div className="flex flex-col gap-3">
-              <ParticleControl
-                label="Protons"
-                particle="a proton"
-                value={protonCount}
-                min={MIN_PROTON_COUNT}
-                max={MAX_PROTON_COUNT}
-                onChange={handleProtonChange}
-              />
-              <ParticleControl
-                label="Electrons"
-                particle="an electron"
-                value={electronCount}
-                min={MIN_ELECTRON_COUNT}
-                max={MAX_ELECTRON_COUNT}
-                onChange={handleElectronChange}
+              <ElementSummaryCard
+                symbol={element.symbol}
+                name={element.name}
+                atomicNumber={element.atomicNumber}
+                stats={[
+                  ...elementStats,
+                  { label: "Protons − electrons", value: statValue(chargeDifference ?? "—") },
+                  {
+                    label: "Ionic charge",
+                    value: (
+                      <output
+                        aria-label={`Ionic charge: ${chargeDescription}`}
+                        aria-live="polite"
+                        className="font-semibold text-foreground"
+                      >
+                        {chargeDescription}
+                      </output>
+                    ),
+                  },
+                ]}
               />
             </div>
-            <button
-              type="button"
-              onClick={handleResetNeutral}
-              disabled={protonCount === selectedElement.atomicNumber && electronCount === selectedElement.atomicNumber}
-              className="mt-3 w-full rounded-md border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Reset to neutral {selectedElement.name} ({selectedElement.symbol})
-            </button>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Choose an element above to pick a reset target, or adjust protons and electrons independently.
-              Common-ion notes appear when counts match documented examples.
-            </p>
-          </div>}
+          </div>
+
+          <div className="rounded-xl border border-border bg-muted/50 p-4" aria-live="polite" aria-atomic="true">
+            <h3 className="text-sm font-semibold text-foreground">Charge and stability</h3>
+            <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-2">
+              <StabilityInsight
+                title="Noble-gas electron stability"
+                met={nobleGasStability.met}
+                {...nobleGasStabilityPanelText(electronCount, nobleGasStability)}
+              />
+              <StabilityInsight
+                title="Neutral charge stability"
+                met={neutralChargeStability.met}
+                {...neutralChargeStabilityPanelText(protons, electronCount, neutralChargeStability)}
+              />
+              <StabilityInsight
+                title="Charge from protons and electrons"
+                headline={chargePanelText.headline}
+                hint={chargePanelText.hint}
+              />
+              <StabilityInsight
+                title="Outer-shell rule (duet/octet)"
+                met={outerShellRuleMeetsStability}
+                {...outerShellRulePanelText(electronCount, charge)}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+          <BohrDiagramCard {...diagramProps} />
+          <ElementSummaryCard
+            symbol={element.symbol}
+            name={element.name}
+            atomicNumber={element.atomicNumber}
+            stats={elementStats}
+          />
+        </div>
+      )}
 
       {/* ── Electron Shell Reference ───────────────────────────────────── */}
       <section className="rounded-2xl border border-border bg-card p-6">

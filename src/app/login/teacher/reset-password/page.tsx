@@ -20,6 +20,29 @@ import { createClient } from "@/lib/supabase/client";
 const EXPIRED_LINK_MESSAGE =
   "Your reset link is invalid or has expired. Please request a new one from the sign-in page.";
 
+const SIGN_OUT_FAILED_MESSAGE =
+  "Your password was updated, but you could not be signed out of this reset session. Close this tab, then sign in with your new password.";
+
+/**
+ * Signs out of the recovery session. Falls back to clearing only this
+ * browser's session when the global sign-out reports an error or throws.
+ */
+async function endRecoverySession(supabase: ReturnType<typeof createClient>): Promise<boolean> {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (!error) return true;
+  } catch {
+    // Fall through to the local sign-out.
+  }
+
+  try {
+    const { error } = await supabase.auth.signOut({ scope: "local" });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export default function TeacherResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -28,6 +51,7 @@ export default function TeacherResetPasswordPage() {
   const [confirmError, setConfirmError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -54,24 +78,43 @@ export default function TeacherResetPasswordPage() {
     setIsSubmitting(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
 
-    if (error) {
-      setFormError(
-        isAuthSessionMissingError(error)
-          ? EXPIRED_LINK_MESSAGE
-          : error.message || GENERIC_RETRY_MESSAGE,
-      );
+      if (error) {
+        setFormError(
+          isAuthSessionMissingError(error)
+            ? EXPIRED_LINK_MESSAGE
+            : error.message || GENERIC_RETRY_MESSAGE,
+        );
+        setPassword("");
+        setConfirmPassword("");
+        setIsSubmitting(false);
+        return;
+      }
+    } catch {
+      setFormError(GENERIC_RETRY_MESSAGE);
       setPassword("");
       setConfirmPassword("");
       setIsSubmitting(false);
       return;
     }
 
+    // The password has changed from here on, so the form must not offer a
+    // retry: submitting the same password again would be rejected.
+    setPassword("");
+    setConfirmPassword("");
+    setPasswordUpdated(true);
+
     // End the recovery session so the teacher signs in through the normal
     // login flow, which checks for an approved teacher record.
-    await supabase.auth.signOut();
-    router.push("/login/teacher?password=reset");
+    if (await endRecoverySession(supabase)) {
+      router.push("/login/teacher?password=reset");
+      return;
+    }
+
+    setFormError(SIGN_OUT_FAILED_MESSAGE);
+    setIsSubmitting(false);
   }
 
   return (
@@ -115,8 +158,8 @@ export default function TeacherResetPasswordPage() {
             error={confirmError}
           />
           <AuthFormError message={formError} />
-          <AuthPrimaryButton type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Updating password..." : "Update password"}
+          <AuthPrimaryButton type="submit" disabled={isSubmitting || passwordUpdated}>
+            {passwordUpdated ? "Password updated" : isSubmitting ? "Updating password..." : "Update password"}
           </AuthPrimaryButton>
         </form>
       </AuthCard>

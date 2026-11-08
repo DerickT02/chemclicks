@@ -18,7 +18,7 @@ export default function HelpPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">For teachers</h2>
           <p><Link href="/create-account/teacher" className="underline">Create a teacher account</Link>, verify your email, and <Link href="/login/teacher" className="underline">sign in</Link>. Create a class and share its code and Student ID instructions with students.</p>
-          <p>Assign an available activity and enter optional opening/closing times in your device&apos;s local time. Use Edit dates to extend a deadline. Refresh your classroom to see current lesson progress. Scores from finished assigned quizzes appear under Activity attempts.</p>
+          <p>Assign an available activity and enter optional opening/closing times in your device&apos;s local time. Use Edit dates to extend a deadline. Student approval requests, Student progress, and Activity attempts update live while the tab is visible, with periodic background checks if the live connection is unavailable. Approve new student accounts under Students &amp; approvals before they can sign in. Scores from finished assigned quizzes appear under Activity attempts.</p>
           <p>Disabling a class blocks student access but keeps its data. There is currently no reactivation control. For account or data requests, contact the person operating your ChemClicks site.</p>
         </section>
         <section id="student-data" className="space-y-3">

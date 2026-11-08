@@ -1,13 +1,6 @@
 import Link from "next/link";
-import type { TeacherClassLessonProgress, LessonStatus } from "@/lib/server/teacher-lesson-progress";
+import type { TeacherClassLessonProgress } from "@/lib/server/teacher-lesson-progress";
 import type { AssignmentStage } from "@/lib/assignments/stages";
-
-// Used when the database has not been migrated to return a stage yet.
-const STAGE_FROM_STATUS: Record<LessonStatus, AssignmentStage> = {
-  not_started: "not_started",
-  in_progress: "exploring",
-  completed: "completed",
-};
 
 // How the class's stages are counted on an activity card, furthest along first.
 const BUCKETS: { label: string; stages: AssignmentStage[] }[] = [
@@ -33,7 +26,7 @@ export function ActivityProgressSummary({ classId, assignmentId, activityTitle, 
   const href = `/admin/classes/${classId}/activities/${assignmentId}`;
   const stages = students?.map((student) => {
     const lesson = student.lessons.find((item) => item.assignmentId === assignmentId);
-    return lesson ? lesson.stage ?? STAGE_FROM_STATUS[lesson.status] : "not_started";
+    return lesson?.progress.stage ?? "not_started";
   });
   const counts = stages
     ? BUCKETS.map((bucket) => ({

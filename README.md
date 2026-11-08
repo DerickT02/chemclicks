@@ -106,6 +106,11 @@ approval for each database/Auth change. SQL exists in both
 `supabase/migrations/` and `src/lib/supabase/migration/`; historical files do not
 prove which migrations are deployed. No fresh-database baseline is certified.
 
+Teacher live updates require five separately reviewed migrations before deploying
+that frontend; see [teacher live updates](docs/teacher-live-updates.md) for the
+private Broadcast authorization, lightweight attempts RPC, fallback behavior,
+and local/hosted validation steps.
+
 Student login requires
 `supabase/migrations/20260922191858_student_supabase_auth.sql`. It adds an
 optional link from existing student records to Supabase Auth; no student data is
