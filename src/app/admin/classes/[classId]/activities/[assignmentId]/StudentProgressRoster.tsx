@@ -15,6 +15,7 @@ const QUIZ_TITLES: Record<string, string> = {
   [BOHR_STABILITY_QUIZ_KEY]: 'Bohr Model Stability Quiz',
   [LEWIS_QUIZZES.covalent.quizKey]: LEWIS_QUIZZES.covalent.title,
   [LEWIS_QUIZZES.ionic.quizKey]: LEWIS_QUIZZES.ionic.title,
+  [LEWIS_QUIZZES.diagram.quizKey]: LEWIS_QUIZZES.diagram.title,
 }
 
 type Student = TeacherActivityAttemptSummary['students'][number]

@@ -1,7 +1,11 @@
 import type { ActivityType } from "@/lib/db/activities";
-import { LEWIS_COVALENT_QUIZ_KEY, LEWIS_IONIC_QUIZ_KEY } from "@/lib/db/quiz-questions";
+import {
+  LEWIS_COVALENT_QUIZ_KEY,
+  LEWIS_DIAGRAM_QUIZ_KEY,
+  LEWIS_IONIC_QUIZ_KEY,
+} from "@/lib/db/quiz-questions";
 
-export type LewisQuizKind = "covalent" | "ionic";
+export type LewisQuizKind = "diagram" | "covalent" | "ionic";
 
 export type LewisQuizConfig = {
   /** Assigning this lesson to a class unlocks the quiz for that class. */
@@ -13,6 +17,13 @@ export type LewisQuizConfig = {
 };
 
 export const LEWIS_QUIZZES: Record<LewisQuizKind, LewisQuizConfig> = {
+  diagram: {
+    lessonType: "lewis_diagram",
+    lessonTitle: "Lewis Dot Diagram",
+    quizKey: LEWIS_DIAGRAM_QUIZ_KEY,
+    path: "/student/quizzes/lewis-diagram",
+    title: "Lewis Dot Diagrams Quiz",
+  },
   covalent: {
     lessonType: "lewis_structures_covalent",
     lessonTitle: "Lewis Structures — Covalent",

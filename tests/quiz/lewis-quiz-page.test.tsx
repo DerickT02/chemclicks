@@ -20,6 +20,7 @@ vi.mock("@/components/assignments/AssignmentAccess", () => ({
 vi.mock("@/lib/db/quiz-questions", () => ({
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
+  LEWIS_DIAGRAM_QUIZ_KEY: "lewis_diagram",
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/lewis/LewisQuiz", () => ({

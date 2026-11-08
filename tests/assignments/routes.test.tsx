@@ -227,6 +227,7 @@ describe("student assignment pages", () => {
   it.each([
     ["lewis_structures_covalent", "/student/quizzes/covalent"],
     ["lewis_structures_ionic", "/student/quizzes/ionic"],
+    ["lewis_diagram", "/student/quizzes/lewis-diagram"],
     ["bohr_model_intro", "/student/quizzes/bohr"],
   ])("shows a Take quiz link on %s assignments that names the assignment", async (type, path) => {
     reader.mockResolvedValue({ status: "ok", assignments: [{
@@ -237,9 +238,7 @@ describe("student assignment pages", () => {
     expect(html).toContain(`href="${path}?assignmentId=lesson"`);
   });
   it("shows no Take quiz link on other activities", async () => {
-    reader.mockResolvedValue({ status: "ok", assignments: [assignment, {
-      ...assignment, id: "diagram", activity: { ...assignment.activity, type: "lewis_diagram" },
-    }] });
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     const html = renderToStaticMarkup(await StudentPage());
     expect(html).not.toContain("Take quiz");
     expect(html).not.toContain("/student/quizzes/");

@@ -39,7 +39,7 @@ describe("sectionQuizKey", () => {
   it.each([
     ["bohr_model_intro", "bohr_model_intro"],
     ["bohr_model_stability", "bohr_model_stability"],
-    ["lewis_diagram", null],
+    ["lewis_diagram", "lewis_diagram"],
     ["lewis_structures_covalent", "lewis_covalent"],
     ["lewis_structures_ionic", "lewis_ionic"],
     ["measurement_ruler_tenths", "measurement_ruler_tenths"],
@@ -55,6 +55,7 @@ describe("isSectionComplete", () => {
   it.each([
     ["bohr_model_intro", "bohr_models"],
     ["bohr_model_stability", "bohr_models"],
+    ["lewis_diagram", "lewis_diagram"],
     ["lewis_structures_covalent", "lewis_covalent"],
     ["lewis_structures_ionic", "lewis_ionic"],
     ["measurement_ruler_tenths", "measurement_ruler_tenths"],
@@ -80,11 +81,8 @@ describe("isSectionComplete", () => {
     expect(isSectionComplete(type, "completed", new Set([other]))).toBe(false);
   });
 
-  it("completes the Lewis dot diagram, which has no quiz, once its exploration is finished", () => {
-    expect(isSectionComplete("lewis_diagram", "completed", none)).toBe(true);
-    expect(isSectionComplete("lewis_diagram", "in_progress", none)).toBe(false);
-    expect(isSectionComplete("lewis_diagram", "not_started", none)).toBe(false);
-    expect(isSectionComplete("lewis_diagram", null, none)).toBe(false);
+  it("does not complete the Lewis dot diagram on another Lewis quiz's pass", () => {
+    expect(isSectionComplete("lewis_diagram", "completed", new Set(["lewis_covalent", "lewis_ionic"]))).toBe(false);
   });
 });
 
@@ -188,7 +186,7 @@ describe("the Bohr → Lewis → Measurement journey", () => {
   const finish: [string, SectionRecord][] = [
     ["bohr-intro", record("in_progress", "bohr_models")],
     ["bohr-stability", record("completed", "bohr_models")],
-    ["lewis-diagram", record("completed")],
+    ["lewis-diagram", record("completed", "lewis_diagram")],
     ["lewis-covalent", record("completed", "lewis_covalent")],
     ["lewis-ionic", record("completed", "lewis_ionic")],
     ["ruler-tenths", record("completed", "measurement_ruler_tenths")],
