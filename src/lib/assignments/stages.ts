@@ -1,7 +1,7 @@
 // Where a student is within one assignment, as derived on the server by
 // public.assignment_progress_state. 'completed' follows the shared completion
-// rule (isSectionComplete): the quiz is passed, or, for an activity without a
-// quiz, the exploration is finished.
+// rule (isSectionComplete): exploration and its quiz are both complete, or
+// exploration is complete for activities without a quiz.
 export type AssignmentStage =
   | "not_started"
   | "exploring"

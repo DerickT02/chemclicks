@@ -363,6 +363,8 @@ type ResultsProps = {
   onChooseInstrument: () => void;
   /** Where a passed assigned attempt leads next; null when nothing is open. */
   nextDestination?: string | null;
+  /** Whether exploration and the quiz together completed this assignment. */
+  assignmentCompleted?: boolean | null;
   pending?: boolean;
 };
 
@@ -372,6 +374,7 @@ export function AttemptResults({
   onTryAgain,
   onChooseInstrument,
   nextDestination = null,
+  assignmentCompleted,
   pending = false,
 }: ResultsProps) {
   const spec = results.mode
@@ -379,7 +382,7 @@ export function AttemptResults({
     : INSTRUMENTS[results.instrument];
   const passed = results.passed ?? hasPassed(results.score, results.total);
   const percent = Math.round((results.score / results.total) * 100);
-  const continueTo = assignedMode && passed ? nextDestination : null;
+  const continueTo = assignedMode && passed && assignmentCompleted === true ? nextDestination : null;
 
   // The button that finished the attempt is gone, so focus starts on the score.
   return (
@@ -394,6 +397,11 @@ export function AttemptResults({
           message={`You answered ${results.score} of ${results.total} correctly on the first try (${percent}%). Passing takes ${passingScore(results.total)} of ${results.total} (${PASS_PERCENT}%).`}
         />
       </div>
+      {assignedMode && passed && assignmentCompleted === false && (
+        <p className="mt-3 text-sm font-medium text-foreground" role="status">
+          Quiz passed — exploration still needed.
+        </p>
+      )}
       {results.attemptNumber !== undefined && (
         <p className="mt-3 text-sm text-muted-foreground">
           {`Attempt ${results.attemptNumber}`}
@@ -528,6 +536,7 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
           score: result.score,
           total: result.total,
           passed: result.passed,
+          assignmentCompleted: result.assignmentCompleted,
         });
       },
       "The quiz could not be completed. Please try again.",
@@ -551,6 +560,7 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
         onTryAgain={() => startAttempt(state.instrument)}
         onChooseInstrument={() => dispatch({ type: "choose-instrument" })}
         nextDestination={nextDestination}
+        assignmentCompleted={state.assignmentCompleted}
         pending={pending}
       />
       </>

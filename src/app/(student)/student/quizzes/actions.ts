@@ -28,17 +28,16 @@ export async function submitQuizAction(
   input: SubmitQuizInput,
 ): Promise<QuizCompleteResult> {
   const attempt = await submitStudentQuiz(input);
-  const progression = attempt.passed
-    ? await getQuizProgression(input.assignmentId, input.quizKey)
-    : { passed: false, nextDestination: null };
+  const progression = await getQuizProgression(input.assignmentId, input.quizKey);
 
   return {
     score: attempt.score ?? 0,
     total: attempt.question_total ?? 0,
     percent: attempt.percentage ?? 0,
     passed: attempt.passed === true,
+    assignmentCompleted: progression.assignmentCompleted,
     attemptId: attempt.id,
     attemptNumber: attempt.attempt_number,
-    nextDestination: progression.passed ? progression.nextDestination : null,
+    nextDestination: attempt.passed === true && progression.passed ? progression.nextDestination : null,
   };
 }

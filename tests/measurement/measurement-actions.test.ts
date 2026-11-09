@@ -58,7 +58,7 @@ describe("measurement quiz server actions", () => {
     expect(mocks.progression).not.toHaveBeenCalled();
   });
 
-  it("returns the saved result, unchanged, each time a completion is replayed", async () => {
+  it("preserves assignment completion when a failed completion is replayed", async () => {
     mocks.complete.mockResolvedValue({
       id: "result-1",
       attempt_number: 3,
@@ -69,6 +69,11 @@ describe("measurement quiz server actions", () => {
       status: "completed",
       completed_at: "2026-11-04T13:00:00Z",
     });
+    mocks.progression.mockResolvedValue({
+      passed: true,
+      assignmentCompleted: true,
+      nextDestination: "/student/assignments/next",
+    });
 
     const first = await completeMeasurementQuizAction(assignmentId, attemptId);
     const replay = await completeMeasurementQuizAction(assignmentId, attemptId);
@@ -78,10 +83,21 @@ describe("measurement quiz server actions", () => {
       score: 3,
       total: 5,
       passed: false,
+      assignmentCompleted: true,
       completedAt: "2026-11-04T13:00:00Z",
       nextDestination: null,
     });
     expect(replay).toEqual(first);
-    expect(mocks.progression).not.toHaveBeenCalled();
+    expect(mocks.progression).toHaveBeenCalledTimes(2);
+    expect(mocks.progression).toHaveBeenNthCalledWith(
+      1,
+      assignmentId,
+      "measurement_ruler_hundredths",
+    );
+    expect(mocks.progression).toHaveBeenNthCalledWith(
+      2,
+      assignmentId,
+      "measurement_ruler_hundredths",
+    );
   });
 });

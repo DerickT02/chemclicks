@@ -38,7 +38,7 @@ BEGIN
   PERFORM public.student_attempt_transition(student,c,assignment,'complete',finished.id);
   IF NOT EXISTS(SELECT 1 FROM public.student_progress WHERE id=progress AND status='in_progress' AND completed_at IS NULL) THEN RAISE EXCEPTION 'Stale completion overwrote retry progress'; END IF;
   PERFORM public.student_attempt_transition(student,c,assignment,'complete',second_attempt.id);
-  IF NOT EXISTS(SELECT 1 FROM public.student_progress WHERE id=progress AND status='completed' AND completed_at IS NOT NULL) THEN RAISE EXCEPTION 'Completion progress incorrect'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.student_progress WHERE id=progress AND status='completed' AND completed_at IS NOT NULL AND exploration_completed AND exploration_completed_at IS NOT NULL) THEN RAISE EXCEPTION 'Completion progress or durable exploration marker incorrect'; END IF;
   PERFORM public.student_attempt_transition(student,c,assignment,'retry',finished.id);
   SELECT count(*) INTO n FROM public.student_attempts WHERE progress_id=progress;
   IF n<>2 THEN RAISE EXCEPTION 'Stale retry inflated attempts'; END IF;
