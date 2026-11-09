@@ -101,7 +101,7 @@ describe('activity student progress page', () => {
   it('shows the roster for the activity in the URL, with its title and class', async () => {
     const html = renderToStaticMarkup(await Page(props('second')))
     expect(mock.activities).toHaveBeenCalledWith('class')
-    expect(mock.summary).toHaveBeenCalledWith('class', 'second')
+    expect(mock.summary).toHaveBeenCalledWith('class', 'second', { live: true })
     expect(html).toContain('<h1 class="mt-4 text-3xl font-semibold">Lewis diagrams</h1>')
     expect(html).toContain('Student progress · Chemistry')
     expect(html).toContain('href="/admin?classId=class"')

@@ -1,0 +1,109 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
+const mocks = vi.hoisted(() => ({ teacher: vi.fn(), rpc: vi.fn() }));
+vi.mock("@/lib/server/teacher", () => ({ requireTeacherId: mocks.teacher }));
+vi.mock("@/lib/server/database", () => ({ createServiceClient: () => ({ rpc: mocks.rpc }) }));
+const fallback = vi.hoisted(() => ({ roster: vi.fn(), progress: vi.fn(), attempts: vi.fn() }));
+vi.mock("@/lib/server/student-roster", () => ({ getOwnedStudentRoster: fallback.roster }));
+vi.mock("@/lib/server/teacher-lesson-progress", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/server/teacher-lesson-progress")>(), getTeacherClassLessonProgress: fallback.progress,
+}));
+vi.mock("@/lib/server/teacher-attempts", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/server/teacher-attempts")>(), getTeacherActivityAttemptSummary: fallback.attempts,
+}));
+import { getTeacherClassUpdates, isClassUpdateCursor } from "@/lib/server/teacher-class-updates";
+import { GET } from "@/app/admin/classes/[classId]/updates/route";
+
+const classId = "11111111-1111-4111-8111-111111111111";
+const assignmentId = "22222222-2222-4222-8222-222222222222";
+const data = { classId, revision: "42", reset: false, removedStudentIds: [], roster: null, progress: null, attempts: null };
+const request = (query = "", id = classId) => GET(new Request(`https://chemclicks.test/admin/classes/${id}/updates${query}`), {
+  params: Promise.resolve({ classId: id }),
+});
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.teacher.mockResolvedValue("verified-session-teacher");
+  mocks.rpc.mockResolvedValue({ data, error: null });
+});
+
+describe("combined teacher class updates", () => {
+  it("authenticates once and performs one RPC for both roster and progress", async () => {
+    const response = await request("?after=40&teacherId=untrusted");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(await response.json()).toEqual(data);
+    expect(mocks.teacher).toHaveBeenCalledTimes(1);
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("teacher_class_updates", {
+      p_teacher_id: "verified-session-teacher", p_class_id: classId, p_after: "40", p_assignment_id: null,
+    });
+  });
+  it("preserves large revision precision and supports the selected assignment overview", async () => {
+    expect((await request(`?after=9007199254740993&assignmentId=${assignmentId}`)).status).toBe(200);
+    expect(mocks.rpc).toHaveBeenLastCalledWith("teacher_class_updates", expect.objectContaining({ p_after: "9007199254740993", p_assignment_id: assignmentId }));
+  });
+  it("requests a full baseline when no cursor is provided", async () => {
+    await getTeacherClassUpdates(classId);
+    expect(mocks.rpc).toHaveBeenCalledWith("teacher_class_updates", expect.objectContaining({ p_after: null }));
+  });
+  it.each(["", "-1", "01", "1.2", "NaN", "9223372036854775808", "9999999999999999999999999"])("rejects invalid cursor %j before authentication or reads", async cursor => {
+    expect(isClassUpdateCursor(cursor)).toBe(false);
+    expect((await request(`?after=${cursor}`)).status).toBe(400);
+    expect(mocks.teacher).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it.each(["0", "1", "9223372036854775807"])("accepts valid cursor %s", cursor => {
+    expect(isClassUpdateCursor(cursor)).toBe(true);
+  });
+  it("rejects invalid class or assignment IDs without reads", async () => {
+    expect((await request("", "invalid")).status).toBe(400);
+    expect((await request("?assignmentId=invalid")).status).toBe(400);
+    await expect(getTeacherClassUpdates(classId, { after: "-1" })).rejects.toThrow("Invalid");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("denies unauthenticated callers without querying and never leaks private error details", async () => {
+    mocks.teacher.mockRejectedValue(new Error("private session details"));
+    const response = await request();
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain("private session details");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("normalizes changed progress and attempt rows like the direct reads", async () => {
+    const lesson = { assignmentId, activityId: "activity", activityTitle: "Bohr Models", status: "in_progress" };
+    const attempt = (id: string, startedAt: string) => ({ id, attemptNumber: 1, status: "completed", startedAt, completedAt: null });
+    mocks.rpc.mockResolvedValue({ data: {
+      ...data,
+      progress: { classId, className: "Period 1", students: [{ studentId: "s", firstName: "A", lastName: "B", lessons: [lesson] }] },
+      attempts: { classId, className: "Period 1", assignmentId, activityId: "activity", activityTitle: "Bohr Models", students: [{
+        studentId: "s", firstName: "A", lastName: "B", verified: true, attemptCount: 2, completedCount: 2, inProgressCount: 0,
+        overallStatus: "taking_quiz", attempts: [attempt("older", "2026-09-22T12:00:00Z"), attempt("newer", "2026-09-24T12:00:00Z")],
+      }] },
+    }, error: null });
+    const result = await getTeacherClassUpdates(classId, { assignmentId });
+    expect(result.progress?.students[0].lessons[0]).toEqual({
+      assignmentId, activityId: "activity", activityTitle: "Bohr Models", progress: expect.objectContaining({ stage: "exploring" }),
+    });
+    const student = result.attempts?.students[0];
+    expect(student?.progress.stage).toBe("quiz_in_progress");
+    expect(student?.attempts.map(row => row.id)).toEqual(["newer", "older"]);
+  });
+  it("falls back to full, cursorless snapshots when the incremental RPC is not migrated", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "missing" } });
+    const roster = { pending: [], active: [] };
+    const progress = { classId, className: "Period 1", students: [] };
+    const attempts = { classId, assignmentId, students: [] };
+    fallback.roster.mockResolvedValue(roster);
+    fallback.progress.mockResolvedValue(progress);
+    fallback.attempts.mockResolvedValue(attempts);
+    expect(await getTeacherClassUpdates(classId, { after: "7", assignmentId })).toEqual({
+      classId, revision: null, reset: true, removedStudentIds: [], roster, progress, attempts,
+    });
+    expect(fallback.attempts).toHaveBeenCalledWith(classId, assignmentId, { live: true });
+    expect((await getTeacherClassUpdates(classId)).attempts).toBeNull();
+  });
+  it.each([{ data: null, error: null }, { data: null, error: { message: "private database details" } }])("fails closed when ownership or database reads fail (%j)", async result => {
+    mocks.rpc.mockResolvedValue(result);
+    const response = await request();
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain("private database details");
+  });
+});

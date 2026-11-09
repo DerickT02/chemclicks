@@ -6,6 +6,7 @@ import type { StudentAttempt } from "@/lib/db/student_attempts";
 import type { MeasurementQuizModeKey } from "@/lib/measurement/modes";
 import { getMeasurementQuizMode } from "@/lib/measurement/modes";
 import { evaluateAnswer, type AnswerResult } from "@/lib/measurement/answer";
+import { savedAnswerResult } from "@/lib/measurement/quiz";
 
 const UUID_PATTERN = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const MODE_KEYS = new Set<MeasurementQuizModeKey>([
@@ -18,6 +19,9 @@ const MODE_KEYS = new Set<MeasurementQuizModeKey>([
 export type MeasurementAttemptQuestion = {
   questionIndex: number;
   reading: number;
+  /** The saved first gradable answer, when an unfinished attempt is resumed. */
+  firstAnswer: string | null;
+  isCorrect: boolean | null;
 };
 
 export type MeasurementAttemptStart = {
@@ -62,25 +66,39 @@ export async function startStudentMeasurementQuiz(
   const response = data as {
     attempt_id?: unknown;
     attempt_number?: unknown;
+    mode?: unknown;
     questions?: unknown;
   };
   if (typeof response.attempt_id !== "string"
     || !Number.isInteger(response.attempt_number)
-    || !Array.isArray(response.questions)) {
+    || (response.attempt_number as number) < 1
+    || response.mode !== mode
+    || !Array.isArray(response.questions)
+    || response.questions.length === 0) {
     throw new Error("The measurement quiz returned an invalid attempt.");
   }
 
-  const questions = response.questions.map((question) => {
+  const questions = response.questions.map((question, index) => {
     if (!question || typeof question !== "object") {
       throw new Error("The measurement quiz returned an invalid question.");
     }
-    const row = question as { question_index?: unknown; reading?: unknown };
-    if (!Number.isInteger(row.question_index)
+    const row = question as {
+      question_index?: unknown;
+      reading?: unknown;
+      first_answer?: unknown;
+      is_correct?: unknown;
+    };
+    const firstAnswer = row.first_answer ?? null;
+    const isCorrect = row.is_correct ?? null;
+    if (row.question_index !== index
       || typeof row.reading !== "number"
-      || !Number.isFinite(row.reading)) {
+      || !Number.isFinite(row.reading)
+      || !(firstAnswer === null || typeof firstAnswer === "string")
+      || !(isCorrect === null || typeof isCorrect === "boolean")
+      || (firstAnswer === null) !== (isCorrect === null)) {
       throw new Error("The measurement quiz returned an invalid question.");
     }
-    return { questionIndex: row.question_index as number, reading: row.reading };
+    return { questionIndex: index, reading: row.reading, firstAnswer, isCorrect };
   });
 
   return {
@@ -127,9 +145,20 @@ export async function recordStudentMeasurementAnswer(
   };
   if (typeof receipt.counted !== "boolean"
     || !(typeof receipt.first_try_correct === "boolean" || receipt.first_try_correct === null)
+    || (receipt.counted && receipt.first_try_correct === null)
     || typeof receipt.mode !== "string" || !isModeKey(receipt.mode)
     || typeof receipt.reading !== "number" || !Number.isFinite(receipt.reading)) {
     throw new Error("Your answer could not be saved. Please try again.");
+  }
+
+  // An answer was already saved for this question, for example by a request
+  // whose response was lost. The saved grade stands, not this resubmission.
+  if (!receipt.counted && receipt.first_try_correct !== null) {
+    return {
+      counted: false,
+      firstTryCorrect: receipt.first_try_correct,
+      result: savedAnswerResult(receipt.first_try_correct),
+    };
   }
   return {
     counted: receipt.counted,
@@ -158,8 +187,22 @@ export async function completeStudentMeasurementQuiz(
       p_attempt_id: attemptId,
     },
   );
-  if (error || !Array.isArray(data) || data.length !== 1) {
+  if (error || !Array.isArray(data) || data.length !== 1 || !isCompletedAttempt(data[0])) {
     throw new Error("The measurement quiz could not be completed.");
   }
-  return data[0] as StudentAttempt;
+  return data[0];
+}
+
+function isCompletedAttempt(value: unknown): value is StudentAttempt {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.id === "string"
+    && Number.isInteger(row.attempt_number)
+    && Number.isInteger(row.question_total)
+    && Number.isInteger(row.score)
+    && (row.question_total as number) > 0
+    && (row.score as number) >= 0
+    && (row.score as number) <= (row.question_total as number)
+    && typeof row.passed === "boolean"
+    && row.status === "completed";
 }
