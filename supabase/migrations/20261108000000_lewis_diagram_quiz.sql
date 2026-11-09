@@ -4,16 +4,18 @@
 -- was finished (see 20261104000200). It is now graded like the other Lewis
 -- lessons: a reviewed `lewis_diagram` question pool, bound to lewis_diagram
 -- assignments in the trusted quiz RPCs, 80% to pass, unlimited retries, and
--- completion once that quiz is passed.
+-- completion once its exploration is finished and that quiz is passed (the
+-- SCRUM-233 rule shared by every quizzed lesson).
 --
 -- The pool covers single-atom Lewis dot diagrams and valence electrons for
 -- elements 1-20 (the explorer's range). It does not repeat the
 -- diagram-based covalent molecule questions from SCRUM-131
 -- (20261021010000), which stay in the lewis_covalent pool.
 --
--- Apply after 20261104000300_fix_bohr_quiz_access_and_progress_history.sql
--- and the 20261105* teacher live-update migrations. This file is
--- intentionally not applied by the application agent.
+-- Apply after 20261107011100_scrum_233_assignment_completion.sql, which
+-- drops and recreates assignment_progress_state; running this file first
+-- would lose the lewis_diagram mapping. This file is intentionally not
+-- applied by the application agent.
 
 BEGIN;
 
@@ -193,7 +195,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.assignment_progress_state(uuid, text) IS
-  'Shared assignment status and stage. Quizzed lessons, including the Lewis dot diagram since SCRUM-234, complete once their own quiz is passed.';
+  'Shared assignment status and stage. Quizzed lessons, including the Lewis dot diagram since SCRUM-234, complete once their exploration is finished and their own quiz is passed.';
 
 -- Like the other assignment-gated quizzes, the lewis_diagram pool (and its
 -- answers) is read only by the server with the service-role client. The list

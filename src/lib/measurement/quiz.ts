@@ -78,6 +78,7 @@ export type ResultsState = {
   attemptId?: string;
   attemptNumber?: number;
   passed?: boolean;
+  assignmentCompleted?: boolean | null;
   score: number;
   total: number;
 };
@@ -91,6 +92,9 @@ export type QuizState =
   | QuestionState
   | ResultsState;
 
+/** A question's saved first gradable answer, from the server; null fields when unanswered. */
+export type SavedAnswer = { answer: string | null; correct: boolean | null };
+
 export type QuizAction =
   /** Readings come from pickReadings in the caller, so the reducer stays pure. */
   | {
@@ -101,11 +105,13 @@ export type QuizAction =
       attemptId?: string;
       attemptNumber?: number;
       score?: number;
+      /** Answers already saved for a resumed attempt, one per reading. */
+      saved?: readonly SavedAnswer[];
     }
   | { type: "edit-answer"; answer: string }
   | { type: "submit" }
   | { type: "server-submit"; result: AnswerResult; counted: boolean; firstTryCorrect: boolean | null }
-  | { type: "server-complete"; attemptId: string; attemptNumber: number; score: number; total: number; passed: boolean }
+  | { type: "server-complete"; attemptId: string; attemptNumber: number; score: number; total: number; passed: boolean; assignmentCompleted?: boolean | null }
   | { type: "next" }
   | { type: "choose-instrument" };
 
@@ -141,6 +147,47 @@ function startQuestion(
   };
 }
 
+/** Feedback for a question whose first answer the server had already saved. */
+export function savedAnswerResult(correct: boolean): AnswerResult {
+  return correct
+    ? { status: "correct", message: "Your first answer was already saved and was correct." }
+    : {
+      status: "incorrect",
+      reason: "value",
+      message: "Your first answer was already saved and was incorrect. Only the first answer counts.",
+    };
+}
+
+/**
+ * Resumes a saved attempt where the server says it is: at the first unanswered
+ * question, or on the last one, locked, once every answer is saved.
+ */
+function resumeAttempt(action: Extract<QuizAction, { type: "start" }>): QuestionState {
+  const mode = action.mode ?? null;
+  const saved = action.saved ?? [];
+  const score = saved.filter((entry) => entry.correct === true).length;
+  const open = action.readings.findIndex((_, index) => (saved[index]?.answer ?? null) === null);
+  const questionIndex = open === -1 ? action.readings.length - 1 : open;
+  const question = startQuestion(
+    action.instrument, mode, action.readings, questionIndex, score,
+    action.attemptId, action.attemptNumber,
+  );
+
+  const last = saved[questionIndex];
+  if (open !== -1 || !last || last.answer === null || last.correct === null) return question;
+
+  const spec = mode ? getMeasurementQuizMode(mode).spec : INSTRUMENTS[action.instrument];
+  const graded = evaluateAnswer(last.answer, currentReading(question), spec);
+  return {
+    ...question,
+    answer: last.answer,
+    // The server's grade is authoritative if the client would grade it differently.
+    result: (graded.status === "correct") === last.correct ? graded : savedAnswerResult(last.correct),
+    attempt: 1,
+    firstTryCorrect: last.correct,
+  };
+}
+
 /** A student may move on once they have submitted a gradable answer. */
 export function canContinue(question: QuestionState): boolean {
   return question.result !== null && question.result.status !== "invalid";
@@ -152,6 +199,7 @@ export function isAnswerLocked(question: QuestionState): boolean {
 }
 
 export function quizReducer(state: QuizState, action: QuizAction): QuizState {
+  if (action.type === "start" && action.saved) return resumeAttempt(action);
   if (action.type === "start") return startQuestion(
     action.instrument,
     action.mode ?? null,
@@ -169,6 +217,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       attemptId: action.attemptId,
       attemptNumber: action.attemptNumber,
       passed: action.passed,
+      assignmentCompleted: action.assignmentCompleted,
       score: action.score,
       total: action.total,
     };
@@ -203,7 +252,9 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
 
     case "server-submit": {
       if (isAnswerLocked(state)) return state;
-      const addsPoint = action.counted && action.firstTryCorrect === true;
+      // A replay (counted false) still carries the saved grade, so a lost first
+      // response can't cost the student a point they earned.
+      const addsPoint = action.firstTryCorrect === true && state.firstTryCorrect === null;
       return {
         ...state,
         result: action.result,

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const directory = new URL("../../supabase/migrations/", import.meta.url);
-const filename = "20261106000000_lewis_diagram_quiz.sql";
+const filename = "20261108000000_lewis_diagram_quiz.sql";
 
 const readRaw = (name: string): string => readFileSync(new URL(name, directory), "utf8");
 const normalize = (sql: string): string => sql
@@ -42,9 +42,9 @@ const rows = parseSeed(raw, "lewis_diagram");
 const promptKey = (question: string): string => question.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 describe("Lewis dot diagram quiz migration (SCRUM-234)", () => {
-  it("has its own version that sorts after dev's progress and live-update migrations", () => {
-    expect(migrationNames.filter((name) => name.startsWith("20261106000000_"))).toEqual([filename]);
-    expect(migrationNames).not.toContain("20261104010000_lewis_diagram_quiz.sql");
+  it("has its own version that sorts after dev's SCRUM-233 completion migration", () => {
+    expect(migrationNames.filter((name) => name.startsWith("20261108000000_"))).toEqual([filename]);
+    for (const old of ["20261104010000_lewis_diagram_quiz.sql", "20261106000000_lewis_diagram_quiz.sql"]) expect(migrationNames).not.toContain(old);
     const latestOther = migrationNames.filter((name) => name.endsWith(".sql") && name !== filename).sort().at(-1);
     expect(latestOther).toBeDefined();
     expect(filename > (latestOther as string)).toBe(true);
@@ -101,7 +101,7 @@ describe("Lewis dot diagram quiz migration (SCRUM-234)", () => {
     // The replace target must still exist in the latest definition from dev.
     const latestHelper = migrationNames
       .filter((name) => name.endsWith(".sql") && name < filename)
-      .filter((name) => normalize(readRaw(name)).includes("create or replace function public.assignment_progress_state("))
+      .filter((name) => /create (or replace )?function public\.assignment_progress_state\(/.test(normalize(readRaw(name))))
       .sort()
       .at(-1);
     expect(latestHelper).toBeDefined();

@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "My Assignments | ChemClicks" };
 export const dynamic = "force-dynamic";
 
 const OPEN_SECTIONS: readonly QueueSection[] = ["not_started", "in_progress", "completed", "unknown", "unsupported"];
-const ACTIONS = { not_started: "Open to start", in_progress: "Resume exploration", completed: "Review exploration", unknown: "Open activity" } as const;
+const ACTIONS = { not_started: "Open to start", in_progress: "Resume exploration", completed: "Review assignment", unknown: "Open activity" } as const;
 
 function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; section: QueueSection }) {
   const available = OPEN_SECTIONS.includes(section);
@@ -31,8 +31,18 @@ function AssignmentCard({ assignment, section }: { assignment: QueueAssignment; 
         </p>
       )}
       {section === "not_started" && <p className="text-sm">Exploration not started.</p>}
-      {section === "in_progress" && <p className="text-sm">Your current exploration is in progress.</p>}
-      {section === "completed" && <p className="text-sm">Exploration completion saved. This is not a quiz grade.</p>}
+      {section === "in_progress" && <p className="text-sm">
+        {assignment.passingQuizKey && !assignment.explorationCompleted
+          ? "Quiz passed — exploration still needed."
+          : assignment.stage === "explored"
+            ? "Exploration finished — quiz still needed."
+            : assignment.stage === "needs_retry"
+              ? "Quiz not passed yet — try again."
+              : assignment.stage === "quiz_in_progress"
+                ? "Quiz in progress."
+                : "Your assignment is in progress."}
+      </p>}
+      {section === "completed" && <p className="text-sm">Assignment completion saved.</p>}
       {section === "unknown" && <p className="text-sm text-muted-foreground">Progress unavailable. Open the activity to check your saved attempts.</p>}
       {section === "upcoming" && <p className="text-sm text-muted-foreground">Not open yet. Check back when this activity opens.</p>}
       {section === "closed" && <>
@@ -91,7 +101,7 @@ export default async function StudentAssignmentsPage() {
                 No activities are available right now. Check the schedules below or ask your teacher about your next activity.
               </p>
             ) : allAvailableCompleted && (
-              <p className="rounded-lg border border-border p-6">Your available explorations are completed. You can review them while they remain open.</p>
+              <p className="rounded-lg border border-border p-6">Your available assignments are completed. You can review them while they remain open.</p>
             )}
             {groups.map(group => (
               <section key={group.id} aria-labelledby={`queue-${group.id}`} className="space-y-3">

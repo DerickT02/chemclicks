@@ -339,7 +339,13 @@ export function MeasurementQuestion({
           <button
             type="button"
             autoFocus
-            onClick={() => onContinue ? onContinue(question) : dispatch({ type: "next" })}
+            // aria-disabled, not disabled, while the attempt saves: a disabled button drops focus.
+            aria-disabled={pending || undefined}
+            onClick={() => {
+              if (pending) return;
+              if (onContinue) onContinue(question);
+              else dispatch({ type: "next" });
+            }}
             className={PRIMARY_BUTTON_CLASS}
           >
             {continueLabel}
@@ -357,6 +363,9 @@ type ResultsProps = {
   onChooseInstrument: () => void;
   /** Where a passed assigned attempt leads next; null when nothing is open. */
   nextDestination?: string | null;
+  /** Whether exploration and the quiz together completed this assignment. */
+  assignmentCompleted?: boolean | null;
+  pending?: boolean;
 };
 
 export function AttemptResults({
@@ -365,13 +374,15 @@ export function AttemptResults({
   onTryAgain,
   onChooseInstrument,
   nextDestination = null,
+  assignmentCompleted,
+  pending = false,
 }: ResultsProps) {
   const spec = results.mode
     ? getMeasurementQuizMode(results.mode).spec
     : INSTRUMENTS[results.instrument];
   const passed = results.passed ?? hasPassed(results.score, results.total);
   const percent = Math.round((results.score / results.total) * 100);
-  const continueTo = assignedMode && passed ? nextDestination : null;
+  const continueTo = assignedMode && passed && assignmentCompleted === true ? nextDestination : null;
 
   // The button that finished the attempt is gone, so focus starts on the score.
   return (
@@ -386,6 +397,11 @@ export function AttemptResults({
           message={`You answered ${results.score} of ${results.total} correctly on the first try (${percent}%). Passing takes ${passingScore(results.total)} of ${results.total} (${PASS_PERCENT}%).`}
         />
       </div>
+      {assignedMode && passed && assignmentCompleted === false && (
+        <p className="mt-3 text-sm font-medium text-foreground" role="status">
+          Quiz passed — exploration still needed.
+        </p>
+      )}
       {results.attemptNumber !== undefined && (
         <p className="mt-3 text-sm text-muted-foreground">
           {`Attempt ${results.attemptNumber}`}
@@ -395,7 +411,8 @@ export function AttemptResults({
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={onTryAgain}
+          aria-disabled={pending || undefined}
+          onClick={() => { if (!pending) onTryAgain(); }}
           className={continueTo ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
         >
           Try again with new questions
@@ -430,25 +447,46 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextDestination, setNextDestination] = useState<string | null>(null);
+  // Set synchronously, so a second click before React re-renders can't send the request again.
+  const inFlight = useRef(false);
+
+  function send<T>(request: () => Promise<T>, onSaved: (value: T) => void, failure: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
+    setError(null);
+    request()
+      .then(onSaved)
+      .catch(() => setError(failure))
+      .finally(() => {
+        inFlight.current = false;
+        setPending(false);
+      });
+  }
 
   // The random draw happens here, in an event handler, rather than in the
   // reducer: React can call a reducer twice and needs the same result both times.
   function startAttempt(instrument: InstrumentId) {
+    if (inFlight.current) return;
     setError(null);
     setNextDestination(null);
     if (mode && assignmentId) {
-      setPending(true);
-      startMeasurementQuizAction(assignmentId, mode)
-        .then((attempt) => dispatch({
+      send(
+        () => startMeasurementQuizAction(assignmentId, mode),
+        (attempt) => dispatch({
           type: "start",
           instrument,
           mode,
           readings: attempt.questions.map((question) => question.reading),
           attemptId: attempt.attemptId,
           attemptNumber: attempt.attemptNumber,
-        }))
-        .catch(() => setError("The quiz could not be started. Please try again."))
-        .finally(() => setPending(false));
+          saved: attempt.questions.map((question) => ({
+            answer: question.firstAnswer,
+            correct: question.isCorrect,
+          })),
+        }),
+        "The quiz could not be started. Please try again.",
+      );
       return;
     }
     dispatch({
@@ -460,35 +498,36 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
   }
 
   function submitAnswer(question: QuestionState) {
-    if (!assignmentId || !question.attemptId) return;
-    setPending(true);
-    setError(null);
-    recordMeasurementAnswerAction(
-      assignmentId,
-      question.attemptId,
-      question.questionIndex,
-      question.answer,
-    )
-      .then((receipt) => dispatch({
+    const { attemptId } = question;
+    if (!assignmentId || !attemptId) return;
+    send(
+      () => recordMeasurementAnswerAction(
+        assignmentId,
+        attemptId,
+        question.questionIndex,
+        question.answer,
+      ),
+      (receipt) => dispatch({
         type: "server-submit",
         result: receipt.result,
         counted: receipt.counted,
         firstTryCorrect: receipt.firstTryCorrect,
-      }))
-      .catch(() => setError("Your answer could not be saved. Please try again."))
-      .finally(() => setPending(false));
+      }),
+      "Your answer could not be saved. Please try again.",
+    );
   }
 
   function continueQuestion(question: QuestionState) {
+    if (inFlight.current) return;
     if (question.questionIndex < question.readings.length - 1) {
       dispatch({ type: "next" });
       return;
     }
-    if (!assignmentId || !question.attemptId || question.attemptNumber === undefined) return;
-    setPending(true);
-    setError(null);
-    completeMeasurementQuizAction(assignmentId, question.attemptId)
-      .then((result) => {
+    const { attemptId } = question;
+    if (!assignmentId || !attemptId || question.attemptNumber === undefined) return;
+    send(
+      () => completeMeasurementQuizAction(assignmentId, attemptId),
+      (result) => {
         setNextDestination(result.nextDestination);
         dispatch({
           type: "server-complete",
@@ -497,10 +536,11 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
           score: result.score,
           total: result.total,
           passed: result.passed,
+          assignmentCompleted: result.assignmentCompleted,
         });
-      })
-      .catch(() => setError("The quiz could not be completed. Please try again."))
-      .finally(() => setPending(false));
+      },
+      "The quiz could not be completed. Please try again.",
+    );
   }
 
   if (state.phase === "choosing") {
@@ -520,6 +560,8 @@ export default function MeasurementQuiz({ assignmentId, mode }: MeasurementQuizP
         onTryAgain={() => startAttempt(state.instrument)}
         onChooseInstrument={() => dispatch({ type: "choose-instrument" })}
         nextDestination={nextDestination}
+        assignmentCompleted={state.assignmentCompleted}
+        pending={pending}
       />
       </>
     );
