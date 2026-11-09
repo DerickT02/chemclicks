@@ -41,7 +41,7 @@ describe("sectionQuizKey", () => {
   it.each([
     ["bohr_model_intro", "bohr_model_intro"],
     ["bohr_model_stability", "bohr_model_stability"],
-    ["lewis_diagram", null],
+    ["lewis_diagram", "lewis_diagram"],
     ["lewis_structures_covalent", "lewis_covalent"],
     ["lewis_structures_ionic", "lewis_ionic"],
     ["measurement_ruler_tenths", "measurement_ruler_tenths"],
@@ -174,7 +174,7 @@ describe("the Bohr → Lewis → Measurement journey", () => {
   const finish: [string, SectionRecord][] = [
     ["bohr-intro", record("completed", "completed", true, "bohr_models")],
     ["bohr-stability", record("completed", "completed", true, "bohr_models")],
-    ["lewis-diagram", record("completed", "completed", true, null)],
+    ["lewis-diagram", record("completed", "completed", true, "lewis_diagram")],
     ["lewis-covalent", record("completed", "completed", true, "lewis_covalent")],
     ["lewis-ionic", record("completed", "completed", true, "lewis_ionic")],
     ["ruler-tenths", record("completed", "completed", true, "measurement_ruler_tenths")],

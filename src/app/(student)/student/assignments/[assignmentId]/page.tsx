@@ -18,7 +18,7 @@ import MeasurementQuiz from "@/components/measurement/MeasurementQuiz";
 
 import { hasActivityContent } from "@/lib/assignments/activity-content";
 import { getActivityDefinition, getNewAssignmentBlockReason } from "@/lib/activities/registry";
-import { lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
+import { LEWIS_QUIZZES, lewisQuizForLesson } from "@/lib/assignments/lewis-quizzes";
 import { measurementAttemptLabel, measurementQuizModeForActivity } from "@/lib/measurement/modes";
 import { getAssignmentGate } from "@/lib/assignments/prerequisites";
 import { assignmentPath } from "@/lib/assignments/sequence";
@@ -64,6 +64,9 @@ export default async function AssignmentPage({ params }: {
       || attempt.quiz_key === BOHR_INTRO_QUIZ_KEY
       || attempt.quiz_key === BOHR_STABILITY_QUIZ_KEY,
   );
+  const lewisQuizAttempts = quizKind
+    ? attempts.filter((attempt) => attempt.quiz_key === LEWIS_QUIZZES[quizKind].quizKey)
+    : [];
   const measurementAttempts = attempts.filter((attempt) => attempt.instrument !== null && attempt.instrument !== undefined);
   const latest = explorationAttempts[0];
   return (
@@ -113,6 +116,7 @@ export default async function AssignmentPage({ params }: {
               attempts={bohrQuizAttempts}
             />
           )}
+          {quizKind && <QuizAttemptHistory title={LEWIS_QUIZZES[quizKind].title} attempts={lewisQuizAttempts} />}
           {measurementQuizMode && (
             <>
               <section aria-label="Measurement quiz history" className="rounded-xl border border-border bg-card p-6">

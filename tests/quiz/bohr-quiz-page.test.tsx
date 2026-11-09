@@ -19,6 +19,7 @@ vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_STABILITY_QUIZ_KEY: "bohr_model_stability",
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
+  LEWIS_DIAGRAM_QUIZ_KEY: "lewis_diagram",
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/bohr/BohrModelsQuiz", () => ({

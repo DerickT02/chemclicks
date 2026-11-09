@@ -9,6 +9,7 @@ export const BOHR_INTRO_QUIZ_KEY = "bohr_model_intro";
 export const BOHR_STABILITY_QUIZ_KEY = "bohr_model_stability";
 export const LEWIS_COVALENT_QUIZ_KEY = "lewis_covalent";
 export const LEWIS_IONIC_QUIZ_KEY = "lewis_ionic";
+export const LEWIS_DIAGRAM_QUIZ_KEY = "lewis_diagram";
 
 type QuizQuestionRow = {
   question_key: string;

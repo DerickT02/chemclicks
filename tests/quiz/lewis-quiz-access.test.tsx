@@ -31,6 +31,7 @@ vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_STABILITY_QUIZ_KEY: "bohr_model_stability",
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
+  LEWIS_DIAGRAM_QUIZ_KEY: "lewis_diagram",
   listQuizQuestions: mocks.listQuestions,
 }));
 vi.mock("next/navigation", () => ({
@@ -230,7 +231,7 @@ describe("independent Lewis quizzes", () => {
     expect(await renderQuizFor(open)).toContain("Started ");
   });
 
-  it("shows no quiz cards on the Lewis dot diagram page", async () => {
+  it("shows only its own quiz card on the Lewis dot diagram page", async () => {
     withAssignments([diagram, covalentLesson, ionicLesson]);
     mocks.attempts.mockResolvedValue([{
       id: "exploration", attempt_number: 1, quiz_key: null, status: "in_progress",
@@ -238,8 +239,11 @@ describe("independent Lewis quizzes", () => {
     }]);
     const html = await renderAssignment(diagram.id);
     expect(html).toContain("Lewis exercise");
+    expect(html).toContain("Lewis Dot Diagrams Quiz");
+    expect(html).toContain(`/student/quizzes/lewis-diagram?assignmentId=${diagram.id}`);
     expect(html).not.toContain("Compounds Quiz");
-    expect(html).not.toContain("/student/quizzes/");
+    expect(html).not.toContain("/student/quizzes/covalent");
+    expect(html).not.toContain("/student/quizzes/ionic");
   });
 
   it("shows only the matching quiz card on each lesson page", async () => {
