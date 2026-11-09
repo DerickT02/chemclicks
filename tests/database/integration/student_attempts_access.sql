@@ -3,14 +3,22 @@
 BEGIN;
 DO $$
 DECLARE
-  ta uuid := gen_random_uuid(); tb uuid := gen_random_uuid(); stranger uuid := gen_random_uuid();
+  ta uuid; tb uuid; stranger uuid := gen_random_uuid();
   ca uuid; cb uuid; act uuid; aa uuid; ab uuid; sa uuid; sb uuid; pa uuid; pb uuid; mismatch uuid;
   attempt uuid; n integer; tbl text; op text;
 BEGIN
-  INSERT INTO auth.users(id,email,email_confirmed_at)
-    VALUES(ta,ta||'@example.invalid',now()),(tb,tb||'@example.invalid',now()),(stranger,stranger||'@example.invalid',now());
-  INSERT INTO public.teachers(id,email,display_name)
-    VALUES(ta,ta||'@example.invalid','Test A'),(tb,tb||'@example.invalid','Test B');
+  SELECT t.id INTO ta FROM public.teachers t
+    JOIN auth.users u ON u.id = t.id
+    WHERE u.email_confirmed_at IS NOT NULL AND NOT COALESCE(u.is_anonymous, false)
+    ORDER BY t.id LIMIT 1;
+  SELECT t.id INTO tb FROM public.teachers t
+    JOIN auth.users u ON u.id = t.id
+    WHERE t.id <> ta
+      AND u.email_confirmed_at IS NOT NULL AND NOT COALESCE(u.is_anonymous, false)
+    ORDER BY t.id LIMIT 1;
+  IF ta IS NULL OR tb IS NULL THEN
+    RAISE EXCEPTION 'Two verified teacher fixtures are required';
+  END IF;
   SELECT id INTO act FROM public.activities WHERE type::text='lewis_diagram' LIMIT 1;
   IF act IS NULL THEN RAISE EXCEPTION 'An activity fixture anchor is required'; END IF;
   INSERT INTO public.classes(teacher_id,name,section,class_code) VALUES(ta,'Access test A','Test',upper(substr(md5(ta::text),1,6))) RETURNING id INTO ca;
@@ -37,8 +45,12 @@ BEGIN
 
   UPDATE public.students SET verified=false WHERE id=sa;
   SET LOCAL ROLE service_role;
-  -- dev resolves enrollment from the authenticated Supabase session, not verified.
-  PERFORM public.student_attempt_access(sa,ca,pa,false);
+  -- A valid auth identity does not replace the student approval requirement.
+  BEGIN
+    PERFORM public.student_attempt_access(sa,ca,pa,false);
+    RAISE EXCEPTION 'Unverified student access allowed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
   RESET ROLE;
   UPDATE public.students SET verified=true WHERE id=sa;
   UPDATE public.classes SET is_active=false WHERE id=ca;
@@ -76,12 +88,36 @@ BEGIN
 
   FOREACH tbl IN ARRAY ARRAY['classes','teachers','student_attempts','students','student_progress','class_activities','activities'] LOOP
     FOREACH op IN ARRAY ARRAY['INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'] LOOP
-      IF has_table_privilege('anon','public.'||tbl,op) OR has_table_privilege('authenticated','public.'||tbl,op) THEN RAISE EXCEPTION 'Unexpected % grant on %',op,tbl; END IF;
+      IF has_table_privilege('anon','public.'||tbl,op)
+         OR has_table_privilege('authenticated','public.'||tbl,op) THEN
+        IF NOT (
+          tbl='class_activities' AND op IN ('INSERT','UPDATE')
+          AND NOT has_table_privilege('anon','public.class_activities',op)
+          AND has_table_privilege('authenticated','public.class_activities',op)
+          AND (SELECT relrowsecurity FROM pg_class WHERE oid='public.class_activities'::regclass)
+          AND EXISTS (
+            SELECT 1 FROM pg_policies
+            WHERE schemaname='public' AND tablename='class_activities'
+              AND cmd=op AND 'authenticated'::name=ANY(roles)
+              AND (
+                (op='INSERT' AND with_check LIKE '%auth.uid%'
+                  AND with_check LIKE '%class_activities.class_id%')
+                OR (op='UPDATE' AND qual LIKE '%auth.uid%'
+                  AND qual LIKE '%class_activities.class_id%'
+                  AND with_check LIKE '%auth.uid%'
+                  AND with_check LIKE '%class_activities.class_id%')
+              )
+          )
+        ) THEN
+          RAISE EXCEPTION 'Unexpected % grant on %',op,tbl;
+        END IF;
+      END IF;
     END LOOP;
   END LOOP;
   IF (SELECT relrowsecurity FROM pg_class WHERE oid='public.classes'::regclass)
     OR (SELECT relrowsecurity FROM pg_class WHERE oid='public.teachers'::regclass)
     OR NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.student_attempts'::regclass)
+    OR NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.class_activities'::regclass)
     THEN RAISE EXCEPTION 'Unexpected RLS state'; END IF;
 END $$;
 SELECT 'PASS: student own/other, teacher own/other, anonymous, unrelated, enrollment, unauthorized writes and RLS state' AS result;

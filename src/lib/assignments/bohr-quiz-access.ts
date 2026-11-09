@@ -14,7 +14,6 @@ export type BohrQuizAccess =
   | { status: "missing" }
   | { status: "scheduled"; assignment: StudentAssignment }
   | { status: "closed"; assignment: StudentAssignment }
-  | { status: "blocked"; assignment: StudentAssignment; blocker: StudentAssignment }
   | { status: "available"; assignment: StudentAssignment };
 
 function isBohrAssignment(assignment: StudentAssignment): boolean {

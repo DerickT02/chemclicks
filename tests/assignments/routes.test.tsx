@@ -24,7 +24,9 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
 }));
 vi.mock("@/components/assignments/AssignmentAccess", () => ({ default: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock("@/components/bohr-models/BohrModelViewer", () => ({ default: () => <p>Bohr exercise</p> }));
+vi.mock("@/components/bohr-models/BohrModelViewer", () => ({
+  default: ({ mode }: { mode?: string }) => <p>Bohr exercise{mode ? `: ${mode}` : ""}</p>,
+}));
 vi.mock("@/components/measurement/GraduatedCylinder", () => ({ default: () => <p>Cylinder exercise</p> }));
 vi.mock("@/components/measurement/PrecisionRuler", () => ({ default: ({ precision }: { precision: string }) => <p>Ruler exercise: {precision}</p> }));
 vi.mock("@/components/lewis/LewisDotExplorer", () => ({ default: () => <p>Lewis exercise</p> }));
@@ -122,6 +124,7 @@ describe("student assignment pages", () => {
     attempts.mockResolvedValue([startedExploration]);
     const html = renderToStaticMarkup(await page("bohr"));
     expect(html).toContain("Bohr exercise");
+    expect(html).toContain(`Bohr exercise: ${type === "bohr_model_stability" ? "stability" : "intro"}`);
     expect(html).toContain("Start exploration");
     expect(html).toContain('href="/student/quizzes/bohr?assignmentId=bohr"');
     expect(html).not.toContain("Lewis exercise");
@@ -146,14 +149,14 @@ describe("student assignment pages", () => {
     const bohr = { ...assignment, id: "bohr", activity: { ...assignment.activity, type: "bohr_model_stability" } };
     reader.mockResolvedValue({ status: "ok", assignments: [bohr] });
     attempts.mockResolvedValue([{
-      id: "bohr-quiz", attempt_number: 1, quiz_key: "bohr_models", instrument: null, precision_mode: null,
+      id: "bohr-quiz", attempt_number: 1, quiz_key: "bohr_model_stability", instrument: null, precision_mode: null,
       status: "completed", score: 10, question_total: 12, passed: true,
       started_at: "2026-10-01T12:00:00Z", completed_at: "2026-10-01T12:05:00Z",
     }]);
 
     const html = renderToStaticMarkup(await AssignmentPage({ params: Promise.resolve({ assignmentId: "bohr" }) }));
 
-    expect(html).toContain("Bohr quiz history");
+    expect(html).toContain("Bohr Model Stability quiz history");
     expect(html).toContain("10 of 12 correct");
     expect(html).toContain("Passed");
   });
@@ -224,6 +227,7 @@ describe("student assignment pages", () => {
   it.each([
     ["lewis_structures_covalent", "/student/quizzes/covalent"],
     ["lewis_structures_ionic", "/student/quizzes/ionic"],
+    ["lewis_diagram", "/student/quizzes/lewis-diagram"],
     ["bohr_model_intro", "/student/quizzes/bohr"],
   ])("shows a Take quiz link on %s assignments that names the assignment", async (type, path) => {
     reader.mockResolvedValue({ status: "ok", assignments: [{
@@ -234,36 +238,22 @@ describe("student assignment pages", () => {
     expect(html).toContain(`href="${path}?assignmentId=lesson"`);
   });
   it("shows no Take quiz link on other activities", async () => {
-    reader.mockResolvedValue({ status: "ok", assignments: [assignment, {
-      ...assignment, id: "diagram", activity: { ...assignment.activity, type: "lewis_diagram" },
-    }] });
+    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     const html = renderToStaticMarkup(await StudentPage());
     expect(html).not.toContain("Take quiz");
     expect(html).not.toContain("/student/quizzes/");
   });
 });
 
-describe("prerequisite gating", () => {
+describe("section navigation", () => {
   const blocker = { ...assignment, id: "bohr-intro", activity: { ...assignment.activity, id: "bohr", title: "Bohr Intro", type: "bohr_model_intro" } };
 
-  it("shows a locked panel instead of the exercise when an earlier section is unfinished", async () => {
-    reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
-    gate.mockResolvedValue({ status: "locked", blocker });
-    const html = renderToStaticMarkup(await page());
-    expect(gate).toHaveBeenCalledWith(assignment.id);
-    expect(html).toContain("This section is locked.");
-    expect(html).toContain('href="/student/assignments/bohr-intro"');
-    expect(html).toContain('href="/student"');
-    expect(html).not.toContain("Cylinder exercise");
-    expect(html).not.toContain("Start exploration");
-    expect(attempts).not.toHaveBeenCalled();
-  });
   it("sends a signed-out gate result to the student login", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     gate.mockResolvedValue({ status: "unauthenticated" });
     await expect(page()).rejects.toThrow("REDIRECT:/login/student");
   });
-  it("links a completed section to the next unlocked one", async () => {
+  it("links a completed section to the next unfinished one", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [assignment] });
     gate.mockResolvedValue({ status: "open", entry: { complete: true }, next: { assignment: blocker } });
     const html = renderToStaticMarkup(await page());
@@ -277,15 +267,13 @@ describe("prerequisite gating", () => {
     expect(html).toContain("finished all open sections");
     expect(html).toContain('href="/student"');
   });
-  it("hides start and quiz links on locked queue cards and names the blocking section", async () => {
+  it("offers start and quiz links on every open queue card", async () => {
     reader.mockResolvedValue({ status: "ok", assignments: [{
       ...assignment, id: "lesson", activity: { ...assignment.activity, type: "lewis_structures_covalent" },
-      lockedBy: { id: "bohr-intro", activity: { title: "Bohr Intro" } },
     }] });
     const html = renderToStaticMarkup(await StudentPage());
-    expect(html).toContain("Locked: finish");
-    expect(html).toContain('href="/student/assignments/bohr-intro"');
-    expect(html).not.toContain('href="/student/assignments/lesson"');
-    expect(html).not.toContain("Take quiz");
+    expect(html).not.toContain("Locked");
+    expect(html).toContain('href="/student/assignments/lesson"');
+    expect(html).toContain("Take quiz");
   });
 });

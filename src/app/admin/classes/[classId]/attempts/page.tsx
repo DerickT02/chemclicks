@@ -1,41 +1,22 @@
+import { redirect } from 'next/navigation'
 import { getTeacherClassActivities } from '@/lib/server/teacher-activities'
-import { getTeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
-import { AttemptRoster } from './AttemptRoster'
 
+// Replaced by one student progress page per activity
+// (/admin/classes/[classId]/activities/[assignmentId]); old links still work.
 export default async function ActivityAttemptsPage({ params, searchParams }: {
   params: Promise<{ classId: string }>
-  searchParams: Promise<{ assignmentId?: string }>
+  searchParams: Promise<{ assignmentId?: string | string[] }>
 }) {
   const { classId } = await params
-  const { assignmentId } = await searchParams
-  const classroom = await getTeacherClassActivities(classId)
-  const selectedId = assignmentId ?? classroom.assignments[0]?.id
-  // Never fall back to another assignment when an explicit selection is invalid.
-  if (selectedId && !classroom.assignments.some(item => item.id === selectedId)) {
-    throw new Error('Activity access denied or unavailable.')
+  const { assignmentId: requested } = await searchParams
+  const assignmentId = Array.isArray(requested) ? requested[0] : requested
+  // The activity page checks ownership and shows 404 for a foreign assignment.
+  if (assignmentId) {
+    redirect(`/admin/classes/${encodeURIComponent(classId)}/activities/${encodeURIComponent(assignmentId)}`)
   }
-  const summary = selectedId ? await getTeacherActivityAttemptSummary(classId, selectedId) : null
-  return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-foreground">
-      <h1 className="text-3xl font-semibold">Activity attempts</h1>
-      <p className="mt-2 text-muted-foreground">{classroom.name}</p>
-      {classroom.assignments.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-border bg-card p-5">No activities assigned to this class yet.</p>
-      ) : (
-        <>
-          <form className="my-6 flex flex-wrap items-end gap-3" action={`/admin/classes/${classId}/attempts`}>
-            <div>
-              <label htmlFor="assignment" className="mb-2 block text-sm font-medium">Activity</label>
-              <select key={selectedId} id="assignment" name="assignmentId" defaultValue={selectedId}
-                className="max-w-full rounded-md border border-border bg-card p-2 text-foreground">
-                {classroom.assignments.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-              </select>
-            </div>
-            <button className="rounded-md bg-primary px-4 py-2 text-primary-foreground" type="submit">View attempts</button>
-          </form>
-          {summary && <AttemptRoster summary={summary} />}
-        </>
-      )}
-    </main>
-  )
+  const classroom = await getTeacherClassActivities(classId)
+  const first = classroom.assignments[0]
+  redirect(first
+    ? `/admin/classes/${classroom.id}/activities/${first.id}`
+    : `/admin?classId=${classroom.id}`)
 }

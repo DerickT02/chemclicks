@@ -46,6 +46,10 @@ BEGIN
   SELECT * INTO finished FROM public.student_attempt_transition(student,c,assignment,'complete',first_attempt.id);
   IF finished.status<>'completed' OR finished.score IS NOT NULL OR finished.passed IS NOT NULL
      OR finished.percentage IS NOT NULL OR finished.quiz_key IS NOT NULL THEN RAISE EXCEPTION 'Exploration completion was graded'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.student_progress
+    WHERE id = progress AND exploration_completed AND exploration_completed_at = finished.completed_at
+  ) THEN RAISE EXCEPTION 'Bohr exploration completion marker was not saved'; END IF;
   SELECT count(*) INTO n FROM public.student_attempts WHERE progress_id=progress AND (quiz_key IS NOT NULL OR passed IS NOT NULL);
   IF n<>0 THEN RAISE EXCEPTION 'Exploration completion created a quiz result'; END IF;
   RESET ROLE;

@@ -13,9 +13,11 @@ DECLARE
   replayed_attempt public.student_attempts%ROWTYPE;
   failed_attempt public.student_attempts%ROWTYPE;
   failed_replay public.student_attempts%ROWTYPE;
+  exploration_attempt public.student_attempts%ROWTYPE;
   pass_answers jsonb;
   fail_answers jsonb;
   attempt_count integer;
+  assignment_status text;
 BEGIN
   SELECT id INTO teacher FROM public.teachers LIMIT 1;
   SELECT id INTO activity
@@ -70,9 +72,26 @@ BEGIN
 
   SET LOCAL ROLE service_role;
 
+  SELECT * INTO exploration_attempt
+    FROM public.student_attempt_transition(
+      student, classroom, assignment, 'start', NULL
+    );
+  IF exploration_attempt.quiz_key IS NOT NULL OR exploration_attempt.status <> 'in_progress' THEN
+    RAISE EXCEPTION 'Exploration did not start before the assigned quiz';
+  END IF;
+
   PERFORM public.student_quiz_start(
     student, classroom, assignment, 'bohr_models'
   );
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.student_progress
+    WHERE id = exploration_attempt.progress_id
+      AND exploration_completed
+      AND exploration_completed_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'Starting the quiz did not durably finish the open exploration';
+  END IF;
 
   SELECT * INTO first_attempt
     FROM public.student_quiz_submit(
@@ -90,13 +109,18 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.student_progress
     WHERE id = first_attempt.progress_id
-      AND status = 'completed'
-      AND completed_at IS NOT NULL
+      AND exploration_completed
+      AND exploration_completed_at IS NOT NULL
   ) THEN
-    RAISE EXCEPTION 'Passing Bohr quiz did not complete assignment progress';
+    RAISE EXCEPTION 'Quiz start/pass did not preserve the durable exploration completion';
+  END IF;
+  SELECT state.status INTO assignment_status
+  FROM public.assignment_progress_state(first_attempt.progress_id, 'bohr_model_intro') state;
+  IF assignment_status <> 'completed' THEN
+    RAISE EXCEPTION 'Passing quiz and exploration did not complete the shared assignment state';
   END IF;
 
-  PERFORM public.student_quiz_start(
+  PERFORM public.student_quiz_retry_start(
     student, classroom, assignment, 'bohr_models'
   );
 
@@ -125,10 +149,14 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.student_progress
     WHERE id = failed_attempt.progress_id
-      AND status = 'in_progress'
-      AND completed_at IS NULL
+      AND exploration_completed
   ) THEN
-    RAISE EXCEPTION 'Failed Bohr quiz incorrectly completed assignment progress';
+    RAISE EXCEPTION 'Failed retry erased the durable exploration completion';
+  END IF;
+  SELECT state.status INTO assignment_status
+  FROM public.assignment_progress_state(failed_attempt.progress_id, 'bohr_model_intro') state;
+  IF assignment_status <> 'completed' THEN
+    RAISE EXCEPTION 'Failed retry erased the first passing completion';
   END IF;
 
   SELECT * INTO failed_replay

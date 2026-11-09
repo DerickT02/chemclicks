@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  session: vi.fn(), admin: vi.fn(), read: vi.fn(),
+  session: vi.fn(), admin: vi.fn(), read: vi.fn(), rpc: vi.fn(),
   calls: [] as { table: string; method: string; args: unknown[] }[],
 }));
 vi.mock("server-only", () => ({}));
@@ -20,8 +20,7 @@ const assignment = (id: string, overrides: Partial<AssignmentRow> = {}): Assignm
   activity: { id: `activity-${id}`, title: id, type: "lewis_diagram", order_index: 1 }, ...overrides,
 });
 let assignments: AssignmentRow[];
-let progress: { id: string; class_activity_id: string; status: string }[];
-let passedAttempts: { progress_id: string; quiz_key: string }[];
+let states: { assignment_id: string; status: string; stage: string; exploration_completed: boolean; exploration_completed_at: string | null; passing_attempt_number: number | null; passing_score: number | null; passing_total: number | null; passing_percentage: number | null; passing_quiz_key: string | null; passing_completed_at: string | null; failed_quiz_attempt_count: number; completed_at: string | null }[];
 const calls = (table: string, method: string) => mocks.calls.filter(call => call.table === table && call.method === method);
 const tables = () => mocks.calls.filter(call => call.method === "select").map(call => call.table);
 /** Replace one table's response; every other table keeps the default fixture. */
@@ -34,19 +33,33 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.calls.length = 0;
   assignments = [assignment("a"), assignment("b"), assignment("c")];
-  progress = [
-    { id: "progress-b", class_activity_id: "b", status: "in_progress" },
-    { id: "progress-c", class_activity_id: "c", status: "completed" },
-  ];
-  passedAttempts = [];
+  states = ["a", "b", "c"].map((assignmentId, index) => ({
+    assignment_id: assignmentId,
+    status: index === 0 ? "not_started" : index === 1 ? "in_progress" : "completed",
+    stage: index === 0 ? "not_started" : index === 1 ? "exploring" : "completed",
+    exploration_completed: index === 2,
+    exploration_completed_at: null,
+    passing_attempt_number: null,
+    passing_score: null,
+    passing_total: null,
+    passing_percentage: null,
+    passing_quiz_key: null,
+    passing_completed_at: null,
+    failed_quiz_attempt_count: 0,
+    completed_at: null,
+  }));
   mocks.session.mockResolvedValue({ studentId, classId });
   mocks.read.mockImplementation((table: string) => {
     if (table === "students") return { data: { id: studentId, class_id: classId, first_name: "Alex", last_name: "Student", login_id: "private-login" }, error: null };
     if (table === "classes") return { data: { id: classId, name: "Chemistry", section: "A", is_active: true, class_code: "private-code" }, error: null };
-    const rows = table === "class_activities" ? assignments : table === "student_attempts" ? passedAttempts : progress;
+    const rows = table === "class_activities" ? assignments : [];
     return { data: structuredClone(rows), error: null };
   });
-  mocks.admin.mockImplementation(() => ({ from: (table: string) => {
+  mocks.rpc.mockImplementation(async (name: string, args: { p_assignment_ids?: string[] }) => {
+    mocks.calls.push({ table: name, method: "rpc", args: [args] });
+    return { data: states.filter(row => args.p_assignment_ids?.includes(row.assignment_id)), error: null };
+  });
+  mocks.admin.mockImplementation(() => ({ rpc: mocks.rpc, from: (table: string) => {
     const builder: Record<string, (...args: unknown[]) => unknown> = {};
     for (const method of ["select", "eq", "is", "in", "order", "not"]) {
       builder[method] = (...args: unknown[]) => {
@@ -66,23 +79,21 @@ async function queue() {
 }
 
 describe("authorized student work queue", () => {
-  it("maps stored progress, defaults a missing row to not started, and reads each table once with ownership filters", async () => {
+  it("uses the shared assignment state RPC for completion and reads metadata with ownership filters", async () => {
     const result = await queue();
     expect(result.assignments.map(row => row.progress)).toEqual(["not_started", "in_progress", "completed"]);
     expect(result.context).toEqual({ studentName: "Alex Student", className: "Chemistry", section: "A" });
     expect(result.progressError).toBeNull();
     expect(JSON.stringify(result)).not.toMatch(/private-login|private-code|student_id|class_id|score|passed/);
-    expect(tables()).toEqual(["students", "classes", "class_activities", "student_progress", "student_attempts"]);
+    expect(tables()).toEqual(["students", "classes", "class_activities"]);
     // Unassigned (archived) work must not reappear in the student's list.
     expect(calls("class_activities", "is").map(call => call.args)).toEqual([["archived_at", null]]);
     expect(calls("students", "eq").map(call => call.args)).toEqual([["id", studentId], ["class_id", classId]]);
     expect(calls("classes", "eq").map(call => call.args)).toEqual([["id", classId], ["is_active", true]]);
     expect(calls("class_activities", "eq").map(call => call.args)).toEqual([["class_id", classId]]);
-    expect(calls("student_progress", "eq").map(call => call.args)).toEqual([["student_id", studentId]]);
-    expect(calls("student_progress", "in").map(call => call.args)).toEqual([["class_activity_id", ["a", "b", "c"]]]);
-    // Passed quizzes are read only for this student's own progress rows.
-    expect(calls("student_attempts", "in").map(call => call.args)).toEqual([["progress_id", ["progress-b", "progress-c"]]]);
-    expect(calls("student_attempts", "eq").map(call => call.args)).toEqual([["passed", true], ["status", "completed"]]);
+    expect(calls("student_assignment_progress_states", "rpc").map(call => call.args)).toEqual([[
+      { p_student_id: studentId, p_class_id: classId, p_assignment_ids: ["a", "b", "c"] },
+    ]]);
   });
 
   it("gives future/closed/invalid/unsupported work null progress and only asks for open exercises", async () => {
@@ -90,61 +101,47 @@ describe("authorized student work queue", () => {
       assignment("closed", { closes_at: "2000-01-01T00:00:00Z" }), assignment("invalid", { closes_at: "bad" }),
       assignment("unsupported", { activity: { id: "future", title: "Future", type: "future_activity" as AssignmentRow["activity"]["type"], order_index: 1 } }),
     ];
+    states = [{ ...states[0], assignment_id: "open" }];
     const result = await queue();
     expect(result.assignments.map(row => [row.id, row.progress])).toEqual([
       ["open", "not_started"], ["future", null], ["closed", null], ["invalid", null], ["unsupported", null],
     ]);
-    expect(calls("student_progress", "in").map(call => call.args)).toEqual([["class_activity_id", ["open"]]]);
+    expect(calls("student_assignment_progress_states", "rpc").map(call => call.args)).toEqual([[
+      { p_student_id: studentId, p_class_id: classId, p_assignment_ids: ["open"] },
+    ]]);
     expect(mocks.calls.filter(call => call.method === "select").some(call => String(call.args[0]).includes("*"))).toBe(false);
   });
 
   it("skips the progress read when no supported work is open", async () => {
     assignments = [assignment("closed", { closes_at: "2000-01-01T00:00:00Z" })];
     expect((await queue()).assignments[0].progress).toBeNull();
-    expect(calls("student_progress", "select")).toEqual([]);
+    expect(calls("student_assignment_progress_states", "rpc")).toEqual([]);
   });
 
   it("keeps the assignments but hides every progress state when the progress read fails", async () => {
-    override("student_progress", failed);
+    mocks.rpc.mockResolvedValue(failed);
     const result = await queue();
     expect(result.assignments.map(row => row.id)).toEqual(["a", "b", "c"]);
     expect(result.assignments.every(row => row.progress === null)).toBe(true);
-    expect(result.progressError).toContain("Exploration progress could not be loaded");
+    expect(result.progressError).toContain("Assignment progress could not be loaded");
   });
 
   it("treats an unrecognised status as unknown for that assignment only", async () => {
-    progress.push({ id: "progress-a", class_activity_id: "a", status: "future_status" });
+    states[0].status = "future_status";
     const result = await queue();
     expect(result.assignments.map(row => row.progress)).toEqual([null, "in_progress", "completed"]);
     expect(result.progressError).toBeNull();
   });
 
-  it("marks each section locked by the first earlier unfinished section", async () => {
+  it("never marks a section locked behind an earlier unfinished one", async () => {
     assignments = [
       assignment("a", { activity: { id: "x", title: "First", type: "lewis_diagram", order_index: 1 } }),
-      assignment("b", { activity: { id: "y", title: "Second", type: "lewis_diagram", order_index: 2 } }),
-      assignment("c", { activity: { id: "z", title: "Third", type: "lewis_diagram", order_index: 3 } }),
+      assignment("b", { activity: { id: "y", title: "Second", type: "lewis_structures_covalent", order_index: 2 } }),
     ];
-    progress = [{ id: "progress-a", class_activity_id: "a", status: "completed" }];
+    states = ["a", "b"].map(assignmentId => ({ ...states[0], assignment_id: assignmentId }));
     const result = await queue();
-    expect(result.assignments.map(row => row.lockedBy?.id ?? null)).toEqual([null, null, "b"]);
-    expect(result.assignments[2].lockedBy).toEqual({ id: "b", activity: { title: "Second" } });
-  });
-
-  it("counts a Lewis lesson as finished only once its quiz is passed", async () => {
-    assignments = [
-      assignment("a", { activity: { id: "x", title: "Covalent", type: "lewis_structures_covalent", order_index: 1 } }),
-      assignment("b", { activity: { id: "y", title: "Next", type: "lewis_diagram", order_index: 2 } }),
-    ];
-    progress = [{ id: "progress-a", class_activity_id: "a", status: "completed" }];
-    expect((await queue()).assignments[1].lockedBy?.id).toBe("a");
-    passedAttempts = [{ progress_id: "progress-a", quiz_key: "lewis_covalent" }];
-    expect((await queue()).assignments[1].lockedBy).toBeNull();
-  });
-
-  it.each(["student_progress", "student_attempts"])("shows no locks when the %s read fails", async table => {
-    override(table, failed);
-    expect((await queue()).assignments.every(row => row.lockedBy === null)).toBe(true);
+    expect(result.assignments.map(row => row.progress)).toEqual(["not_started", "not_started"]);
+    expect(result.assignments.every(row => !("lockedBy" in row))).toBe(true);
   });
 
   it("requires a session and an active class before reading assignments", async () => {

@@ -5,13 +5,14 @@ import { scheduleStatus } from "@/lib/assignments/schedule";
 
 export type QueueAssignment = StudentAssignment & {
   progress: ProgressStatus | null;
-  /** The earlier section the student must finish first; absent or null when unlocked. */
-  lockedBy?: { id: string; activity: { title: string } } | null;
+  explorationCompleted: boolean | null;
+  passingQuizKey: string | null;
+  stage: string | null;
 };
 export const QUEUE_SECTIONS = [
   { id: "in_progress", title: "In progress" },
   { id: "not_started", title: "To do" },
-  { id: "completed", title: "Completed explorations" },
+  { id: "completed", title: "Completed assignments" },
   { id: "unknown", title: "Available — progress unavailable" },
   { id: "unsupported", title: "Exercise unavailable" },
   { id: "upcoming", title: "Upcoming" },

@@ -11,6 +11,7 @@ import StudentPage from "@/app/(student)/student/page";
 const now = Date.parse("2026-04-01T12:00:00Z");
 const assignment = (id: string, overrides: Partial<QueueAssignment> = {}): QueueAssignment => ({
   id, opens_at: null, closes_at: null, progress: "not_started",
+  explorationCompleted: false, passingQuizKey: null, stage: "not_started",
   activity: { id: `activity-${id}`, title: `Activity ${id}`, type: "lewis_structures_covalent", order_index: 1 },
   ...overrides,
 });
@@ -54,8 +55,8 @@ describe("student dashboard work queue", () => {
     const output = await html();
     expect(output).toContain("Alex Student · Chemistry");
     expect(output).toContain("Period A");
-    for (const text of ["To do (1)", "In progress (1)", "Completed explorations (1)", "Open to start",
-      "Resume exploration", "Review exploration", "Exploration completion saved", "This is not a quiz grade",
+    for (const text of ["To do (1)", "In progress (1)", "Completed assignments (1)", "Open to start",
+      "Resume exploration", "Review assignment", "Assignment completion saved.",
       "Explore untracked practice"]) expect(output).toContain(text);
     expect(output).not.toContain("Use Start exploration");
     expect(output).not.toContain("Refresh assignments");
@@ -75,8 +76,8 @@ describe("student dashboard work queue", () => {
     expect(output).toContain("You can still view your saved exploration history");
     expect(output).toContain('href="/student/assignments/closed/history"');
     expect(output).toContain('dateTime="2026-04-02T12:00:00Z"');
-    expect(output).not.toContain("Completed explorations");
-    expect(output).not.toContain("Exploration completion saved");
+    expect(output).not.toContain("Completed assignments");
+    expect(output).not.toContain("Assignment completion saved");
     expect(output).not.toContain('href="/student/assignments/future');
     expect(output).not.toContain('href="/student/quizzes/');
     expect(output).not.toContain("Take quiz");
@@ -99,7 +100,7 @@ describe("student dashboard work queue", () => {
     expect(output).toContain("Open activity");
     expect(output).not.toContain("To do (1)");
     expect(output).not.toContain("Exploration not started");
-    expect(output).not.toContain("Your available explorations are completed");
+    expect(output).not.toContain("Your available assignments are completed");
   });
 
   it("shows unavailable data without a false empty class or enrollment context", async () => {
@@ -123,14 +124,23 @@ describe("student dashboard work queue", () => {
     expect(output).not.toContain("Take quiz");
   });
 
-  it("offers review for completed open explorations without claiming future work or quizzes are complete", async () => {
+  it("offers review for completed assignments without claiming future work is complete", async () => {
     reader.mockResolvedValue(response([assignment("review", { progress: "completed" }),
       assignment("future", { opens_at: "2026-04-02T12:00:00Z" })]));
     const output = await html();
-    expect(output).toContain("Your available explorations are completed");
+    expect(output).toContain("Your available assignments are completed");
     expect(output).toContain("review them while they remain open");
     expect(output).toContain("Upcoming (1)");
     expect(output).not.toContain("All assignments completed");
+  });
+
+  it("explains that a passed quiz still needs exploration when the student returns", async () => {
+    reader.mockResolvedValue(response([assignment("partial", {
+      progress: "in_progress", passingQuizKey: "lewis_covalent", explorationCompleted: false,
+    })]));
+    const output = await html();
+    expect(output).toContain("Quiz passed — exploration still needed.");
+    expect(output).not.toContain("Assignment completion saved");
   });
 
   it("redirects missing or inactive membership before showing any class details", async () => {

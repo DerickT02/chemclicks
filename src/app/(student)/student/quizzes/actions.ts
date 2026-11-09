@@ -2,7 +2,7 @@
 
 import { submitStudentQuiz } from "@/lib/server/student-quizzes";
 import { startStudentQuiz } from "@/lib/server/student-quiz-start";
-import { assertAssignmentUnlocked, getQuizProgression } from "@/lib/assignments/prerequisites";
+import { getQuizProgression } from "@/lib/assignments/prerequisites";
 import type { QuizAnswer, QuizCompleteResult } from "@/components/quiz/types";
 
 type SubmitQuizInput = {
@@ -18,8 +18,6 @@ export async function startQuizAction(
   quizKey: string,
   retry = false,
 ): Promise<{ status: "in_progress"; startedAt: string } | { status: "retry_required" }> {
-  // Only new attempts are gated, so an attempt already in flight can be submitted.
-  await assertAssignmentUnlocked(assignmentId);
   const result = await startStudentQuiz(assignmentId, quizKey, retry);
   return result.status === "in_progress"
     ? { status: result.status, startedAt: result.started_at }
@@ -30,17 +28,16 @@ export async function submitQuizAction(
   input: SubmitQuizInput,
 ): Promise<QuizCompleteResult> {
   const attempt = await submitStudentQuiz(input);
-  const progression = attempt.passed
-    ? await getQuizProgression(input.assignmentId, input.quizKey)
-    : { passed: false, nextDestination: null };
+  const progression = await getQuizProgression(input.assignmentId, input.quizKey);
 
   return {
     score: attempt.score ?? 0,
     total: attempt.question_total ?? 0,
     percent: attempt.percentage ?? 0,
     passed: attempt.passed === true,
+    assignmentCompleted: progression.assignmentCompleted,
     attemptId: attempt.id,
     attemptNumber: attempt.attempt_number,
-    nextDestination: progression.passed ? progression.nextDestination : null,
+    nextDestination: attempt.passed === true && progression.passed ? progression.nextDestination : null,
   };
 }

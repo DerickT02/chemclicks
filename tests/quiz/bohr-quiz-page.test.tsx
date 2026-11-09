@@ -15,8 +15,11 @@ const adminClient = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
 vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_QUIZ_KEY: "bohr_models",
+  BOHR_INTRO_QUIZ_KEY: "bohr_model_intro",
+  BOHR_STABILITY_QUIZ_KEY: "bohr_model_stability",
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
+  LEWIS_DIAGRAM_QUIZ_KEY: "lewis_diagram",
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/bohr/BohrModelsQuiz", () => ({
@@ -38,7 +41,12 @@ beforeEach(() => {
   listQuestions.mockReset();
   getAccess.mockResolvedValue({
     status: "available",
-    assignment: { id: "assignment-1", opens_at: null, closes_at: null },
+    assignment: {
+      id: "assignment-1",
+      opens_at: null,
+      closes_at: null,
+      activity: { type: "bohr_model_intro", title: "Introduction" },
+    },
   });
 });
 
@@ -50,12 +58,10 @@ describe("Bohr quiz page", () => {
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
-  it("does not read questions while the quiz is locked", async () => {
+  it("sends an unassigned quiz back to the assignments page without reading questions", async () => {
     getAccess.mockResolvedValue({ status: "locked" });
 
-    const html = renderToStaticMarkup(await BohrModelQuizPage());
-
-    expect(html).toContain("This quiz is locked");
+    await expect(BohrModelQuizPage()).rejects.toThrow("REDIRECT:/student");
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
@@ -82,7 +88,7 @@ describe("Bohr quiz page", () => {
     const html = renderToStaticMarkup(await BohrModelQuizPage());
 
     // The server's own client: student sessions are not allowed to read the rows.
-    expect(listQuestions).toHaveBeenCalledWith(adminClient, "bohr_models");
+    expect(listQuestions).toHaveBeenCalledWith(adminClient, "bohr_model_intro");
     expect(html).toContain("Quiz with 2 questions");
     expect(html).not.toContain("Check your understanding");
     expect(html).not.toContain("Back to");

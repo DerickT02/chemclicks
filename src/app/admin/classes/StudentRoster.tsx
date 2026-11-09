@@ -6,9 +6,9 @@ import type { StudentRoster as Roster, RosterStudent } from "@/lib/server/studen
 
 const INITIAL_STATE: ApprovalState = { status: "idle", message: "" };
 
-type Props = { classId: string; roster: Roster };
+type Props = { classId: string; roster: Roster; liveStatus?: string };
 
-export default function StudentRoster({ classId, roster }: Props) {
+export default function StudentRoster({ classId, roster, liveStatus }: Props) {
   const headingId = useId();
   const [state, action, pending] = useActionState(async (previous: ApprovalState, data: FormData): Promise<ApprovalState> => {
     try {
@@ -72,6 +72,7 @@ export default function StudentRoster({ classId, roster }: Props) {
   return (
     <section aria-labelledby={headingId} className="mt-7 space-y-4">
       <h3 id={headingId} className="text-lg font-semibold">Students & approvals</h3>
+      {liveStatus && <p role="status" className="text-sm text-muted-foreground">{liveStatus}</p>}
       <p className="text-sm text-muted-foreground">Pending students cannot sign in until you approve them.</p>
       <p role={state.status === "error" && !pending ? "alert" : "status"}
         className={`text-sm ${state.status === "error" && !pending ? "text-destructive" : "text-foreground"}`}>

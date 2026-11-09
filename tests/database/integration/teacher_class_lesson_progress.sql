@@ -2,27 +2,34 @@
 BEGIN;
 DO $$
 DECLARE
-  teacher uuid; c uuid; other_class uuid;
+  teacher uuid; foreign_teacher uuid; c uuid; other_class uuid; empty_class uuid; foreign_class uuid;
   bohr_activity uuid; covalent_activity uuid; diagram_activity uuid;
   bohr_assignment uuid; covalent_assignment uuid; diagram_assignment uuid;
   not_started_student uuid; bohr_in_progress_student uuid; bohr_completed_student uuid;
   covalent_explorer_only_student uuid; covalent_both_done_student uuid;
-  diagram_in_progress_student uuid; outsider uuid;
+  diagram_in_progress_student uuid; covalent_quiz_started_student uuid; bohr_retry_started_student uuid; outsider uuid;
   progress uuid; result jsonb; row_data jsonb; lesson jsonb;
 BEGIN
   SELECT t.id INTO teacher FROM public.teachers t JOIN auth.users u ON u.id=t.id
     WHERE u.email_confirmed_at IS NOT NULL AND NOT COALESCE(u.is_anonymous,false) LIMIT 1;
+  SELECT t.id INTO foreign_teacher FROM public.teachers t JOIN auth.users u ON u.id=t.id
+    WHERE t.id<>teacher AND u.email_confirmed_at IS NOT NULL
+      AND NOT COALESCE(u.is_anonymous,false) LIMIT 1;
   SELECT id INTO bohr_activity FROM public.activities WHERE type='bohr_model_intro' LIMIT 1;
   SELECT id INTO covalent_activity FROM public.activities WHERE type='lewis_structures_covalent' LIMIT 1;
   SELECT id INTO diagram_activity FROM public.activities WHERE type='lewis_diagram' LIMIT 1;
-  IF teacher IS NULL OR bohr_activity IS NULL OR covalent_activity IS NULL OR diagram_activity IS NULL THEN
-    RAISE EXCEPTION 'Verified teacher and bohr_model_intro/lewis_structures_covalent/lewis_diagram activities required';
+  IF teacher IS NULL OR foreign_teacher IS NULL OR bohr_activity IS NULL OR covalent_activity IS NULL OR diagram_activity IS NULL THEN
+    RAISE EXCEPTION 'Two verified teachers and required activities are needed';
   END IF;
 
   INSERT INTO public.classes(teacher_id,name,section,class_code) VALUES
     (teacher,'Lesson progress test','Test',upper(substr(md5(random()::text),1,6))) RETURNING id INTO c;
   INSERT INTO public.classes(teacher_id,name,section,class_code) VALUES
     (teacher,'Other lesson progress test','Test',upper(substr(md5(random()::text),1,6))) RETURNING id INTO other_class;
+  INSERT INTO public.classes(teacher_id,name,section,class_code) VALUES
+    (teacher,'Empty lesson progress test','Test',upper(substr(md5(random()::text),1,6))) RETURNING id INTO empty_class;
+  INSERT INTO public.classes(teacher_id,name,section,class_code) VALUES
+    (foreign_teacher,'Foreign lesson progress test','Test',upper(substr(md5(random()::text),1,6))) RETURNING id INTO foreign_class;
 
   INSERT INTO public.class_activities(class_id,activity_id) VALUES(c,bohr_activity) RETURNING id INTO bohr_assignment;
   INSERT INTO public.class_activities(class_id,activity_id) VALUES(c,covalent_activity) RETURNING id INTO covalent_assignment;
@@ -42,27 +49,46 @@ BEGIN
     VALUES(c,'DiagramInProgress','Test',gen_random_uuid()::text) RETURNING id INTO diagram_in_progress_student;
   INSERT INTO public.students(class_id,first_name,last_name,student_id)
     VALUES(other_class,'Outsider','Test',gen_random_uuid()::text) RETURNING id INTO outsider;
+  INSERT INTO public.students(class_id,first_name,last_name,student_id)
+    VALUES(c,'CovalentQuizStarted','Test',gen_random_uuid()::text) RETURNING id INTO covalent_quiz_started_student;
+  INSERT INTO public.students(class_id,first_name,last_name,student_id)
+    VALUES(c,'BohrRetryStarted','Test',gen_random_uuid()::text) RETURNING id INTO bohr_retry_started_student;
 
   -- Bohr (quiz-only): an attempt that failed to pass still counts as in_progress, not completed.
   INSERT INTO public.student_progress(student_id,class_activity_id) VALUES(bohr_in_progress_student,bohr_assignment) RETURNING id INTO progress;
   INSERT INTO public.student_attempts(progress_id,attempt_number,quiz_key,question_total,score,percentage,passed,status,completed_at)
     VALUES(progress,1,'bohr_models',10,5,50.00,false,'completed',now());
 
-  -- Bohr (quiz-only): a passing attempt means completed, even though student_progress.status is still 'not_started'.
+  -- Bohr quiz-only pass: without completed exploration, the assignment stays incomplete.
   INSERT INTO public.student_progress(student_id,class_activity_id) VALUES(bohr_completed_student,bohr_assignment) RETURNING id INTO progress;
   INSERT INTO public.student_attempts(progress_id,attempt_number,quiz_key,question_total,score,percentage,passed,status,completed_at)
     VALUES(progress,1,'bohr_models',10,9,90.00,true,'completed',now());
 
   -- Covalent (dual): explorer completed, quiz never attempted -> in_progress, not completed.
-  INSERT INTO public.student_progress(student_id,class_activity_id,status) VALUES(covalent_explorer_only_student,covalent_assignment,'completed') RETURNING id INTO progress;
+  INSERT INTO public.student_progress(
+    student_id,class_activity_id,status,exploration_completed,exploration_completed_at
+  ) VALUES(covalent_explorer_only_student,covalent_assignment,'completed',true,now()) RETURNING id INTO progress;
 
   -- Covalent (dual): explorer completed AND quiz passed -> completed.
-  INSERT INTO public.student_progress(student_id,class_activity_id,status) VALUES(covalent_both_done_student,covalent_assignment,'completed') RETURNING id INTO progress;
+  INSERT INTO public.student_progress(
+    student_id,class_activity_id,status,exploration_completed,exploration_completed_at
+  ) VALUES(covalent_both_done_student,covalent_assignment,'completed',true,now()) RETURNING id INTO progress;
   INSERT INTO public.student_attempts(progress_id,attempt_number,quiz_key,question_total,score,percentage,passed,status,completed_at)
     VALUES(progress,1,'lewis_covalent',12,11,91.67,true,'completed',now());
 
   -- Lewis diagram (exploration-only): status is read straight off student_progress.
   INSERT INTO public.student_progress(student_id,class_activity_id,status) VALUES(diagram_in_progress_student,diagram_assignment,'in_progress');
+
+  -- Covalent: exploration finished and a quiz start saved, nothing submitted yet -> quiz_in_progress.
+  INSERT INTO public.student_progress(
+    student_id,class_activity_id,status,quiz_started_at,exploration_completed,exploration_completed_at
+  ) VALUES(covalent_quiz_started_student,covalent_assignment,'completed',now(),true,now());
+
+  -- Bohr: a failed attempt followed by a later retry start -> quiz_in_progress, not needs_retry.
+  INSERT INTO public.student_progress(student_id,class_activity_id,status,quiz_started_at)
+    VALUES(bohr_retry_started_student,bohr_assignment,'in_progress',now()) RETURNING id INTO progress;
+  INSERT INTO public.student_attempts(progress_id,attempt_number,quiz_key,question_total,score,percentage,passed,status,started_at,completed_at)
+    VALUES(progress,1,'bohr_models',10,5,50.00,false,'completed',now() - interval '2 hours',now() - interval '1 hour');
 
   -- Malformed cross-class progress must neither enter the roster nor leak into it.
   INSERT INTO public.student_progress(student_id,class_activity_id,status) VALUES(outsider,bohr_assignment,'completed');
@@ -70,35 +96,50 @@ BEGIN
   SET LOCAL ROLE service_role;
   result := public.teacher_class_lesson_progress(teacher,c);
 
-  IF jsonb_array_length(result->'students')<>6 THEN RAISE EXCEPTION 'Roster not scoped correctly (got %)', jsonb_array_length(result->'students'); END IF;
+  IF jsonb_array_length(result->'students')<>8 THEN RAISE EXCEPTION 'Roster not scoped correctly (got %)', jsonb_array_length(result->'students'); END IF;
 
   FOR row_data IN SELECT value FROM jsonb_array_elements(result->'students') LOOP
     IF row_data->>'studentId'=not_started_student::text THEN
       IF row_data->>'overallPercent'<>'0' THEN RAISE EXCEPTION 'Not-started student should be 0%%'; END IF;
       FOR lesson IN SELECT value FROM jsonb_array_elements(row_data->'lessons') LOOP
         IF lesson->>'status'<>'not_started' THEN RAISE EXCEPTION 'Untouched lesson should be not_started, got %', lesson->>'status'; END IF;
+        IF lesson->>'stage'<>'not_started' THEN RAISE EXCEPTION 'Untouched lesson stage should be not_started, got %', lesson->>'stage'; END IF;
       END LOOP;
 
     ELSIF row_data->>'studentId'=bohr_in_progress_student::text THEN
       SELECT value INTO lesson FROM jsonb_array_elements(row_data->'lessons') WHERE value->>'activityId'=bohr_activity::text;
       IF lesson->>'status'<>'in_progress' THEN RAISE EXCEPTION 'Failed bohr attempt should read in_progress, got %', lesson->>'status'; END IF;
+      IF lesson->>'stage'<>'needs_retry' THEN RAISE EXCEPTION 'Failed bohr attempt stage should be needs_retry, got %', lesson->>'stage'; END IF;
 
     ELSIF row_data->>'studentId'=bohr_completed_student::text THEN
       SELECT value INTO lesson FROM jsonb_array_elements(row_data->'lessons') WHERE value->>'activityId'=bohr_activity::text;
-      IF lesson->>'status'<>'completed' THEN RAISE EXCEPTION 'Passed bohr quiz should read completed even though student_progress.status is untouched, got %', lesson->>'status'; END IF;
+      IF lesson->>'status'<>'in_progress' THEN RAISE EXCEPTION 'Quiz-only pass must remain incomplete until exploration is completed, got %', lesson->>'status'; END IF;
+      IF lesson->>'stage'<>'exploring' THEN RAISE EXCEPTION 'Quiz-only pass should remain in the incomplete stage, got %', lesson->>'stage'; END IF;
       IF lesson->>'activityTitle' IS NULL OR lesson->>'activityTitle'='' THEN RAISE EXCEPTION 'Lesson must carry a name, not just an id'; END IF;
 
     ELSIF row_data->>'studentId'=covalent_explorer_only_student::text THEN
       SELECT value INTO lesson FROM jsonb_array_elements(row_data->'lessons') WHERE value->>'activityId'=covalent_activity::text;
       IF lesson->>'status'<>'in_progress' THEN RAISE EXCEPTION 'Explorer-only covalent lesson should read in_progress, not completed, got %', lesson->>'status'; END IF;
+      IF lesson->>'stage'<>'explored' THEN RAISE EXCEPTION 'Explorer-only covalent stage should be explored, got %', lesson->>'stage'; END IF;
 
     ELSIF row_data->>'studentId'=covalent_both_done_student::text THEN
       SELECT value INTO lesson FROM jsonb_array_elements(row_data->'lessons') WHERE value->>'activityId'=covalent_activity::text;
       IF lesson->>'status'<>'completed' THEN RAISE EXCEPTION 'Covalent lesson with both halves done should read completed, got %', lesson->>'status'; END IF;
+      IF lesson->>'stage'<>'completed' THEN RAISE EXCEPTION 'Covalent lesson with both halves done stage should be completed, got %', lesson->>'stage'; END IF;
 
     ELSIF row_data->>'studentId'=diagram_in_progress_student::text THEN
       SELECT value INTO lesson FROM jsonb_array_elements(row_data->'lessons') WHERE value->>'activityId'=diagram_activity::text;
       IF lesson->>'status'<>'in_progress' THEN RAISE EXCEPTION 'Exploration-only lesson should read student_progress.status directly, got %', lesson->>'status'; END IF;
+      IF lesson->>'stage'<>'exploring' THEN RAISE EXCEPTION 'In-progress exploration stage should be exploring, got %', lesson->>'stage'; END IF;
+
+    ELSIF row_data->>'studentId'=covalent_quiz_started_student::text THEN
+      SELECT value INTO lesson FROM jsonb_array_elements(row_data->'lessons') WHERE value->>'activityId'=covalent_activity::text;
+      IF lesson->>'stage'<>'quiz_in_progress' THEN RAISE EXCEPTION 'Saved quiz start should read quiz_in_progress before submission, got %', lesson->>'stage'; END IF;
+      IF lesson->>'status'<>'in_progress' THEN RAISE EXCEPTION 'Started-but-unsubmitted quiz must not read completed, got %', lesson->>'status'; END IF;
+
+    ELSIF row_data->>'studentId'=bohr_retry_started_student::text THEN
+      SELECT value INTO lesson FROM jsonb_array_elements(row_data->'lessons') WHERE value->>'activityId'=bohr_activity::text;
+      IF lesson->>'stage'<>'quiz_in_progress' THEN RAISE EXCEPTION 'Retry started after a failed attempt should read quiz_in_progress, got %', lesson->>'stage'; END IF;
 
     ELSE RAISE EXCEPTION 'Foreign or unexpected student included: %', row_data->>'studentId';
     END IF;
@@ -106,11 +147,11 @@ BEGIN
 
   -- Ownership and grant checks, mirroring teacher_activity_attempt_summary.
   BEGIN PERFORM public.teacher_class_lesson_progress(gen_random_uuid(),c); RAISE EXCEPTION 'Foreign teacher allowed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
-  BEGIN PERFORM public.teacher_class_lesson_progress(teacher,other_class); RAISE EXCEPTION 'Foreign class allowed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM public.teacher_class_lesson_progress(teacher,foreign_class); RAISE EXCEPTION 'Foreign class allowed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
 
   SET LOCAL ROLE service_role;
-  result := public.teacher_class_lesson_progress(teacher,other_class);
+  result := public.teacher_class_lesson_progress(teacher,empty_class);
   IF result->'students'<>'[]'::jsonb THEN RAISE EXCEPTION 'Empty roster failed'; END IF;
   RESET ROLE;
 
@@ -122,5 +163,5 @@ BEGIN
   BEGIN PERFORM public.teacher_class_lesson_progress(teacher,c); RAISE EXCEPTION 'Browser RPC allowed'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
 END $$;
-SELECT 'PASS: per-activity-type status derivation, lesson names, roster scoping, teacher authorization and RPC grants' AS result;
+SELECT 'PASS: per-activity-type status and stage derivation, lesson names, roster scoping, teacher authorization and RPC grants' AS result;
 ROLLBACK;

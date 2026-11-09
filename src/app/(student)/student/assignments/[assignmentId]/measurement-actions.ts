@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertAssignmentUnlocked, getQuizProgression } from "@/lib/assignments/prerequisites";
+import { getQuizProgression } from "@/lib/assignments/prerequisites";
 import {
   completeStudentMeasurementQuiz,
   recordStudentMeasurementAnswer,
@@ -9,7 +9,6 @@ import {
 } from "@/lib/server/student-measurement-quizzes";
 
 export async function startMeasurementQuizAction(assignmentId: string, mode: string) {
-  await assertAssignmentUnlocked(assignmentId);
   return startStudentMeasurementQuiz(assignmentId, mode);
 }
 
@@ -28,16 +27,17 @@ export async function completeMeasurementQuizAction(
 ) {
   const attempt = await completeStudentMeasurementQuiz(assignmentId, attemptId);
   revalidatePath(`/student/assignments/${assignmentId}`);
-  const progression = attempt.passed === true && attempt.quiz_key
+  const progression = attempt.quiz_key
     ? await getQuizProgression(assignmentId, attempt.quiz_key)
-    : { passed: false, nextDestination: null };
+    : { passed: false, assignmentCompleted: null, nextDestination: null };
   return {
     attemptId: attempt.id,
     attemptNumber: attempt.attempt_number,
     score: attempt.score ?? 0,
     total: attempt.question_total ?? 0,
     passed: attempt.passed === true,
+    assignmentCompleted: progression.assignmentCompleted,
     completedAt: attempt.completed_at,
-    nextDestination: progression.passed ? progression.nextDestination : null,
+    nextDestination: attempt.passed === true && progression.passed ? progression.nextDestination : null,
   };
 }

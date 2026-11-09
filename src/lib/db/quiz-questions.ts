@@ -5,8 +5,11 @@ import { COVALENT_COMPOUNDS } from "@/lib/chemistry/covalent-compounds";
 // Logic and types regarding the QUIZ_QUESTIONS table.
 
 export const BOHR_QUIZ_KEY = "bohr_models";
+export const BOHR_INTRO_QUIZ_KEY = "bohr_model_intro";
+export const BOHR_STABILITY_QUIZ_KEY = "bohr_model_stability";
 export const LEWIS_COVALENT_QUIZ_KEY = "lewis_covalent";
 export const LEWIS_IONIC_QUIZ_KEY = "lewis_ionic";
+export const LEWIS_DIAGRAM_QUIZ_KEY = "lewis_diagram";
 
 type QuizQuestionRow = {
   question_key: string;

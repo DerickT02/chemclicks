@@ -4,7 +4,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import TeacherLabsPage from "@/app/admin/labs/page";
-import TeacherBohrModelsLabPage from "@/app/admin/labs/bohr-models/page";
+import TeacherBohrIntroductionLabPage from "@/app/admin/labs/bohr-models/intro/page";
+import TeacherBohrStabilityLabPage from "@/app/admin/labs/bohr-models/stability/page";
 import TeacherLewisLabPage from "@/app/admin/labs/lewis/page";
 import TeacherMeasurementLabPage from "@/app/admin/labs/measurement/page";
 import StudentLabsPage from "@/app/(student)/student/labs/page";
@@ -18,19 +19,40 @@ function hrefs(html: string): string[] {
 describe("teacher labs", () => {
   it("lists every lab and keeps the teacher inside the teacher area", () => {
     const links = hrefs(renderToStaticMarkup(<TeacherLabsPage />));
-    expect(links).toEqual(["/admin/labs/bohr-models", "/admin/labs/lewis", "/admin/labs/measurement"]);
+    expect(links).toEqual([
+      "/admin/labs/bohr-models/intro",
+      "/admin/labs/bohr-models/stability",
+      "/admin/labs/lewis",
+      "/admin/labs/measurement",
+    ]);
     for (const href of links) {
       expect(existsSync(resolve(process.cwd(), "src/app", href.slice(1), "page.tsx")), `Missing route for ${href}`).toBe(true);
     }
   });
 
+  it("renders the atom icon without corrupted encoding in both lab indexes", () => {
+    for (const Page of [TeacherLabsPage, StudentLabsPage]) {
+      const container = document.createElement("div");
+      container.innerHTML = renderToStaticMarkup(<Page />);
+      const card = container.querySelector('a[href$="/bohr-models/stability"]');
+      expect(card?.textContent).toContain("⚛️");
+      expect(card?.textContent).not.toContain("âš");
+    }
+  });
+
   it("leaves the student index linking to the student lab routes", () => {
     const links = hrefs(renderToStaticMarkup(<StudentLabsPage />));
-    expect(links).toEqual(["/student/labs/bohr-models", "/student/labs/lewis", "/student/labs/measurement"]);
+    expect(links).toEqual([
+      "/student/labs/bohr-models/intro",
+      "/student/labs/bohr-models/stability",
+      "/student/labs/lewis",
+      "/student/labs/measurement",
+    ]);
   });
 
   it.each([
-    ["Bohr Models", TeacherBohrModelsLabPage],
+    ["Bohr Model Introduction", TeacherBohrIntroductionLabPage],
+    ["Bohr Model Stability", TeacherBohrStabilityLabPage],
     ["Lewis Structures", TeacherLewisLabPage],
     ["Measurement Lab", TeacherMeasurementLabPage],
   ] as const)("shows the %s lab without quizzes or student-only links", (title, Page) => {

@@ -20,6 +20,7 @@ vi.mock("@/components/assignments/AssignmentAccess", () => ({
 vi.mock("@/lib/db/quiz-questions", () => ({
   LEWIS_COVALENT_QUIZ_KEY: "lewis_covalent",
   LEWIS_IONIC_QUIZ_KEY: "lewis_ionic",
+  LEWIS_DIAGRAM_QUIZ_KEY: "lewis_diagram",
   listQuizQuestions: listQuestions,
 }));
 vi.mock("@/components/quiz/lewis/LewisQuiz", () => ({
@@ -90,7 +91,6 @@ describe.each([
   it.each([
     ["scheduled", "This quiz is not open yet."],
     ["closed", "This quiz is closed."],
-    ["locked", "This quiz is locked."],
   ])("explains %s access without reading quiz content", async (status, message) => {
     getAccess.mockResolvedValue({ status, assignment: { id: "assignment-1" } });
     const html = await render();
@@ -98,18 +98,9 @@ describe.each([
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
-  it("links a blocked quiz back to the earlier section without reading quiz content", async () => {
-    getAccess.mockResolvedValue({
-      status: "blocked",
-      assignment: { id: "assignment-1" },
-      blocker: { id: "bohr-1", activity: { title: "Bohr Intro" } },
-    });
-    const html = renderToStaticMarkup(await LewisQuizPage({ kind, assignmentId: "assignment-1" }));
-    expect(getAccess).toHaveBeenCalledWith(kind, "assignment-1");
-    expect(html).toContain("This section is locked.");
-    expect(html).toContain("Bohr Intro");
-    expect(html).toContain('href="/student/assignments/bohr-1"');
-    expect(html).toContain('href="/student"');
+  it("sends an unassigned quiz back to the assignments page without reading quiz content", async () => {
+    getAccess.mockResolvedValue({ status: "locked" });
+    await expect(render()).rejects.toThrow("REDIRECT:/student");
     expect(listQuestions).not.toHaveBeenCalled();
   });
 

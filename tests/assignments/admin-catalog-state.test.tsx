@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { progressFacts } from "../testing/progress";
 
 const mocks = vi.hoisted(() => ({ catalog: vi.fn(), assignments: vi.fn(), classes: vi.fn(), lessonProgress: vi.fn(), teacher: vi.fn(), roster: vi.fn() }));
 vi.mock("@/app/admin/classes/DisableClassControl", () => ({ default: ({ classId, className }: { classId: string; className: string }) => <button data-class-id={classId}>Disable {className}</button> }));
@@ -111,8 +112,8 @@ const fiveAssignments = Array.from({ length: 5 }, (_, index) => ({ ...assignment
 const lessonStudent = {
   studentId: student.id, firstName: student.first_name, lastName: student.last_name, verified: true, overallPercent: 20,
   lessons: [
-    { assignmentId: "assignment-0", activityId: "activity-0", activityTitle: "Lewis Diagrams", status: "completed" },
-    { assignmentId: "assignment-1", activityId: "activity-1", activityTitle: "Graduated Cylinder", status: "not_started" },
+    { assignmentId: "assignment-0", activityId: "activity-0", activityTitle: "Lewis Diagrams", progress: progressFacts({ stage: "completed" }) },
+    { assignmentId: "assignment-1", activityId: "activity-1", activityTitle: "Graduated Cylinder", progress: progressFacts() },
   ],
 };
 function populateClass() {
@@ -122,14 +123,16 @@ function populateClass() {
 }
 
 describe("teacher enrollment and lesson progress", () => {
-  it("lists each student's named lesson progress from the verified lesson reader", async () => {
+  it("summarises each activity's progress on its own card and links to its progress page", async () => {
     populateClass();
     const html = await render();
-    expect(html).toContain("Student progress");
-    expect(html).toContain("Mina Chen");
-    expect(html).toContain("20% complete");
-    expect(html).toContain("Lewis Diagrams: Completed");
-    expect(html).toContain("Graduated Cylinder: Not started");
+    expect(html).toContain(`href="/admin/classes/${classId}/activities/assignment-0"`);
+    expect(html).toContain(`href="/admin/classes/${classId}/activities/assignment-1"`);
+    expect(html).toContain("1 student · 1 completed");
+    expect(html).toContain("1 student · 1 not started");
+    // Progress is no longer listed per student on the classroom page.
+    expect(html).not.toContain('role="progressbar"');
+    expect(html).not.toContain("Activity attempts");
     expect(html).toContain("1 student enrolled");
     expect(html).toContain("Active students");
     expect(mocks.lessonProgress).toHaveBeenCalledWith(classId);
@@ -157,7 +160,6 @@ describe("teacher enrollment and lesson progress", () => {
     const html = await render();
     expect(html).toContain("0 students enrolled");
     expect(html).toContain("0 students · Code");
-    expect(html).toContain("No students in this class yet.");
   });
   it("keeps valid enrollment but reports a lesson-progress failure instead of an empty class", async () => {
     populateClass();
@@ -165,14 +167,17 @@ describe("teacher enrollment and lesson progress", () => {
     const html = await render();
     expect(html).toContain("1 student enrolled");
     expect(html).toContain("Student progress could not be loaded");
-    expect(html).not.toContain("No students in this class yet.");
-    expect(html).not.toContain("% complete");
+    expect(html).toContain("Retry student progress");
+    // Each card says progress is unavailable rather than showing false zeroes, and still links.
+    expect(html).toContain("Progress unavailable.");
+    expect(html).not.toContain("not started");
+    expect(html).toContain(`href="/admin/classes/${classId}/activities/assignment-0"`);
     expect(html).not.toContain("private RPC");
   });
   it("loads the requested class alongside the class list, without reading it twice", async () => {
     populateClass();
     const html = await render();
-    expect(html).toContain("Lewis Diagrams: Completed");
+    expect(html).toContain("1 student · 1 completed");
     expect(mocks.teacher).toHaveBeenCalledTimes(1);
     // Counts need the service role, and only ever for the verified teacher's own classes.
     expect(mocks.classes).toHaveBeenCalledWith({ role: "service" }, "teacher");
@@ -191,7 +196,8 @@ describe("teacher enrollment and lesson progress", () => {
     });
     const html = renderToStaticMarkup(await AdminPage({ searchParams: Promise.resolve({ classId: foreignId }) }));
     expect(html).toContain(`data-class-id="${classId}"`);
-    expect(html).toContain("Mina Chen");
+    expect(html).toContain(`href="/admin/classes/${classId}/activities/assignment-0"`);
+    expect(html).not.toContain("foreign-assignment");
     expect(html).not.toContain("Student progress could not be loaded");
     expect(mocks.assignments).toHaveBeenLastCalledWith(expect.anything(), classId);
     expect(mocks.lessonProgress).toHaveBeenLastCalledWith(classId);
