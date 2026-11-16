@@ -69,7 +69,7 @@ describe('activity student progress page', () => {
     expect(html).toContain('First quiz started')
     expect(html).toContain('Latest quiz started')
     expect(html).toContain('Exploration to first quiz:</dt><dd>1h 1m')
-    expect(html).toContain('Quiz:</dt><dd>In progress · 1 attempt not passed')
+    expect(html).toMatch(/Quiz score<\/dt><dd[^>]*>In progress · 1 attempt not passed/)
   })
   it('shows a single exploration figure from the saved exploration-to-first-quiz interval', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
@@ -203,14 +203,15 @@ describe('activity student progress page', () => {
       stage: 'completed', passingQuizAttemptNumber: 2, passingQuizScore: 10, passingQuizTotal: 12,
       passingQuizPercentage: 83.33, completedAt: '2026-09-23T12:05:00Z', failedQuizAttemptCount: 1,
     })] }} />)
-    expect(passed).toContain('Passed on attempt 2: 10/12 (83.33%)')
+    expect(passed).toMatch(/Quiz score<\/dt><dd[^>]*>Passed on attempt 2: 10\/12 \(83\.33%\)/)
+    expect(passed.match(/Passed on attempt 2/g)).toHaveLength(1)
   })
   it('does not show a pass or score for a student with no submitted quiz', () => {
     const html = renderToStaticMarkup(<AttemptRoster summary={{ ...report, students: [{
       ...report.students[0], progress: progressFacts({ stage: 'explored' }),
     }] }} />)
-    expect(html).toContain('Quiz:</dt><dd>Not started')
-    expect(html).not.toMatch(/\d+\/\d+/)
+    expect(html).toMatch(/Quiz score<\/dt><dd[^>]*>Not started/)
+    expect(html.replace(/<[^>]*>/g, '')).not.toMatch(/\d+\/\d+/)
   })
   it('provides accessible loading, retry and not-found states without showing raw errors', () => {
     expect(renderToStaticMarkup(<NotFound />)).toContain('Activity not found')

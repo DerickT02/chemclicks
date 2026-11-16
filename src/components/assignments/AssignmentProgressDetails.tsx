@@ -14,25 +14,6 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
   );
 }
 
-function attempts(count: number): string {
-  return `${count} ${count === 1 ? "attempt" : "attempts"}`;
-}
-
-function QuizResult({ facts }: { facts: AssignmentProgressFacts }) {
-  const failed = facts.failedQuizAttemptCount;
-  if (facts.passingQuizAttemptNumber !== null) {
-    const score = facts.passingQuizScore !== null && facts.passingQuizTotal !== null
-      ? `: ${facts.passingQuizScore}/${facts.passingQuizTotal}` : "";
-    const percent = facts.passingQuizPercentage !== null ? ` (${facts.passingQuizPercentage}%)` : "";
-    return <>Passed on attempt {facts.passingQuizAttemptNumber}{score}{percent}</>;
-  }
-  if (facts.stage === "quiz_in_progress") {
-    return <>In progress{failed > 0 ? ` · ${attempts(failed)} not passed` : ""}</>;
-  }
-  if (failed > 0) return <>Not passed yet · {attempts(failed)} submitted</>;
-  return <>Not started</>;
-}
-
 // Exploration time is the saved first-exploration-start to first-quiz-start
 // interval; quiz-taking time is never added to it. Missing history reads as
 // "not recorded" rather than a guessed value.
@@ -51,11 +32,6 @@ export function AssignmentProgressDetails({ facts, className }: Props) {
         <Row term="Exploration to first quiz">
           {facts.timeToFirstQuizSeconds !== null ? formatDuration(facts.timeToFirstQuizSeconds)
             : quizReached ? "Not recorded" : "Quiz not started"}
-        </Row>
-      )}
-      {facts.stage !== "not_started" && (
-        <Row term="Quiz">
-          <QuizResult facts={facts} />
         </Row>
       )}
       {facts.stage === "completed" && (

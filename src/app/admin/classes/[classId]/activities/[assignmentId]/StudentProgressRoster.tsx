@@ -3,7 +3,8 @@ import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempt
 import { AttemptHistoryTable } from '@/app/admin/classes/[classId]/activities/[assignmentId]/AttemptHistoryTable'
 import { LazyAttemptHistory } from '@/app/admin/classes/[classId]/activities/[assignmentId]/LazyAttemptHistory'
 import { AssignmentProgressDetails } from '@/components/assignments/AssignmentProgressDetails'
-import { StageBar } from '@/components/assignments/StageBar'
+import { AssignmentProgressHeader } from '@/components/assignments/AssignmentProgressHeader'
+import { QuizScore } from '@/components/assignments/QuizScore'
 import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
 type Props = {
   summary: TeacherActivityAttemptSummary
@@ -22,10 +23,11 @@ export function StudentProgressRoster({ summary, lazyHistory = false }: Props) {
             const name = `${student.firstName} ${student.lastName}`
             return (
             <li key={student.studentId} className="py-4 first:pt-0 last:pb-0">
-              <StageBar
+              <AssignmentProgressHeader
                 stage={progress.stage}
                 label={`${name}, ${summary.activityTitle}`}
                 title={<h3 className="text-base font-semibold">{name}</h3>}
+                quizResult={<QuizScore facts={progress} />}
               />
               <AssignmentProgressDetails
                 className="mt-2 space-y-1 text-sm text-muted-foreground"
