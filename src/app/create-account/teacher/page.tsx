@@ -10,6 +10,7 @@ import {
   AuthPageLayout,
   AuthPrimaryButton,
 } from "@/components/auth/AuthPageLayout";
+import { ResendTeacherVerification } from "@/components/auth/ResendTeacherVerification";
 import {
   buildTeacherEmailRedirectTo,
   getTeacherVerificationMessage,
@@ -48,9 +49,12 @@ export default function TeacherCreateAccountPage() {
             </AuthFooter>
           }
         >
-          <p className="text-sm text-muted-foreground" role="status">
-            {getTeacherVerificationMessage(email)}
-          </p>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground" role="status">
+              {getTeacherVerificationMessage(email)}
+            </p>
+            <ResendTeacherVerification email={email} />
+          </div>
         </AuthCard>
       </AuthPageLayout>
     );
