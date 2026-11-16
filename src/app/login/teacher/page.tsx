@@ -12,13 +12,16 @@ import {
   AuthPrimaryButton,
   authSecondaryLinkClassName,
 } from "@/components/auth/AuthPageLayout";
+import { resendTeacherVerification } from "@/lib/auth/resend-teacher-verification";
 import {
   buildTeacherPasswordResetRedirectTo,
   getTeacherPasswordResetMessage,
+  getTeacherVerificationResentMessage,
 } from "@/lib/auth/teacher-email-verification";
 import { validateTeacherEmail } from "@/lib/auth/validate-teacher-signup";
 import {
   DATABASE_RETRY_MESSAGE,
+  EMAIL_NOT_CONFIRMED_MESSAGE,
   GENERIC_RETRY_MESSAGE,
   INVALID_CREDENTIALS_MESSAGE,
 } from "@/lib/errors/user-facing-errors";
@@ -51,34 +54,54 @@ function TeacherLoginForm() {
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [resetNotice, setResetNotice] = useState<string | undefined>();
+  const [notice, setNotice] = useState<string | undefined>();
   const [isSendingReset, setIsSendingReset] = useState(false);
-  const verificationRequired = searchParams.get("verification") === "required";
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
+  const [awaitingVerification, setAwaitingVerification] = useState(
+    () => searchParams.get("verification") === "required",
+  );
   const passwordWasReset = searchParams.get("password") === "reset";
 
-  async function handleForgottenPassword() {
+  function startEmailRequest(purpose: string): string | undefined {
     setEmailError(undefined);
     setPasswordError(undefined);
     setFormError(undefined);
-    setResetNotice(undefined);
+    setNotice(undefined);
 
-    if (!email.trim()) {
-      setEmailError("Enter your email above to reset your password.");
-      return;
-    }
-
-    const nextEmailError = validateTeacherEmail(email);
+    const normalizedEmail = email.trim();
+    const nextEmailError = normalizedEmail
+      ? validateTeacherEmail(normalizedEmail)
+      : `Enter your email above to ${purpose}.`;
     if (nextEmailError) {
       setEmailError(nextEmailError);
-      return;
+      return undefined;
     }
+    return normalizedEmail;
+  }
+
+  async function handleResendVerification() {
+    const normalizedEmail = startEmailRequest("resend the verification email");
+    if (!normalizedEmail) return;
+
+    setIsSendingVerification(true);
+    const result = await resendTeacherVerification(normalizedEmail, window.location.origin);
+    if (result.sent) {
+      // Generic message so we don't reveal whether the email has an unverified account.
+      setNotice(getTeacherVerificationResentMessage(normalizedEmail));
+    } else {
+      setFormError(result.error);
+    }
+    setIsSendingVerification(false);
+  }
+
+  async function handleForgottenPassword() {
+    const normalizedEmail = startEmailRequest("reset your password");
+    if (!normalizedEmail) return;
 
     setIsSendingReset(true);
 
     try {
       const supabase = createClient();
-      const normalizedEmail = email.trim();
-
       const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: buildTeacherPasswordResetRedirectTo(window.location.origin),
       });
@@ -89,7 +112,7 @@ function TeacherLoginForm() {
       }
 
       // Generic message so we don't reveal whether the email has an account.
-      setResetNotice(getTeacherPasswordResetMessage(normalizedEmail));
+      setNotice(getTeacherPasswordResetMessage(normalizedEmail));
     } catch {
       setFormError(GENERIC_RETRY_MESSAGE);
     } finally {
@@ -102,7 +125,7 @@ function TeacherLoginForm() {
     setEmailError(undefined);
     setPasswordError(undefined);
     setFormError(undefined);
-    setResetNotice(undefined);
+    setNotice(undefined);
 
     const nextEmailError = validateTeacherEmail(email);
     if (nextEmailError) {
@@ -127,7 +150,11 @@ function TeacherLoginForm() {
       });
 
       if (signInError) {
-        setFormError(INVALID_CREDENTIALS_MESSAGE);
+        if (signInError.code === "email_not_confirmed") {
+          setAwaitingVerification(true);
+        } else {
+          setFormError(INVALID_CREDENTIALS_MESSAGE);
+        }
         setPassword("");
         return;
       }
@@ -165,6 +192,16 @@ function TeacherLoginForm() {
             <Link href="/create-account/teacher" className={authSecondaryLinkClassName}>
               Create account
             </Link>
+            {awaitingVerification ? (
+              <button
+                type="button"
+                onClick={() => void handleResendVerification()}
+                disabled={isSendingVerification}
+                className={authSecondaryLinkClassName}
+              >
+                {isSendingVerification ? "Sending verification email..." : "Resend verification email"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => void handleForgottenPassword()}
@@ -206,17 +243,17 @@ function TeacherLoginForm() {
             }}
             error={passwordError}
           />
-          {verificationRequired ? (
-            <AuthFormError message="Please verify your email before signing in to teacher features." />
+          {awaitingVerification && !formError && !notice ? (
+            <AuthFormError message={EMAIL_NOT_CONFIRMED_MESSAGE} />
           ) : null}
-          {passwordWasReset && !resetNotice ? (
+          {passwordWasReset && !notice ? (
             <p className="text-sm text-muted-foreground" role="status">
               Your password has been updated. Please sign in.
             </p>
           ) : null}
-          {resetNotice ? (
+          {notice ? (
             <p className="text-sm text-muted-foreground" role="status">
-              {resetNotice}
+              {notice}
             </p>
           ) : null}
           <AuthFormError message={formError} />
