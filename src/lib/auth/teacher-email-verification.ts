@@ -8,6 +8,10 @@ export function getTeacherVerificationMessage(email: string): string {
   return `We sent a verification link to ${email}. Open your inbox and click the link to verify your email and finish creating your teacher account.`;
 }
 
+export function getTeacherVerificationResentMessage(email: string): string {
+  return `If ${email} has an account awaiting verification, we sent a new verification link. Check your inbox and spam folder.`;
+}
+
 export const TEACHER_RESET_PASSWORD_PATH = "/login/teacher/reset-password";
 
 export function buildTeacherPasswordResetRedirectTo(origin: string): string {

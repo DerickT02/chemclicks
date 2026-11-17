@@ -11,6 +11,10 @@ export const CLASS_CODE_LOOKUP_MESSAGE =
 
 export const INVALID_CREDENTIALS_MESSAGE =
   "The email or password is incorrect. Check both and try again.";
+export const EMAIL_NOT_CONFIRMED_MESSAGE =
+  "Please verify your email before signing in. Use Resend verification email below if you need a new link.";
+export const EMAIL_RATE_LIMIT_MESSAGE =
+  "Too many email requests. Please wait a minute before trying again.";
 export const INVALID_STUDENT_ID_MESSAGE =
   "That Student ID was not found in this classroom. Check the ID and try again.";
 
