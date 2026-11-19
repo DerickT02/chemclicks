@@ -50,7 +50,6 @@ const teachers = [
     studentCode: "STUDENT01",
     firstName: "Jordan",
     lastName: "Lee",
-    assignmentId: "30000000-0000-0000-0000-000000000001",
     assignActivities: true,
   },
   {
@@ -65,7 +64,6 @@ const teachers = [
     studentCode: "STUDENT02",
     firstName: "Casey",
     lastName: "Patel",
-    assignmentId: "30000000-0000-0000-0000-000000000002",
     assignActivities: false,
   },
 ];
@@ -140,14 +138,13 @@ for (const fixture of teachers) {
     const { data: activities, error: activityError } = await admin
       .from("activities")
       .select("id, type")
-      .in("type", ["bohr_model_intro", "lewis_diagram"])
       .order("order_index");
     if (activityError || !activities?.length) {
       throw new Error(`Loading seed activities failed: ${activityError?.message ?? "none found"}`);
     }
 
-    const assignments = activities.slice(0, 2).map((activity, index) => ({
-      id: index === 0 ? fixture.assignmentId : `${fixture.assignmentId.slice(0, -1)}${index + 1}`,
+    const assignments = activities.map((activity, index) => ({
+      id: `30000000-0000-0000-0000-00000000000${index + 1}`,
       class_id: fixture.classId,
       activity_id: activity.id,
       passing_threshold: 70,
