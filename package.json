@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "seed:local": "node scripts/seed-local.mjs",
+    "reset:local": "npx supabase db reset && npm run seed:local",
     "lint": "eslint",
     "test": "vitest run --config vitest.config.mts",
     "test:watch": "vitest --config vitest.config.mts",
