@@ -14,7 +14,7 @@ import Footer from "@/components/Footer";
 import LabsPage from "@/app/(student)/student/labs/page";
 
 function routeExists(href: string): boolean {
-  return ["", "/(student)", "/(teacher)"].some((group) => existsSync(
+  return ["", "/(student)"].some((group) => existsSync(
     resolve(process.cwd(), `src/app${group}`, href.slice(1), "page.tsx"),
   ));
 }
