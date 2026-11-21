@@ -154,9 +154,11 @@ Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`
 
 ## 🧪 Testing
 
-Tests use **Vitest 5** and React Testing Library. The default commands run only
-mocked unit/component suites, without application `.env` credentials;
-unmocked `fetch` is blocked. No Supabase project is required.
+Tests use **Vitest 5** and React Testing Library. The default commands run
+mocked unit/component suites and an isolated Next.js HTTP fixture, without
+application `.env` credentials; unmocked `fetch` is blocked. No Supabase project
+is required. The HTTP fixture builds a temporary app with the real proxy and
+error pages, mocks Supabase, and makes loopback HTTP requests.
 
 ```bash
 npm test                 # Safe unit/component suites
@@ -176,6 +178,18 @@ The safe-checks GitHub workflow runs `npm ci`, `npm test`, TypeScript, and lint,
 without Supabase secrets, database operations, migrations, or deployment.
 Browser/E2E coverage is still pending; no `test:e2e` script is configured.
 Mocked route/component checks do not certify browser or deployed-RPC behavior.
+
+### Error response statuses
+
+The proxy sets error statuses before page rendering: `/forbidden` returns 403,
+`/auth/auth-code-error` returns 400, and `/error` returns 500. Denied admin
+requests render the forbidden page with 403 without redirecting; role lookup
+failures render the error page with 500. Refreshed session cookies are retained.
+
+Next.js returns 500 for server rendering failures detected before streaming.
+Errors discovered after a loading/Suspense boundary has streamed a 200 response,
+or in the browser, can display error UI but cannot change the already-sent HTTP
+status. Error boundary components do not control response statuses.
 
 ---
 

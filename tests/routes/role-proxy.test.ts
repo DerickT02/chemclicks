@@ -76,7 +76,9 @@ describe("admin route proxy", () => {
   it("fails closed when the student lookup errors", async () => {
     mocks.student.mockResolvedValue({ data: null, error: { message: "private error" } });
     const response = await proxy(request("/admin"));
-    expect(response.headers.get("location")).toBe("https://chemclicks.test/forbidden");
+    expect(response.status).toBe(500);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-rewrite")).toBe("https://chemclicks.test/error");
   });
 
   it("allows approved teachers through", async () => {
@@ -87,11 +89,39 @@ describe("admin route proxy", () => {
   it("forbids signed-in users without a teacher record", async () => {
     mocks.teacher.mockResolvedValue({ data: null, error: null });
     const response = await proxy(request("/admin"));
-    expect(response.headers.get("location")).toBe("https://chemclicks.test/forbidden");
+    expect(response.status).toBe(403);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-rewrite")).toBe("https://chemclicks.test/forbidden");
+  });
+
+  it("returns 500 rather than 403 when the teacher lookup fails", async () => {
+    mocks.teacher.mockResolvedValue({ data: null, error: { message: "private error" } });
+    const response = await proxy(request("/admin?private=value"));
+    expect(response.status).toBe(500);
+    expect(response.headers.get("x-middleware-rewrite")).toBe("https://chemclicks.test/error");
+    expectRefreshedCookies(response);
   });
 
   it("does not look up roles outside protected routes", async () => {
     await proxy(request("/help"));
+    expect(mocks.admin).not.toHaveBeenCalled();
+    expect(mocks.teacherFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe("explicit error pages", () => {
+  it.each([
+    ["/forbidden", 403],
+    ["/auth/auth-code-error", 400],
+    ["/error", 500],
+  ] as const)("%s returns %i without role lookups", async (path, status) => {
+    mocks.user = null;
+    const response = await proxy(request(`${path}?private=value`));
+    expect(response.status).toBe(status);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-rewrite")).toBe(`https://chemclicks.test${path}`);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expectRefreshedCookies(response);
     expect(mocks.admin).not.toHaveBeenCalled();
     expect(mocks.teacherFrom).not.toHaveBeenCalled();
   });
@@ -208,14 +238,18 @@ describe("refreshed session cookies", () => {
     await expectRedirectKeepsCookies("/student", "/admin");
   });
 
-  it("survive the redirect when the student lookup fails", async () => {
+  it("survive the error response when the student lookup fails", async () => {
     mocks.student.mockResolvedValue({ data: null, error: { message: "private error" } });
-    await expectRedirectKeepsCookies("/admin", "/forbidden");
+    const response = await proxy(request("/admin"));
+    expect(response.status).toBe(500);
+    expectRefreshedCookies(response);
   });
 
-  it("survive the redirect when the user has no teacher record", async () => {
+  it("survive the forbidden response when the user has no teacher record", async () => {
     mocks.teacher.mockResolvedValue({ data: null, error: null });
-    await expectRedirectKeepsCookies("/admin", "/forbidden");
+    const response = await proxy(request("/admin"));
+    expect(response.status).toBe(403);
+    expectRefreshedCookies(response);
   });
 
   it("survive the sign-in redirect outside development", async () => {
