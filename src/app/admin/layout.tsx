@@ -2,7 +2,7 @@ import { getTeacherAccessRedirectFromClaims } from "@/lib/auth/teacher-access";
 import { getAuthClaims } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 
-export default async function TeacherGroupLayout({
+export default async function AdminLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
