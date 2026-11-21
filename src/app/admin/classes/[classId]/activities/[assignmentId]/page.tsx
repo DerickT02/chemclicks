@@ -37,6 +37,9 @@ export default async function ActivityProgressPage({ params }: Props) {
       </Link>
       <h1 className="mt-4 text-3xl font-semibold">{assignment.title}</h1>
       <p className="mt-1 text-muted-foreground">Student progress · {classroom.name}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Bars show assignment milestones, not quiz scores. Every submitted quiz result is in the attempt history.
+      </p>
 
       {classroom.assignments.length > 1 && (
         <nav aria-label="Other activities in this class" className="mt-6">

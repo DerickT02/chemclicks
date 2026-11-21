@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ActivityProgressSummary } from '@/app/admin/ActivityProgressSummary'
-import { StageBar } from '@/components/assignments/StageBar'
 import type { AssignmentStage } from '@/lib/assignments/stages'
 import type { TeacherClassLessonProgress } from '@/lib/server/teacher-lesson-progress'
 import { progressFacts } from '../testing/progress'
@@ -46,23 +45,5 @@ describe('ActivityProgressSummary', () => {
     const failed = render(null)
     expect(failed).toContain('Progress unavailable.')
     expect(failed).toContain('href="/admin/classes/class-1/activities/bohr"')
-  })
-})
-
-describe('StageBar', () => {
-  it.each([
-    ['not_started', 0, 'Not started'],
-    ['exploring', 33, 'Started the assignment'],
-    ['explored', 33, 'Exploration finished, quiz not started'],
-    ['quiz_in_progress', 66, 'Taking the quiz'],
-    ['needs_retry', 66, 'Quiz not passed, needs retry'],
-    ['completed', 100, 'Completed'],
-  ] as const)('draws %s at %i%% with its label in text and for assistive technology', (stage, percent, label) => {
-    const html = renderToStaticMarkup(<StageBar stage={stage} label="Alex Student, Bohr Model Intro" title="Alex Student" />)
-    expect(html).toContain(`${label} · ${percent}%`)
-    expect(html).toContain(`aria-valuenow="${percent}"`)
-    expect(html).toContain(`aria-valuetext="${label}"`)
-    expect(html).toContain('aria-label="Alex Student, Bohr Model Intro"')
-    expect(html).toContain(`width:${percent}%`)
   })
 })

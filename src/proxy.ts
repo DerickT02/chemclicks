@@ -34,6 +34,19 @@ function redirectWithSession(response: NextResponse, url: URL): NextResponse {
   return redirectResponse;
 }
 
+// Set the status before the App Router can stream a successful page shell.
+function errorWithSession(response: NextResponse, request: NextRequest, pathname: string, status: number): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+  const errorResponse = NextResponse.rewrite(url, { status });
+  errorResponse.headers.set("Cache-Control", "private, no-store");
+  for (const cookie of response.cookies.getAll()) {
+    errorResponse.cookies.set(cookie);
+  }
+  return errorResponse;
+}
+
 /**
  * Session refresh for Supabase (formerly `middleware.ts` in Next.js).
  * @see https://nextjs.org/docs/messages/middleware-to-proxy
@@ -48,6 +61,12 @@ export default async function proxy(request: NextRequest) {
   const { response, user, supabase } = await updateSession(request);
 
   const { pathname } = request.nextUrl;
+  const errorStatus = pathname === "/forbidden" ? 403
+    : pathname === "/error" ? 500
+    : pathname === "/auth/auth-code-error" ? 400 : null;
+  if (errorStatus !== null) {
+    return errorWithSession(response, request, pathname, errorStatus);
+  }
 
   if (isStudentRoute(pathname)) {
     // Signed-out users and lookup failures fall through to the student layout,
@@ -94,10 +113,7 @@ export default async function proxy(request: NextRequest) {
   const { data: student, error: studentError } = await findStudent(user.id);
 
   if (studentError) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/forbidden";
-    url.search = "";
-    return redirectWithSession(response, url);
+    return errorWithSession(response, request, "/error", 500);
   }
 
   if (student) {
@@ -108,16 +124,18 @@ export default async function proxy(request: NextRequest) {
   }
 
   // Check if the logged-in user has an approved teacher record
-  const { data: teacher } = await supabase
+  const { data: teacher, error: teacherError } = await supabase
     .from("teachers")
     .select("id")
     .eq("id", user.id)
     .maybeSingle();
 
+  if (teacherError) {
+    return errorWithSession(response, request, "/error", 500);
+  }
+
   if (!teacher) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/forbidden";
-    return redirectWithSession(response, url);
+    return errorWithSession(response, request, "/forbidden", 403);
   }
 
   return response;
