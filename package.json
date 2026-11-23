@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "seed:local": "node scripts/seed-local.mjs",
+    "reset:local": "npx supabase db reset && npm run seed:local",
     "lint": "eslint",
     "test": "vitest run --config vitest.config.mts",
     "test:watch": "vitest --config vitest.config.mts",
@@ -31,6 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "jsdom": "^29.1.1",
+    "supabase": "^3.2.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6",
     "vitest": "^5"

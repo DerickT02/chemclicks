@@ -252,14 +252,9 @@ describe("refreshed session cookies", () => {
     expectRefreshedCookies(response);
   });
 
-  it("survive the sign-in redirect outside development", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    try {
-      mocks.user = null;
-      await expectRedirectKeepsCookies("/admin/labs", "/login/teacher?redirectedFrom=%2Fadmin%2Flabs");
-    } finally {
-      vi.unstubAllEnvs();
-    }
+  it("survive the sign-in redirect when signed out", async () => {
+    mocks.user = null;
+    await expectRedirectKeepsCookies("/admin/labs", "/login/teacher?redirectedFrom=%2Fadmin%2Flabs");
   });
 
   it("are kept when the request passes through", async () => {

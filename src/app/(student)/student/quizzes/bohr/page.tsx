@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 import BohrModelsQuiz from "@/components/quiz/bohr/BohrModelsQuiz";
 import { getBohrQuizAccess } from "@/lib/assignments/bohr-quiz-access";
 import { assignmentPath } from "@/lib/assignments/sequence";
@@ -115,13 +116,19 @@ export default async function BohrModelQuizPage({ searchParams }: Props = {}) {
           </h1>
         </header>
 
-        <BohrModelsQuiz
-          assignmentId={access.assignment.id}
-          title={quiz.title}
-          quizKey={quiz.key}
-          questions={questionsResult.error ? [] : questionsResult.data ?? []}
-          loadError={questionsResult.error ? LOAD_ERROR_MESSAGE : null}
-        />
+        <AssignmentAccess
+          key={access.assignment.id}
+          closesAt={access.assignment.closes_at}
+          contentType="quiz"
+        >
+          <BohrModelsQuiz
+            assignmentId={access.assignment.id}
+            title={quiz.title}
+            quizKey={quiz.key}
+            questions={questionsResult.error ? [] : questionsResult.data ?? []}
+            loadError={questionsResult.error ? LOAD_ERROR_MESSAGE : null}
+          />
+        </AssignmentAccess>
       </div>
     </div>
   );

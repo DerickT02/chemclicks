@@ -153,10 +153,29 @@ describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, titl
   it("distinguishes scheduled and closed work without loading questions", async () => {
     withAssignments([{ ...lesson, opens_at: iso(HOUR) }]);
     expect((await getLewisQuizAccess(kind)).status).toBe("scheduled");
-    expect(await renderQuiz()).toContain("This quiz is not open yet.");
+    expect(await renderQuiz()).toContain("lesson is scheduled");
     withAssignments([{ ...lesson, closes_at: iso(-HOUR) }]);
     expect((await getLewisQuizAccess(kind)).status).toBe("closed");
-    expect(await renderQuiz()).toContain("This quiz is closed.");
+    expect(await renderQuiz()).toContain("no longer open");
+    expect(mocks.listQuestions).not.toHaveBeenCalled();
+  });
+
+  it("asks which assignment to use when more than one matching lesson is open", async () => {
+    withAssignments([
+      { ...lesson, id: `${kind}-a`, activity: { ...lesson.activity, title: "Period 1" } },
+      { ...lesson, id: `${kind}-b`, activity: { ...lesson.activity, title: "Period 2" } },
+    ]);
+    expect(await getLewisQuizAccess(kind)).toEqual({
+      status: "selection",
+      assignments: [
+        expect.objectContaining({ id: `${kind}-a` }),
+        expect.objectContaining({ id: `${kind}-b` }),
+      ],
+    });
+    const html = await renderQuiz();
+    expect(html).toContain("Period 1");
+    expect(html).toContain("Period 2");
+    expect(html).toContain(`assignmentId=${kind}-a`);
     expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
 
@@ -172,7 +191,7 @@ describe.each(QUIZZES)("$title unlocked by its lesson assignment", ({ kind, titl
     withAssignments([]);
     await expectSentToAssignments();
     withAssignments([{ ...lesson, closes_at: iso(-1000) }]);
-    expect(await renderQuiz()).toContain("This quiz is closed.");
+    expect(await renderQuiz()).toContain("no longer open");
     expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
 
@@ -197,7 +216,7 @@ describe("Lewis quiz assignment routing", () => {
     expect(await getLewisQuizAccess("covalent", diagram.id)).toEqual({ status: "missing" });
     expect(await getLewisQuizAccess("ionic", "other-class-assignment")).toEqual({ status: "missing" });
     const html = renderToStaticMarkup(await LewisQuizPage({ kind: "covalent", assignmentId: ionicLesson.id }));
-    expect(html).toContain("This assignment is unavailable.");
+    expect(html).toContain("missing or you no longer have access");
     expect(html).toContain('href="/student"');
     expect(mocks.listQuestions).not.toHaveBeenCalled();
   });
@@ -227,7 +246,7 @@ describe("independent Lewis quizzes", () => {
   ])("closing the $closed lesson locks only the $closed quiz", async ({ closed, open }) => {
     const lessons = { covalent: covalentLesson, ionic: ionicLesson };
     withAssignments([{ ...lessons[closed], closes_at: iso(-1000) }, lessons[open]]);
-    expect(await renderQuizFor(closed)).toContain("This quiz is closed.");
+    expect(await renderQuizFor(closed)).toContain("no longer open");
     expect(await renderQuizFor(open)).toContain("Started ");
   });
 

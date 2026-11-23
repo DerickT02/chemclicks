@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { isValidElement } from "react";
+import AssignmentAccess from "@/components/assignments/AssignmentAccess";
 
 const getAccess = vi.hoisted(() => vi.fn());
 const listQuestions = vi.hoisted(() => vi.fn());
@@ -13,6 +15,9 @@ vi.mock("@/lib/assignments/bohr-quiz-access", () => ({
 }));
 const adminClient = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
+vi.mock("@/components/assignments/AssignmentAccess", () => ({
+  default: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock("@/lib/db/quiz-questions", () => ({
   BOHR_QUIZ_KEY: "bohr_models",
   BOHR_INTRO_QUIZ_KEY: "bohr_model_intro",
@@ -112,7 +117,31 @@ describe("Bohr quiz page", () => {
   });
 
   it("keeps a recoverable quiz boundary and sanitizes thrown question-load failures", async () => {
+    listQuestions.mockResolvedValue({ data: [question], error: null });
+    const boundary = async () => {
+      const page = await BohrModelQuizPage();
+      const children: unknown[] = page.props.children.props.children;
+      const node = children.find(child => isValidElement(child) && child.type === AssignmentAccess);
+      if (!isValidElement<{ closesAt: string | null; contentType: string }>(node)) {
+        throw new Error("Missing quiz boundary");
+      }
+      return node;
+    };
+    const initial = await boundary();
+    getAccess.mockResolvedValue({
+      status: "available",
+      assignment: {
+        id: "assignment-1",
+        opens_at: null,
+        closes_at: "2030-01-01T12:00:00Z",
+        activity: { type: "bohr_model_intro", title: "Introduction" },
+      },
+    });
     listQuestions.mockRejectedValue(new Error("private query credentials"));
+    const refreshed = await boundary();
+    expect(initial.key).toBe("assignment-1");
+    expect(refreshed.key).toBe(initial.key);
+    expect(refreshed.props).toMatchObject({ closesAt: "2030-01-01T12:00:00Z", contentType: "quiz" });
     const html = renderToStaticMarkup(await BohrModelQuizPage());
     expect(html).toContain('role="alert"');
     expect(html).toContain("couldn&#x27;t load the quiz questions");

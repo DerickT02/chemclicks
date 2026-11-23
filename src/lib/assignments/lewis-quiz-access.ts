@@ -9,6 +9,7 @@ export type LewisQuizAccess =
   | { status: "unauthenticated" }
   | { status: "error"; message: string }
   | { status: "locked" }
+  | { status: "selection"; assignments: StudentAssignment[] }
   | { status: "missing" }
   | { status: "scheduled"; assignment: StudentAssignment }
   | { status: "closed"; assignment: StudentAssignment }
@@ -48,8 +49,13 @@ export async function getLewisQuizAccess(
     const assignment = lessons.find((item) => item.id === assignmentId);
     return assignment ? getSectionAccess(assignment) : { status: "missing" };
   }
+
+  // Generic entry offers open lessons first, then any scheduled or closed one.
+  // Multiple matches require the caller to present a choice, matching Bohr quizzes.
   const now = Date.now();
-  const assignment = lessons.find((item) => isAssignmentAvailable(item, now)) ?? lessons[0];
-  if (!assignment) return { status: "locked" };
-  return getSectionAccess(assignment);
+  const open = lessons.filter((item) => isAssignmentAvailable(item, now));
+  const candidates = open.length > 0 ? open : lessons;
+  if (candidates.length === 0) return { status: "locked" };
+  if (candidates.length > 1) return { status: "selection", assignments: candidates };
+  return getSectionAccess(candidates[0]);
 }
