@@ -1,5 +1,5 @@
-import { getTeacherAccessRedirectFromClaims } from "@/lib/auth/teacher-access";
-import { getAuthClaims } from "@/lib/auth/server";
+import { getTeacherAccessRedirect } from "@/lib/auth/teacher-access";
+import { getAuthUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 
 export default async function AdminLayout({
@@ -7,8 +7,9 @@ export default async function AdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { data } = await getAuthClaims();
-  const redirectPath = getTeacherAccessRedirectFromClaims(data?.claims ?? null);
+  // Standard access tokens don't carry the user's email confirmation timestamp.
+  const { data, error } = await getAuthUser();
+  const redirectPath = getTeacherAccessRedirect(error ? null : data.user);
 
   if (redirectPath) {
     redirect(redirectPath);
