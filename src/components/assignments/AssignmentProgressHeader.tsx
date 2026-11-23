@@ -1,56 +1,29 @@
 import type { ReactNode } from "react";
+import { AssignmentCompletionSteps } from "@/components/assignments/AssignmentCompletionSteps";
 import { ASSIGNMENT_STAGES, type AssignmentStage } from "@/lib/assignments/stages";
 
 type Props = {
   stage: AssignmentStage;
-  /** Names the bar for assistive technology, e.g. "Alex Kim, Bohr Model Intro". */
+  /** Names the completion steps for assistive technology, e.g. "Alex Kim, Bohr Model Intro". */
   label: string;
-  /** Shown above the status and score, e.g. the student's name. */
+  /** Shown before the status, e.g. the student's name. */
   title: ReactNode;
   quizResult: ReactNode;
 };
 
-/**
- * One student's assignment status and quiz score above a 0/33/66/100%
- * completion bar. The bar tracks milestones, never the quiz percentage.
- */
 export function AssignmentProgressHeader({ stage, label, title, quizResult }: Props) {
-  const { percent, label: stageLabel, className } = ASSIGNMENT_STAGES[stage];
+  const { label: stageLabel, className } = ASSIGNMENT_STAGES[stage];
   return (
-    <div className="space-y-3">
-      <div className="font-medium text-foreground">{title}</div>
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="font-medium text-muted-foreground">Assignment status</dt>
-          <dd className={className}>{stageLabel}</dd>
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          {title}
+          <span className={`text-sm ${className}`}>{stageLabel}</span>
         </div>
-        <div className="sm:text-right">
-          <dt className="font-medium text-muted-foreground">Quiz score</dt>
-          <dd className="text-foreground">{quizResult}</dd>
-        </div>
-      </dl>
-      <div className="pt-7">
-        <div
-          role="progressbar"
-          aria-label={`${label}, assignment completion`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          aria-valuetext={stageLabel}
-          className="relative h-2 rounded-full bg-muted"
-        >
-          <span
-            aria-hidden="true"
-            className={`absolute bottom-full mb-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground tabular-nums transition-all motion-reduce:transition-none ${
-              percent === 0 ? "translate-x-0" : percent === 100 ? "-translate-x-full" : "-translate-x-1/2"
-            }`}
-            style={{ left: `${percent}%` }}
-          >
-            {percent}%
-          </span>
-          <div className="h-full rounded-full bg-accent transition-all motion-reduce:transition-none" style={{ width: `${percent}%` }} />
-        </div>
+        <p className="text-sm text-muted-foreground">{quizResult}</p>
       </div>
+      <p className="pt-2 text-sm font-medium text-muted-foreground">Assignment completion</p>
+      <AssignmentCompletionSteps stage={stage} label={label} />
     </div>
   );
 }

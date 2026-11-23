@@ -10,17 +10,16 @@ export type AssignmentStage =
   | "needs_retry"
   | "completed";
 
-// Three steps on the bar: start the assignment, start the quiz, finish the quiz.
 export const ASSIGNMENT_STAGES: Record<
   AssignmentStage,
-  { percent: number; label: string; className: string }
+  { completedSteps: 0 | 1 | 2 | 3; label: string; className: string }
 > = {
-  not_started: { percent: 0, label: "Not started", className: "text-muted-foreground" },
-  exploring: { percent: 33, label: "Started the assignment", className: "text-foreground" },
-  explored: { percent: 33, label: "Exploration finished, quiz not started", className: "text-foreground" },
-  quiz_in_progress: { percent: 66, label: "Taking the quiz", className: "text-foreground" },
-  needs_retry: { percent: 66, label: "Quiz not passed, needs retry", className: "text-destructive" },
-  completed: { percent: 100, label: "Completed", className: "text-accent" },
+  not_started: { completedSteps: 0, label: "Not started", className: "text-muted-foreground" },
+  exploring: { completedSteps: 1, label: "Started the assignment", className: "text-foreground" },
+  explored: { completedSteps: 2, label: "Exploration finished, quiz not started", className: "text-foreground" },
+  quiz_in_progress: { completedSteps: 2, label: "Taking the quiz", className: "text-foreground" },
+  needs_retry: { completedSteps: 2, label: "Quiz not passed, needs retry", className: "text-destructive" },
+  completed: { completedSteps: 3, label: "Completed", className: "text-accent" },
 };
 
 /** Whether the student has started the quiz at least once by this stage. */

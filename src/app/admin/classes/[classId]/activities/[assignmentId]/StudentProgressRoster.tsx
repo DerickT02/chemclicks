@@ -1,5 +1,6 @@
 import type { TeacherActivityAttemptSummary } from '@/lib/server/teacher-attempts'
 
+import { AttemptHistorySummary } from '@/app/admin/classes/[classId]/activities/[assignmentId]/AttemptHistorySummary'
 import { AttemptHistoryTable } from '@/app/admin/classes/[classId]/activities/[assignmentId]/AttemptHistoryTable'
 import { LazyAttemptHistory } from '@/app/admin/classes/[classId]/activities/[assignmentId]/LazyAttemptHistory'
 import { AssignmentProgressDetails } from '@/components/assignments/AssignmentProgressDetails'
@@ -8,21 +9,34 @@ import { QuizScore } from '@/components/assignments/QuizScore'
 import LocalizedTimestamp from '@/components/datetime/LocalizedTimestamp'
 type Props = {
   summary: TeacherActivityAttemptSummary
+  searchQuery?: string
   /** The summary has no histories; read each one only when it is expanded. */
   lazyHistory?: boolean
 }
 
 /** Every enrolled student's progress on one activity, with their attempt history. */
-export function StudentProgressRoster({ summary, lazyHistory = false }: Props) {
+export function StudentProgressRoster({ summary, searchQuery = '', lazyHistory = false }: Props) {
+  const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const students = summary.students.filter(student => {
+    const name = `${student.firstName} ${student.lastName}`.toLowerCase()
+    return searchTerms.every(term => name.includes(term))
+  })
+
   return (
-    <section aria-label={`Student progress for ${summary.activityTitle}`} className="rounded-xl border border-border bg-card p-5">
-      {summary.students.length === 0 ? <p>No students enrolled in this class yet.</p> : (
-        <ul className="divide-y divide-border">
-          {summary.students.map(student => {
+    <section aria-label={`Student progress for ${summary.activityTitle}`}>
+      {summary.students.length === 0 && <p>No students enrolled in this class yet.</p>}
+      {summary.students.length > 0 && searchTerms.length > 0 && (
+        <p role="status" className="mb-3 text-sm text-muted-foreground">
+          {students.length === 0 ? 'No students match your search.' : `Showing ${students.length} of ${summary.students.length} students`}
+        </p>
+      )}
+      {students.length > 0 && (
+        <ul className="space-y-4">
+          {students.map(student => {
             const { progress } = student
             const name = `${student.firstName} ${student.lastName}`
             return (
-            <li key={student.studentId} className="py-4 first:pt-0 last:pb-0">
+            <li key={student.studentId} className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <AssignmentProgressHeader
                 stage={progress.stage}
                 label={`${name}, ${summary.activityTitle}`}
@@ -47,17 +61,14 @@ export function StudentProgressRoster({ summary, lazyHistory = false }: Props) {
                   </div>
                 )}
               </dl>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {student.attemptCount} {student.attemptCount === 1 ? 'attempt' : 'attempts'} · {student.explorationAttemptCount} exploration {student.explorationAttemptCount === 1 ? 'attempt' : 'attempts'} · {student.quizAttemptCount} quiz {student.quizAttemptCount === 1 ? 'attempt' : 'attempts'} · {student.completedCount} completed · {student.inProgressCount} in progress
-              </p>
-              {student.attemptCount === 0 ? <p className="mt-2 text-sm text-muted-foreground">
+              {student.attemptCount === 0 ? <p className="mt-1 text-sm text-muted-foreground">
                 {progress.stage === 'quiz_in_progress' ? 'Quiz started; no result submitted yet.' : 'No attempts yet.'}
               </p> : (
                 lazyHistory
                   ? <LazyAttemptHistory classId={summary.classId} assignmentId={summary.assignmentId} student={student} />
                   : (
-                    <details className="mt-3">
-                      <summary className="cursor-pointer text-sm underline">View attempt history for {student.firstName} {student.lastName}</summary>
+                    <details className="group/history mt-3">
+                      <AttemptHistorySummary firstName={student.firstName} lastName={student.lastName} attemptCount={student.attemptCount} />
                       <AttemptHistoryTable firstName={student.firstName} lastName={student.lastName} attempts={student.attempts} />
                     </details>
                   )

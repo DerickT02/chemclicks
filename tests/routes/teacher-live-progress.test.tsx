@@ -47,7 +47,7 @@ describe("event-driven teacher progress", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     fetchMock.mockResolvedValue(reply({ value: "completed" }));
     await tick(1);
-    expect(result.current).toEqual({ data: { value: "completed" }, failed: false });
+    expect(result.current).toEqual({ status: "ready", data: { value: "completed" }, failed: false });
     expect(fetchMock).toHaveBeenLastCalledWith("/progress", expect.objectContaining({ cache: "no-store", credentials: "same-origin", signal: expect.any(AbortSignal) }));
     await tick(600_000);
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -81,7 +81,7 @@ describe("event-driven teacher progress", () => {
     const { result } = renderHook(() => useLiveTeacherProgress("/progress", seed, { classId: "class" }));
     fetchMock.mockRejectedValue(new Error("offline"));
     await tick();
-    expect(result.current).toEqual({ data: seed, failed: true });
+    expect(result.current).toEqual({ status: "ready", data: seed, failed: true });
     await change({ kind: "sync" });
     await tick(599_749);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -105,7 +105,7 @@ describe("event-driven teacher progress", () => {
     fetchMock.mockResolvedValue(response);
     const { result } = renderHook(() => useLiveTeacherProgress("/progress", seed));
     await tick();
-    expect(result.current).toEqual({ data: seed, failed: true });
+    expect(result.current).toEqual({ status: "ready", data: seed, failed: true });
   });
 
   it("pauses hidden/offline reads and coalesces visibility, focus and online events", async () => {
@@ -184,6 +184,17 @@ describe("event-driven teacher progress", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("distinguishes loading from a failed first read and recovers automatically", async () => {
+    let reject!: (reason: Error) => void;
+    fetchMock.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+    const { result } = renderHook(() => useLiveTeacherProgress<{ value: string }>("/progress", null));
+    expect(result.current).toEqual({ status: "loading", data: null, failed: false });
+    await act(async () => { reject(new Error("offline")); });
+    expect(result.current).toEqual({ status: "unavailable", data: null, failed: true });
+    await tick(600_000);
+    expect(result.current).toEqual({ status: "ready", data: seed, failed: false });
+  });
+
   it("times out stalled reads and retries after backoff", async () => {
     fetchMock.mockImplementationOnce((_url: string, { signal }: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
       signal.addEventListener("abort", () => reject(new Error("aborted")));
@@ -216,12 +227,12 @@ describe("event-driven teacher progress", () => {
       initialProps: { enabled: true },
     });
     await tick(0);
-    expect(result.current).toEqual({ data: seed, failed: false });
+    expect(result.current).toEqual({ status: "ready", data: seed, failed: false });
     rerender({ enabled: false });
     fetchMock.mockRejectedValue(new Error("offline"));
     rerender({ enabled: true });
     await tick(0);
-    expect(result.current).toEqual({ data: seed, failed: true });
+    expect(result.current).toEqual({ status: "ready", data: seed, failed: true });
   });
 
   it("falls back if Realtime setup throws", async () => {
@@ -250,7 +261,70 @@ const classView = (initialProgress: TeacherClassLessonProgress | null) => (
   </LiveClassroomProvider>
 );
 
+const studentSummary: TeacherActivityAttemptSummary = {
+  classId: "class", className: "Chemistry", assignmentId: "selected", activityId: "activity", activityTitle: "Bohr Models",
+  students: [
+    {
+      studentId: "mina", firstName: "Mina", lastName: "Chen", verified: true,
+      attemptCount: 0, completedCount: 0, inProgressCount: 0, explorationAttemptCount: 0, quizAttemptCount: 0,
+      quizStartedAt: null, progress: progressFacts(), attempts: [],
+    },
+    {
+      studentId: "alex", firstName: "Alex", lastName: "Rivera", verified: true,
+      attemptCount: 0, completedCount: 0, inProgressCount: 0, explorationAttemptCount: 0, quizAttemptCount: 0,
+      quizStartedAt: null, progress: progressFacts({ stage: "completed" }), attempts: [],
+    },
+  ],
+};
+
 describe("teacher live views", () => {
+  it.each(["mina", "CHEN", "  MiNa   cHeN  ", "chen mina", "ina ch"])("searches student names without changing class totals (%s)", query => {
+    render(<LiveStudentProgress assignmentId="selected" initialSummary={studentSummary} />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search students" }), { target: { value: query } });
+    expect(screen.getByRole("heading", { name: "Mina Chen" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Alex Rivera" })).toBeNull();
+    expect(screen.getByText("Showing 1 of 2 students")).toBeTruthy();
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes no matches from an empty class and restores students when the search is cleared", () => {
+    render(<LiveStudentProgress assignmentId="selected" initialSummary={studentSummary} />);
+    const search = screen.getByRole("searchbox", { name: "Search students" });
+    fireEvent.change(search, { target: { value: "Nobody" } });
+    expect(screen.getByText("No students match your search.")).toBeTruthy();
+    expect(screen.queryByRole("list")).toBeNull();
+    expect(screen.queryByText("No students enrolled in this class yet.")).toBeNull();
+    fireEvent.change(search, { target: { value: "   " } });
+    expect(screen.getByRole("heading", { name: "Mina Chen" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Alex Rivera" })).toBeTruthy();
+    expect(screen.queryByText("No students match your search.")).toBeNull();
+  });
+
+  it("shows the enrollment empty state when searching an empty class", () => {
+    render(<LiveStudentProgress assignmentId="selected" initialSummary={{ ...studentSummary, students: [] }} />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search students" }), { target: { value: "Mina" } });
+    expect(screen.getByText("No students enrolled in this class yet.")).toBeTruthy();
+    expect(screen.queryByText("No students match your search.")).toBeNull();
+  });
+
+  it("keeps the search active and filters the latest live roster", async () => {
+    render(<LiveStudentProgress assignmentId="selected" initialSummary={studentSummary} />);
+    const search = screen.getByRole("searchbox", { name: "Search students" }) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "chen" } });
+    expect(screen.getByText("Showing 1 of 2 students")).toBeTruthy();
+    fetchMock.mockResolvedValue(reply({
+      classId: "class", revision: "1", reset: true, removedStudentIds: [], roster: null, progress: null,
+      attempts: { ...studentSummary, students: [studentSummary.students[0], { ...studentSummary.students[1], lastName: "Chen" }] },
+    }));
+    await change({ kind: "progress", assignmentId: "selected" });
+    expect(search.value).toBe("chen");
+    expect(screen.getByRole("heading", { name: "Mina Chen" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Alex Chen" })).toBeTruthy();
+    expect(screen.getByText("Showing 2 of 2 students")).toBeTruthy();
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+  });
+
   it("updates named statuses and percentages on broadcast, and displays stale-data warnings", async () => {
     render(classView(progress));
     expect(screen.getByText("1 student · 1 not started")).toBeTruthy();
@@ -285,14 +359,16 @@ describe("teacher live views", () => {
       quizStartedAt: null, progress: progressFacts({ stage: "exploring" }), attempts: [],
     };
     const summary: TeacherActivityAttemptSummary = { classId: "class", className: "Chemistry", assignmentId: "selected", activityId: "activity", activityTitle: "Bohr Models", students: [student] };
-    render(<LiveStudentProgress initialSummary={summary} />);
+    render(<LiveStudentProgress assignmentId="selected" initialSummary={summary} />);
+    expect(screen.queryByText(/Progress updates live/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Refresh progress/i })).toBeNull();
     await tick(299_000);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("table")).toBeNull();
     fetchMock.mockImplementation(async (url: string) => reply(url.includes("attempt-history") ? [{ id: "attempt", attemptNumber: 1, status: "in_progress", startedAt: "2026-09-23T12:00:00Z", completedAt: null }] : {
       classId: "class", revision: "1", reset: true, removedStudentIds: [], roster: null, progress: null, attempts: summary,
     }));
-    const details = screen.getByText("View attempt history for Mina Chen").closest("details")!;
+    const details = screen.getByText("Attempt history (1)", { exact: false }).closest("details")!;
     act(() => { details.open = true; fireEvent(details, new Event("toggle")); });
     await tick(0);
     expect(screen.getByRole("table")).toBeTruthy();
