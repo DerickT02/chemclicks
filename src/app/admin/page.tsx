@@ -201,7 +201,7 @@ export default async function AdminPage({
                 </p>
                 <div className="mt-4"><CopyClassCode key={selectedClass.id} code={selectedClass.class_code} /></div>
                 <LiveStudentRoster key={selectedClass.id} classId={selectedClass.id} />
-                <section className="mt-7 space-y-6">
+                <section id="class-activities" className="mt-7 space-y-6">
                   <h3 className="text-lg font-semibold">Class activities</h3>
 
                   <LiveProgressStatus />

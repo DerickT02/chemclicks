@@ -14,9 +14,10 @@ type DropdownProps = {
   options: readonly DropdownOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  variant?: "default" | "heading";
 };
 
-export default function Dropdown({ label, value, options, onChange, disabled = false }: DropdownProps) {
+export default function Dropdown({ label, value, options, onChange, disabled = false, variant = "default" }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -27,6 +28,8 @@ export default function Dropdown({ label, value, options, onChange, disabled = f
   const valueId = `${id}-value`;
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selectedOption = options[selectedIndex];
+  const isHeading = variant === "heading";
+  const TriggerContainer = isHeading ? "h1" : "div";
 
   useEffect(() => {
     if (!open) return;
@@ -90,33 +93,35 @@ export default function Dropdown({ label, value, options, onChange, disabled = f
   };
 
   return (
-    <div ref={rootRef} className="relative">
-      <span id={labelId} className="mb-2 block text-sm font-medium text-foreground">{label}</span>
-      <button
-        ref={triggerRef}
-        type="button"
-        role="combobox"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={open ? listId : undefined}
-        aria-activedescendant={open ? `${id}-option-${highlightedIndex}` : undefined}
-        aria-labelledby={labelId}
-        aria-describedby={valueId}
-        disabled={disabled}
-        onClick={() => open ? setOpen(false) : showOptions()}
-        onKeyDown={handleKeyDown}
-        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2.5 text-left shadow-sm transition-colors hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${open ? "border-accent ring-2 ring-accent/15" : "border-border"}`}
-      >
-        <span id={valueId} className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-foreground">{selectedOption?.label ?? "Select an option"}</span>
-          {selectedOption?.description && (
-            <span className="block truncate text-xs text-muted-foreground">{selectedOption.description}</span>
-          )}
-        </span>
-        <svg className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path d="m5 7.5 5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+    <div ref={rootRef} className={isHeading ? "relative w-full sm:w-fit sm:min-w-64 sm:max-w-full" : "relative"}>
+      <span id={labelId} className={isHeading ? "sr-only" : "mb-2 block text-sm font-medium text-foreground"}>{label}</span>
+      <TriggerContainer aria-labelledby={isHeading ? valueId : undefined}>
+        <button
+          ref={triggerRef}
+          type="button"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={open ? listId : undefined}
+          aria-activedescendant={open ? `${id}-option-${highlightedIndex}` : undefined}
+          aria-labelledby={labelId}
+          aria-describedby={valueId}
+          disabled={disabled}
+          onClick={() => open ? setOpen(false) : showOptions()}
+          onKeyDown={handleKeyDown}
+          className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2.5 text-left shadow-sm transition-colors hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${open ? "border-accent ring-2 ring-accent/15" : "border-border"}`}
+        >
+          <span id={valueId} className="min-w-0">
+            <span className={isHeading ? "block text-3xl font-semibold break-words tracking-tight" : "block truncate text-sm font-semibold text-foreground"}>{selectedOption?.label ?? "Select an option"}</span>
+            {selectedOption?.description && (
+              <span className="block truncate text-xs text-muted-foreground">{selectedOption.description}</span>
+            )}
+          </span>
+          <svg className={`${isHeading ? "h-6 w-6" : "h-4 w-4"} shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="m5 7.5 5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </TriggerContainer>
       {open && (
         <div
           id={listId}

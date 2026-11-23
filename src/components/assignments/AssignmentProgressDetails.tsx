@@ -16,22 +16,21 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
 
 // Exploration time is the saved first-exploration-start to first-quiz-start
 // interval; quiz-taking time is never added to it. Missing history reads as
-// "not recorded" rather than a guessed value.
+// "not recorded" rather than a guessed value. Rows that would only repeat the
+// stage ("Not started", "Quiz not started") are left out.
 export function AssignmentProgressDetails({ facts, className }: Props) {
+  if (facts.stage === "not_started") return null;
   const quizReached = hasReachedQuiz(facts.stage) || facts.firstQuizStartedAt !== null
     || facts.passingQuizAttemptNumber !== null || facts.failedQuizAttemptCount > 0;
 
   return (
     <dl className={className ?? "space-y-1 text-sm text-muted-foreground"}>
       <Row term="Exploration started">
-        {facts.stage === "not_started" ? "Not started"
-          : facts.explorationStartedAt ? <LocalizedTimestamp value={facts.explorationStartedAt} />
-            : "Start time not recorded"}
+        {facts.explorationStartedAt ? <LocalizedTimestamp value={facts.explorationStartedAt} /> : "Start time not recorded"}
       </Row>
-      {facts.stage !== "not_started" && (
+      {(facts.timeToFirstQuizSeconds !== null || quizReached) && (
         <Row term="Exploration to first quiz">
-          {facts.timeToFirstQuizSeconds !== null ? formatDuration(facts.timeToFirstQuizSeconds)
-            : quizReached ? "Not recorded" : "Quiz not started"}
+          {facts.timeToFirstQuizSeconds !== null ? formatDuration(facts.timeToFirstQuizSeconds) : "Not recorded"}
         </Row>
       )}
       {facts.stage === "completed" && (

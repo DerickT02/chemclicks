@@ -20,11 +20,23 @@ type Options<T> = {
 
 type Snapshot<T> = { url: string; seed: T | null; data: T | null; failed: boolean };
 
+type ProgressRead<T> =
+  | { status: "loading"; data: null; failed: false }
+  | { status: "unavailable"; data: null; failed: true }
+  | { status: "ready"; data: T; failed: boolean };
+
+function progressRead<T>(data: T | null, failed: boolean): ProgressRead<T> {
+  if (data !== null) return { status: "ready", data, failed };
+  return failed
+    ? { status: "unavailable", data: null, failed: true }
+    : { status: "loading", data: null, failed: false };
+}
+
 // Server-rendered snapshots avoid a redundant mount fetch. Broadcasts are only
 // invalidation hints; every data read still checks teacher ownership server-side.
 export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
   classId, resource = "progress", assignmentId, enabled = true, getCursor, merge,
-}: Options<T> = {}): { data: T | null; failed: boolean } {
+}: Options<T> = {}): ProgressRead<T> {
   const [snapshot, setSnapshot] = useState<Snapshot<T> | null>(null);
   const latestSnapshot = useRef<Snapshot<T> | null>(null);
 
@@ -40,7 +52,7 @@ export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
     const matching = previous?.url === url && previous.seed === initialData;
     let lastData = matching ? previous.data : initialData;
     let lastJson = JSON.stringify(lastData);
-    let lastFailed = matching ? previous.failed : initialData === null;
+    let lastFailed = matching ? previous.failed : false;
     let controller: AbortController | null = null;
     let requestTimeout: number | undefined;
     let fallback: number | undefined;
@@ -155,6 +167,6 @@ export function useLiveTeacherProgress<T>(url: string, initialData: T | null, {
     };
   }, [url, initialData, classId, resource, assignmentId, enabled, getCursor, merge]);
 
-  if (snapshot?.url === url && snapshot.seed === initialData) return { data: snapshot.data, failed: snapshot.failed };
-  return { data: initialData, failed: initialData === null };
+  if (snapshot?.url === url && snapshot.seed === initialData) return progressRead(snapshot.data, snapshot.failed);
+  return progressRead(initialData, false);
 }

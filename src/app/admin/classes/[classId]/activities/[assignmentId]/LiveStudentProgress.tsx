@@ -1,59 +1,75 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import { StudentProgressRoster } from "@/app/admin/classes/[classId]/activities/[assignmentId]/StudentProgressRoster";
-import RefreshAssignments from "@/components/assignments/RefreshAssignments";
 import { useLiveTeacherProgress } from "@/components/assignments/useLiveTeacherProgress";
-import { ASSIGNMENT_STAGES, type AssignmentStage } from "@/lib/assignments/stages";
+import LoadingIcon from "@/components/ui/LoadingIcon";
 import { classSnapshotCursor, mergeClassSnapshot, type TeacherClassSnapshot } from "@/lib/teacher-class-snapshot";
 import type { TeacherActivityAttemptSummary } from "@/lib/server/teacher-attempts";
 
-// Furthest along first, matching the bar.
-const STAGE_ORDER: AssignmentStage[] = [
-  "completed", "needs_retry", "quiz_in_progress", "explored", "exploring", "not_started",
-];
+type Props = {
+  assignmentId: string;
+  initialSummary: TeacherActivityAttemptSummary;
+};
 
 /** One activity's class progress, kept current by revision-based live reads. */
-export function LiveStudentProgress({ initialSummary }: { initialSummary: TeacherActivityAttemptSummary }) {
-  const initial = useMemo<TeacherClassSnapshot>(() => ({
+export function LiveStudentProgress({ assignmentId, initialSummary }: Props) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchId = useId();
+  const initial = useMemo<TeacherClassSnapshot | null>(() => initialSummary.assignmentId === assignmentId ? {
     classId: initialSummary.classId, revision: null, reset: true, removedStudentIds: [],
     roster: null, progress: null, attempts: initialSummary,
-  }), [initialSummary]);
-  const { data, failed } = useLiveTeacherProgress(
-    `/admin/classes/${encodeURIComponent(initialSummary.classId)}/updates?assignmentId=${encodeURIComponent(initialSummary.assignmentId)}`,
+  } : null, [assignmentId, initialSummary]);
+  const { data, failed, status } = useLiveTeacherProgress(
+    `/admin/classes/${encodeURIComponent(initialSummary.classId)}/updates?assignmentId=${encodeURIComponent(assignmentId)}`,
     initial,
-    { classId: initialSummary.classId, assignmentId: initialSummary.assignmentId,
+    { classId: initialSummary.classId, assignmentId,
       getCursor: classSnapshotCursor, merge: mergeClassSnapshot },
   );
-  const summary = data?.attempts ?? initialSummary;
+  const summary = data?.attempts;
 
-  const stages = summary.students.map(student => student.progress.stage);
-  const counts = STAGE_ORDER
-    .map(stage => ({ stage, count: stages.filter(item => item === stage).length }))
-    .filter(item => item.count > 0);
-  const completed = stages.filter(stage => stage === "completed").length;
+  const completed = summary?.students.filter(student => student.progress.stage === "completed").length;
 
   return (
     <>
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-sm text-muted-foreground" role="status">
-          {summary.students.length === 0
+          {summary && (summary.students.length === 0
             ? "No students enrolled yet."
             : <>
               <span className="font-semibold text-foreground">{completed} of {summary.students.length}</span> completed
-              {counts.filter(item => item.stage !== "completed")
-                .map(item => ` · ${item.count} ${ASSIGNMENT_STAGES[item.stage].label.toLowerCase()}`).join("")}
-            </>}
+            </>)}
         </p>
-        <RefreshAssignments label="Refresh progress" refreshOnFocus={false} />
+        <div className="w-full sm:max-w-sm">
+          <label htmlFor={searchId} className="mb-2 block text-sm font-medium text-foreground">Search students</label>
+          <input
+            id={searchId}
+            type="search"
+            value={searchQuery}
+            onChange={event => setSearchQuery(event.target.value)}
+            placeholder="Search by first or last name"
+            autoComplete="off"
+            className="min-h-12 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {failed
-          ? "Live updates interrupted. Showing last loaded progress; retrying automatically."
-          : "Progress updates live, with periodic checks while this tab is visible."}
-      </p>
-      <div className="mt-4">
-        <StudentProgressRoster summary={summary} lazyHistory />
+      {failed && summary && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Live updates interrupted. Showing last loaded progress; retrying automatically.
+        </p>
+      )}
+      <div className="mt-4" aria-busy={status === "loading"}>
+        {status === "loading" ? (
+          <div role="status" aria-label="Loading student progress" className="flex justify-center py-12">
+            <LoadingIcon className="size-16" />
+          </div>
+        ) : summary ? (
+          <StudentProgressRoster key={summary.assignmentId} summary={summary} searchQuery={searchQuery} lazyHistory />
+        ) : (
+          <p role="status" className="text-sm text-muted-foreground">
+            Student progress could not be loaded. Retrying automatically.
+          </p>
+        )}
       </div>
     </>
   );
