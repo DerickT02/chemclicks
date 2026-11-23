@@ -89,12 +89,31 @@ describe.each([
   });
 
   it.each([
-    ["scheduled", "This quiz is not open yet."],
-    ["closed", "This quiz is closed."],
+    ["scheduled", "lesson is scheduled"],
+    ["closed", "no longer open"],
   ])("explains %s access without reading quiz content", async (status, message) => {
-    getAccess.mockResolvedValue({ status, assignment: { id: "assignment-1" } });
+    getAccess.mockResolvedValue({
+      status,
+      assignment: { id: "assignment-1", activity: { title: "Lesson" } },
+    });
     const html = await render();
     expect(html).toContain(message);
+    expect(html).toContain("Back to Lesson");
+    expect(listQuestions).not.toHaveBeenCalled();
+  });
+
+  it("renders an assignment choice for ambiguous generic entry", async () => {
+    getAccess.mockResolvedValue({
+      status: "selection",
+      assignments: [
+        { id: "lesson-a", activity: { title: "Period 1" } },
+        { id: "lesson-b", activity: { title: "Period 2" } },
+      ],
+    });
+    const html = await render();
+    expect(html).toContain("Choose the");
+    expect(html).toContain("assignmentId=lesson-a");
+    expect(html).toContain("assignmentId=lesson-b");
     expect(listQuestions).not.toHaveBeenCalled();
   });
 
